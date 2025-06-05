@@ -50,7 +50,20 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function detectRuleType(input) {
-        return input.includes('*') ? 'wildcard' : 'domain';
+        if (input.includes('*')) {
+            return 'wildcard';
+        }
+        // After stripping scheme + leading www, anything containing a "/" is a
+        // path-segment rule (e.g. reddit.com/r/funny, youtube.com/@somechan).
+        // Bare hosts have no slash and fall through to the legacy domain type.
+        const stripped = input
+            .trim()
+            .replace(/^https?:\/\//, '')
+            .replace(/^www\./, '');
+        if (stripped.includes('/')) {
+            return 'path';
+        }
+        return 'domain';
     }
 
     function normalizePattern(input, type) {
@@ -59,6 +72,23 @@ document.addEventListener('DOMContentLoaded', function() {
             // case is preserved because URL paths and query strings are case
             // sensitive in general.
             return input.trim();
+        }
+        if (type === 'path') {
+            // Path rules are stored as `host/path`: lower-case host, original
+            // path case (paths can be case sensitive on origin servers). Strip
+            // scheme, leading www, and any trailing slash on the path itself.
+            const cleaned = input
+                .trim()
+                .replace(/^https?:\/\//, '')
+                .replace(/^www\./, '')
+                .replace(/\/$/, '');
+            const slash = cleaned.indexOf('/');
+            if (slash === -1) {
+                return cleaned.toLowerCase();
+            }
+            const host = cleaned.slice(0, slash).toLowerCase();
+            const path = cleaned.slice(slash + 1);
+            return `${host}/${path}`;
         }
         // Domain rules are stored bare (no scheme, no www, no trailing slash).
         return input
