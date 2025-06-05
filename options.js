@@ -53,14 +53,16 @@ document.addEventListener('DOMContentLoaded', function() {
         if (input.includes('*')) {
             return 'wildcard';
         }
-        // After stripping scheme + leading www, anything containing a "/" is a
-        // path-segment rule (e.g. reddit.com/r/funny, youtube.com/@somechan).
-        // Bare hosts have no slash and fall through to the legacy domain type.
+        // After stripping scheme + leading www, anything containing a "/" or
+        // a "?" is a path-style rule (e.g. reddit.com/r/funny,
+        // youtube.com/@somechan, example.com?v=foo). The "?" case lets users
+        // target a specific query string against the bare host. Bare hosts
+        // have neither and fall through to the legacy domain type.
         const stripped = input
             .trim()
             .replace(/^https?:\/\//, '')
             .replace(/^www\./, '');
-        if (stripped.includes('/')) {
+        if (stripped.includes('/') || stripped.includes('?')) {
             return 'path';
         }
         return 'domain';
@@ -74,21 +76,34 @@ document.addEventListener('DOMContentLoaded', function() {
             return input.trim();
         }
         if (type === 'path') {
-            // Path rules are stored as `host/path`: lower-case host, original
-            // path case (paths can be case sensitive on origin servers). Strip
-            // scheme, leading www, and any trailing slash on the path itself.
+            // Path rules are stored as `host/path` (or `host?query` for the
+            // query-only form): lower-case host, original case for everything
+            // to the right because paths and query strings can be case
+            // sensitive on origin servers. Strip scheme, leading www, and any
+            // trailing slash on the path itself (but never a trailing `?`).
             //
             // Channel-style paths like youtube.com/@somechan and
             // youtube.com/c/somechan must survive verbatim: the `@` prefix and
-            // the `/c/` segment are load-bearing for matching the right URL,
-            // so we keep the original casing for everything to the right of
-            // the host's slash boundary.
+            // the `/c/` segment are load-bearing for matching the right URL.
+            //
+            // Query-only patterns like example.com?v=foo skip the slash split
+            // and are kept as `host?query`; the matcher knows to splice them
+            // back together without injecting a stray `/`.
             const cleaned = input
                 .trim()
                 .replace(/^https?:\/\//, '')
                 .replace(/^www\./, '')
                 .replace(/\/$/, '');
             const slash = cleaned.indexOf('/');
+            const question = cleaned.indexOf('?');
+
+            // If `?` appears before any `/`, treat the whole tail as the query
+            // half of `host?query`. Otherwise fall back to the host/path split.
+            if (question !== -1 && (slash === -1 || question < slash)) {
+                const host = cleaned.slice(0, question).toLowerCase();
+                const query = cleaned.slice(question); // include the leading "?"
+                return `${host}${query}`;
+            }
             if (slash === -1) {
                 return cleaned.toLowerCase();
             }
