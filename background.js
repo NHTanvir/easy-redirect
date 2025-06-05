@@ -6,8 +6,13 @@
 const SCHEMA_VERSION = 2;
 
 // Rule.type values understood by createRedirectRules. Extended as later PRs land
-// (path, keyword, regex). Anything not in this list is rejected by validation.
-const RULE_TYPES = ['domain', 'wildcard'];
+// (keyword, regex). Anything not in this list is rejected by validation.
+//
+//   domain   - bare host like "example.com", emitted as a four-variant fan-out.
+//   wildcard - user-supplied pattern containing '*', passed through verbatim.
+//   path     - host+path like "reddit.com/r/funny" or "youtube.com/@channel";
+//              matches main_frame requests under that exact path prefix.
+const RULE_TYPES = ['domain', 'wildcard', 'path'];
 
 const DEFAULTS = {
     redirectUrl: 'https://www.google.com',
@@ -42,6 +47,34 @@ function createRule(pattern, type, opts = {}) {
         hitCount: opts.hitCount || 0,
         lastHitAt: opts.lastHitAt || null
     };
+}
+
+// Split a stored path-rule pattern into its host and tail halves. Patterns are
+// stored canonically as either `host/path` or `host?query` (no scheme, no
+// leading www, no trailing slash on the path). The returned `tail` includes
+// the leading separator (`/` or `?`) so the matcher can splice it back into a
+// urlFilter without re-deriving which form this was. Returns `{ host: '', tail:
+// '' }` for an empty pattern, and `{ host, tail: '' }` for a host-only one.
+function splitHostAndPath(pattern) {
+    if (typeof pattern !== 'string' || pattern.length === 0) {
+        return { host: '', tail: '' };
+    }
+    const slash = pattern.indexOf('/');
+    const question = pattern.indexOf('?');
+
+    // Whichever separator appears first wins; if neither appears, the whole
+    // pattern is a bare host.
+    let split = -1;
+    if (slash === -1 && question === -1) {
+        return { host: pattern, tail: '' };
+    } else if (slash === -1) {
+        split = question;
+    } else if (question === -1) {
+        split = slash;
+    } else {
+        split = Math.min(slash, question);
+    }
+    return { host: pattern.slice(0, split), tail: pattern.slice(split) };
 }
 
 // One-shot migration from the legacy `blockedWebsites: string[]` shape to the
@@ -197,7 +230,8 @@ async function updateRedirectRulesFromMessage(rules, redirectUrl) {
  *
  *     domain   : offset  0   variants 0..3 (subdomain, bare, exact, www-exact)
  *     wildcard : offset 10   variants 0     (single rule using pattern as urlFilter)
- *     <future> : offset 20+  reserved for path/keyword/regex
+ *     path     : offset 20   variants 0..1  (bare-host and www-host path match)
+ *     <future> : offset 30+  reserved for keyword/regex
  *
  * If you add a new type, claim the next free offset and document it here. If a
  * type needs more than 10 variants, widen the offset spacing — never overlap.
@@ -205,7 +239,8 @@ async function updateRedirectRulesFromMessage(rules, redirectUrl) {
 const DNR_ID_STRIDE = 100;
 const DNR_TYPE_OFFSETS = {
     domain: 0,
-    wildcard: 10
+    wildcard: 10,
+    path: 20
 };
 
 async function createRedirectRules(rules, redirectUrl) {
@@ -275,6 +310,42 @@ async function createRedirectRules(rules, redirectUrl) {
                     priority: 1,
                     action: { type: 'redirect', redirect: { url: redirectUrl } },
                     condition: { urlFilter: rule.pattern, resourceTypes: ['main_frame'] }
+                });
+            } else if (rule.type === 'path') {
+                // Path rules block a specific path or query under a host (e.g.
+                // "reddit.com/r/funny" or "example.com?v=foo"). We split the
+                // stored pattern into host and tail, then emit two DNR rules
+                // so the rule matches whether the user typed the bare host or
+                // browsed via the www subdomain:
+                //
+                //   variant 0: *://<host><tail>*    (bare host)
+                //   variant 1: *://www.<host><tail>* (www host)
+                //
+                // For path-form patterns the tail begins with `/` so the
+                // resulting filter pins the path segment; for query-form
+                // patterns the tail begins with `?` so the filter matches the
+                // query right after the host. The trailing `*` keeps deeper
+                // paths (or additional query params) under the segment matching
+                // too, so reddit.com/r/funny also redirects /r/funny/comments,
+                // and example.com?v=foo still matches example.com?v=foo&t=2.
+                const offset = baseId + DNR_TYPE_OFFSETS.path;
+                const { host, tail } = splitHostAndPath(rule.pattern);
+                if (!host) {
+                    console.warn(`Skipping malformed path rule "${rule.pattern}" (id=${rule.id}); no host segment.`);
+                    return;
+                }
+                const filterTail = tail || '/';
+                dnrRules.push({
+                    id: offset,
+                    priority: 1,
+                    action: { type: 'redirect', redirect: { url: redirectUrl } },
+                    condition: { urlFilter: `*://${host}${filterTail}*`, resourceTypes: ['main_frame'] }
+                });
+                dnrRules.push({
+                    id: offset + 1,
+                    priority: 1,
+                    action: { type: 'redirect', redirect: { url: redirectUrl } },
+                    condition: { urlFilter: `*://www.${host}${filterTail}*`, resourceTypes: ['main_frame'] }
                 });
             } else {
                 console.warn(`Skipping rule of unsupported type "${rule.type}" (id=${rule.id}); generator not yet wired.`);

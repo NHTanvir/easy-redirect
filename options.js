@@ -50,7 +50,22 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function detectRuleType(input) {
-        return input.includes('*') ? 'wildcard' : 'domain';
+        if (input.includes('*')) {
+            return 'wildcard';
+        }
+        // After stripping scheme + leading www, anything containing a "/" or
+        // a "?" is a path-style rule (e.g. reddit.com/r/funny,
+        // youtube.com/@somechan, example.com?v=foo). The "?" case lets users
+        // target a specific query string against the bare host. Bare hosts
+        // have neither and fall through to the legacy domain type.
+        const stripped = input
+            .trim()
+            .replace(/^https?:\/\//, '')
+            .replace(/^www\./, '');
+        if (stripped.includes('/') || stripped.includes('?')) {
+            return 'path';
+        }
+        return 'domain';
     }
 
     function normalizePattern(input, type) {
@@ -59,6 +74,42 @@ document.addEventListener('DOMContentLoaded', function() {
             // case is preserved because URL paths and query strings are case
             // sensitive in general.
             return input.trim();
+        }
+        if (type === 'path') {
+            // Path rules are stored as `host/path` (or `host?query` for the
+            // query-only form): lower-case host, original case for everything
+            // to the right because paths and query strings can be case
+            // sensitive on origin servers. Strip scheme, leading www, and any
+            // trailing slash on the path itself (but never a trailing `?`).
+            //
+            // Channel-style paths like youtube.com/@somechan and
+            // youtube.com/c/somechan must survive verbatim: the `@` prefix and
+            // the `/c/` segment are load-bearing for matching the right URL.
+            //
+            // Query-only patterns like example.com?v=foo skip the slash split
+            // and are kept as `host?query`; the matcher knows to splice them
+            // back together without injecting a stray `/`.
+            const cleaned = input
+                .trim()
+                .replace(/^https?:\/\//, '')
+                .replace(/^www\./, '')
+                .replace(/\/$/, '');
+            const slash = cleaned.indexOf('/');
+            const question = cleaned.indexOf('?');
+
+            // If `?` appears before any `/`, treat the whole tail as the query
+            // half of `host?query`. Otherwise fall back to the host/path split.
+            if (question !== -1 && (slash === -1 || question < slash)) {
+                const host = cleaned.slice(0, question).toLowerCase();
+                const query = cleaned.slice(question); // include the leading "?"
+                return `${host}${query}`;
+            }
+            if (slash === -1) {
+                return cleaned.toLowerCase();
+            }
+            const host = cleaned.slice(0, slash).toLowerCase();
+            const path = cleaned.slice(slash + 1);
+            return `${host}/${path}`;
         }
         // Domain rules are stored bare (no scheme, no www, no trailing slash).
         return input
@@ -121,6 +172,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // and almost certainly aren't what the user meant.
         if (/^\*+$/.test(trimmed)) {
             return 'Pattern cannot be only "*". Use something like *.example.com/*.';
+        }
+        // Reject lone-slash path patterns — "example.com/" with nothing after
+        // the slash normalises to a plain domain rule, which confuses users who
+        // expect path scoping. Tell them to omit the trailing slash.
+        if (/^https?:\/\//i.test(trimmed) === false && /^[^/*?]+\/$/.test(trimmed)) {
+            return 'Remove the trailing slash — use "example.com" to block the whole domain.';
         }
         return null;
     }
@@ -231,7 +288,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const html = rules.map(rule => {
-            const badgeClass = rule.type === 'wildcard' ? 'badge badge-wildcard' : 'badge badge-domain';
+            const badgeClass = rule.type === 'wildcard' ? 'badge badge-wildcard'
+                : rule.type === 'path' ? 'badge badge-path'
+                : 'badge badge-domain';
             const badgeLabel = (rule.type || 'domain').toUpperCase();
             return `
                 <div class="website-item" data-rule-id="${escapeHtml(rule.id)}">

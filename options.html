@@ -119,6 +119,10 @@
             background: #9c27b0;
         }
 
+        .badge-path {
+            background: #f57c00;
+        }
+
         .help-text {
             color: #666;
             font-size: 12px;
@@ -176,10 +180,14 @@
 
     <div class="section">
         <h3>Add Block Rule</h3>
-        <input type="text" id="newWebsite" placeholder="example.com or *.example.com/path*">
+        <input type="text" id="newWebsite" placeholder="example.com, reddit.com/r/funny, youtube.com/@channel, or *.example.com/path*">
         <div class="help-text">
-            Plain domains are blocked across all subdomains. Use <code>*</code> for wildcards
-            (for example <code>*.facebook.com/*</code> or <code>*search*</code>).
+            Plain domains are blocked across all subdomains. Add a path
+            (e.g. <code>reddit.com/r/funny</code>,
+            <code>youtube.com/@somechan</code>, or
+            <code>youtube.com/c/somechan</code>) to block just that section.
+            Use <code>*</code> for wildcards (e.g. <code>*.facebook.com/*</code>
+            or <code>*search*</code>).
         </div>
         <button id="addWebsite">Add Rule</button>
     </div>
