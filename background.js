@@ -246,7 +246,11 @@ chrome.runtime.onStartup.addListener(async () => {
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'updateRules') {
-        updateRedirectRulesFromMessage(request.rules || [], request.redirectUrl);
+        const opts = {
+            mode: MODES.includes(request.mode) ? request.mode : 'blocklist',
+            alwaysAllowed: Array.isArray(request.alwaysAllowed) ? request.alwaysAllowed : []
+        };
+        updateRedirectRulesFromMessage(request.rules || [], request.redirectUrl, opts);
         sendResponse({ success: true });
         return;
     }
@@ -275,10 +279,14 @@ async function handleKeywordHit(sender, request) {
 
 async function updateRedirectRules() {
     try {
-        const result = await chrome.storage.sync.get(['rules', 'redirectUrl', 'extensionEnabled']);
+        const result = await chrome.storage.sync.get([
+            'rules', 'redirectUrl', 'extensionEnabled', 'mode', 'alwaysAllowed'
+        ]);
         const rules = Array.isArray(result.rules) ? result.rules : [];
         const redirectUrl = result.redirectUrl || 'https://www.google.com';
         const isEnabled = result.extensionEnabled !== false;
+        const mode = MODES.includes(result.mode) ? result.mode : 'blocklist';
+        const alwaysAllowed = Array.isArray(result.alwaysAllowed) ? result.alwaysAllowed : [];
 
         if (!isEnabled) {
             // Clear all rules if extension is disabled
@@ -286,15 +294,15 @@ async function updateRedirectRules() {
             return;
         }
 
-        await createRedirectRules(rules, redirectUrl);
+        await createRedirectRules(rules, redirectUrl, { mode, alwaysAllowed });
     } catch (error) {
         console.error('Error updating redirect rules:', error);
     }
 }
 
-async function updateRedirectRulesFromMessage(rules, redirectUrl) {
+async function updateRedirectRulesFromMessage(rules, redirectUrl, opts) {
     try {
-        await createRedirectRules(rules, redirectUrl);
+        await createRedirectRules(rules, redirectUrl, opts || {});
     } catch (error) {
         console.error('Error updating redirect rules from message:', error);
     }
@@ -305,7 +313,8 @@ async function updateRedirectRulesFromMessage(rules, redirectUrl) {
  * ------------------
  * Each source Rule reserves a block of 100 IDs so different rule types can
  * coexist without colliding, and so future types can claim their own offset
- * without another renumber. The formula is:
+ * without another renumber. Source-rule IDs start at 100 (sourceIndex 0 -> 100)
+ * so the [1, 99] range is reserved for global allowlist-mode rules.
  *
  *     dnrId = (sourceIndex + 1) * 100 + typeOffset + variantOffset
  *
@@ -321,6 +330,16 @@ async function updateRedirectRulesFromMessage(rules, redirectUrl) {
  *
  * If you add a new type, claim the next free offset and document it here. If a
  * type needs more than 10 variants, widen the offset spacing — never overlap.
+ *
+ * Reserved global IDs (allowlist mode):
+ *
+ *     1     catch-all redirect rule (priority 1)
+ *     2..50 alwaysAllowed[] pinned allow rules (priority 3, sequential)
+ *
+ * In allowlist mode the catch-all redirect targets every URL; the per-rule
+ * allow rules emitted from rules[] keep their normal (sourceIndex+1)*100 IDs
+ * but switch action.type from 'redirect' to 'allow' and bump priority to 2 so
+ * they win against the catch-all. alwaysAllowed entries win against both.
  */
 const DNR_ID_STRIDE = 100;
 const DNR_TYPE_OFFSETS = {
@@ -329,21 +348,54 @@ const DNR_TYPE_OFFSETS = {
     path: 20,
     keyword: 30
 };
+const DNR_CATCH_ALL_ID = 1;
+const DNR_ALWAYS_ALLOWED_ID_BASE = 2;
+const DNR_ALWAYS_ALLOWED_MAX = 49; // IDs 2..50 inclusive
 
-async function createRedirectRules(rules, redirectUrl) {
+// Priority math (higher wins on DNR):
+//   1 — catch-all redirect (allowlist mode only)
+//   2 — per-Rule allow (allowlist mode)  / per-Rule redirect (blocklist mode)
+//   3 — alwaysAllowed pinned allow (both modes; always-on)
+const PRIORITY_CATCH_ALL = 1;
+const PRIORITY_RULE = 2;
+const PRIORITY_ALWAYS_ALLOWED = 3;
+
+// Build the DNR condition variants for a domain pattern (matches the prior
+// blocklist layout: subdomain, bare, exact, www-exact). Returned as an array so
+// both 'redirect' and 'allow' emitters can share the urlFilter set.
+function buildDomainConditions(website) {
+    return [
+        { urlFilter: `*://*.${website}/*`, resourceTypes: ['main_frame'] },
+        { urlFilter: `*://${website}/*`, resourceTypes: ['main_frame'] },
+        { urlFilter: `*://${website}`, resourceTypes: ['main_frame'] },
+        { urlFilter: `*://www.${website}`, resourceTypes: ['main_frame'] }
+    ];
+}
+
+async function createRedirectRules(rules, redirectUrl, opts = {}) {
     try {
         // Clear existing rules
         await clearAllRules();
 
-        if (!Array.isArray(rules) || rules.length === 0) {
-            return;
-        }
+        const mode = MODES.includes(opts.mode) ? opts.mode : 'blocklist';
+        const alwaysAllowed = Array.isArray(opts.alwaysAllowed) ? opts.alwaysAllowed : [];
 
-        // Build DNR rules per source Rule. Disabled rules are skipped here, not
-        // deleted — toggling enabled back to true must restore behaviour without
-        // touching storage. Unknown types log a warning so future contributors
-        // see they need to wire a generator + reserve an offset above.
+        // Build DNR rules. Disabled source rules are skipped here, not deleted —
+        // toggling enabled back to true must restore behaviour without touching
+        // storage. Unknown types log a warning so future contributors see they
+        // need to wire a generator + reserve an offset above.
         const dnrRules = [];
+
+        if (mode === 'allowlist') {
+            // One catch-all redirect at the lowest priority. Per-rule allow
+            // entries below override it for the user's permitted patterns.
+            dnrRules.push({
+                id: DNR_CATCH_ALL_ID,
+                priority: PRIORITY_CATCH_ALL,
+                action: { type: 'redirect', redirect: { url: redirectUrl } },
+                condition: { urlFilter: '*', resourceTypes: ['main_frame'] }
+            });
+        }
 
         rules.forEach((rule, index) => {
             if (!rule || rule.enabled === false) {
@@ -351,41 +403,24 @@ async function createRedirectRules(rules, redirectUrl) {
             }
 
             const baseId = (index + 1) * DNR_ID_STRIDE;
+            // In blocklist mode the rule redirects to the configured URL; in
+            // allowlist mode the same pattern instead becomes a higher-priority
+            // 'allow' rule that overrides the catch-all redirect.
+            const ruleAction = mode === 'allowlist'
+                ? { type: 'allow' }
+                : { type: 'redirect', redirect: { url: redirectUrl } };
 
             if (rule.type === 'domain') {
-                const website = rule.pattern;
+                const conditions = buildDomainConditions(rule.pattern);
                 const offset = baseId + DNR_TYPE_OFFSETS.domain;
 
-                // Rule for domain with www / arbitrary subdomain
-                dnrRules.push({
-                    id: offset,
-                    priority: 1,
-                    action: { type: 'redirect', redirect: { url: redirectUrl } },
-                    condition: { urlFilter: `*://*.${website}/*`, resourceTypes: ['main_frame'] }
-                });
-
-                // Rule for domain without www
-                dnrRules.push({
-                    id: offset + 1,
-                    priority: 1,
-                    action: { type: 'redirect', redirect: { url: redirectUrl } },
-                    condition: { urlFilter: `*://${website}/*`, resourceTypes: ['main_frame'] }
-                });
-
-                // Rule for exact domain match
-                dnrRules.push({
-                    id: offset + 2,
-                    priority: 1,
-                    action: { type: 'redirect', redirect: { url: redirectUrl } },
-                    condition: { urlFilter: `*://${website}`, resourceTypes: ['main_frame'] }
-                });
-
-                // Rule for www exact domain match
-                dnrRules.push({
-                    id: offset + 3,
-                    priority: 1,
-                    action: { type: 'redirect', redirect: { url: redirectUrl } },
-                    condition: { urlFilter: `*://www.${website}`, resourceTypes: ['main_frame'] }
+                conditions.forEach((condition, variantIdx) => {
+                    dnrRules.push({
+                        id: offset + variantIdx,
+                        priority: PRIORITY_RULE,
+                        action: ruleAction,
+                        condition
+                    });
                 });
             } else if (rule.type === 'wildcard') {
                 // Wildcards forward the user's pattern straight to DNR. The DNR
@@ -394,8 +429,8 @@ async function createRedirectRules(rules, redirectUrl) {
                 const offset = baseId + DNR_TYPE_OFFSETS.wildcard;
                 dnrRules.push({
                     id: offset,
-                    priority: 1,
-                    action: { type: 'redirect', redirect: { url: redirectUrl } },
+                    priority: PRIORITY_RULE,
+                    action: ruleAction,
                     condition: { urlFilter: rule.pattern, resourceTypes: ['main_frame'] }
                 });
             } else if (rule.type === 'path') {
@@ -457,6 +492,26 @@ async function createRedirectRules(rules, redirectUrl) {
             }
         });
 
+        // alwaysAllowed patterns get the highest priority so they stay reachable
+        // in either mode — especially in allowlist where they keep the options
+        // page, chrome-extension:// URLs, etc. from being caught by the catch-all.
+        const allowedPatterns = alwaysAllowed
+            .filter(p => typeof p === 'string' && p.trim().length > 0)
+            .slice(0, DNR_ALWAYS_ALLOWED_MAX);
+
+        allowedPatterns.forEach((pattern, idx) => {
+            dnrRules.push({
+                id: DNR_ALWAYS_ALLOWED_ID_BASE + idx,
+                priority: PRIORITY_ALWAYS_ALLOWED,
+                action: { type: 'allow' },
+                condition: { urlFilter: pattern.trim(), resourceTypes: ['main_frame'] }
+            });
+        });
+
+        if (dnrRules.length === 0) {
+            return;
+        }
+
         // Add rules in batches to avoid hitting limits
         const batchSize = 50;
         for (let i = 0; i < dnrRules.length; i += batchSize) {
@@ -466,7 +521,10 @@ async function createRedirectRules(rules, redirectUrl) {
             });
         }
 
-        console.log(`Created ${dnrRules.length} redirect rules for ${rules.length} source rules`);
+        console.log(
+            `Created ${dnrRules.length} DNR rules in ${mode} mode ` +
+            `(${rules.length} source rules, ${allowedPatterns.length} always-allowed)`
+        );
     } catch (error) {
         console.error('Error creating redirect rules:', error);
     }
