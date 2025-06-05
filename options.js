@@ -161,6 +161,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const mode = MODES.includes(result.mode) ? result.mode : 'blocklist';
             updateModeButtons(mode);
+            document.getElementById('rulesHeading').textContent =
+                mode === 'allowlist' ? 'Allowed Sites (Allowlist mode)' : 'Block Rules';
         } catch (error) {
             showStatus('Error loading data: ' + error.message, 'error');
         }
