@@ -17,11 +17,24 @@ const SCHEMA_VERSION = 2;
 //   keyword  - word/phrase matched in the page title or body via content script.
 const RULE_TYPES = ['domain', 'wildcard', 'path', 'keyword'];
 
+// Top-level matching mode. In 'blocklist' the rules[] array enumerates patterns
+// to redirect; in 'allowlist' the same rules[] enumerates patterns to permit
+// while everything else is redirected. Default stays 'blocklist' so existing
+// installs keep their current semantics after upgrade. Mode is persisted like
+// every other key in DEFAULTS so the local mirror tracks it via persist() and
+// restoreFromLocalIfSyncEmpty(); switching modes must never delete rules.
+const MODES = ['blocklist', 'allowlist'];
+
 const DEFAULTS = {
     redirectUrl: 'https://www.google.com',
     blockedWebsites: [],
     rules: [],
     extensionEnabled: true,
+    mode: 'blocklist',
+    // Patterns that are always allowed regardless of mode. Pinned list lives in
+    // its own array (not in rules[]) so it can survive Clear All and so the
+    // extension page itself can stay reachable when allowlist mode is on.
+    alwaysAllowed: [],
     schemaVersion: 1
 };
 
@@ -479,7 +492,7 @@ async function clearAllRules() {
 // the backup stays current even when the popup wrote only to sync.
 chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace !== 'sync') return;
-    const watched = ['rules', 'blockedWebsites', 'redirectUrl', 'extensionEnabled'];
+    const watched = ['rules', 'blockedWebsites', 'redirectUrl', 'extensionEnabled', 'mode', 'alwaysAllowed'];
     const relevant = watched.filter(k => k in changes);
     if (relevant.length === 0) return;
 
