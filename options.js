@@ -13,14 +13,14 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('addWebsite').addEventListener('click', addWebsite);
     document.getElementById('clearAll').addEventListener('click', clearAllWebsites);
     document.getElementById('toggleBtn').addEventListener('click', toggleExtension);
-    
+
     // Enter key support
     newWebsiteInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             addWebsite();
         }
     });
-    
+
     redirectUrlInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             saveRedirectUrl();
@@ -30,12 +30,12 @@ document.addEventListener('DOMContentLoaded', function() {
     async function loadData() {
         try {
             const result = await chrome.storage.sync.get(['redirectUrl', 'blockedWebsites', 'extensionEnabled']);
-            
+
             redirectUrlInput.value = result.redirectUrl || 'https://www.google.com';
-            
+
             const blockedWebsites = result.blockedWebsites || [];
             displayWebsites(blockedWebsites);
-            
+
             const isEnabled = result.extensionEnabled !== false; // Default to true
             updateToggleButton(isEnabled);
         } catch (error) {
@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function saveRedirectUrl() {
         const url = redirectUrlInput.value.trim();
-        
+
         if (!url) {
             showStatus('Please enter a redirect URL', 'error');
             return;
@@ -69,7 +69,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function addWebsite() {
         const website = newWebsiteInput.value.trim().toLowerCase();
-        
+
         if (!website) {
             showStatus('Please enter a website', 'error');
             return;
@@ -78,19 +78,19 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const result = await chrome.storage.sync.get(['blockedWebsites']);
             let blockedWebsites = result.blockedWebsites || [];
-            
+
             // Clean up the URL
             let cleanedWebsite = website.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
-            
+
             if (blockedWebsites.includes(cleanedWebsite)) {
                 showStatus('Website already in the list', 'error');
                 return;
             }
-            
+
             blockedWebsites.push(cleanedWebsite);
             await chrome.storage.sync.set({ blockedWebsites });
             await updateRedirectRules();
-            
+
             displayWebsites(blockedWebsites);
             newWebsiteInput.value = '';
             showStatus('Website added successfully!', 'success');
@@ -103,11 +103,11 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const result = await chrome.storage.sync.get(['blockedWebsites']);
             let blockedWebsites = result.blockedWebsites || [];
-            
+
             blockedWebsites = blockedWebsites.filter(site => site !== website);
             await chrome.storage.sync.set({ blockedWebsites });
             await updateRedirectRules();
-            
+
             displayWebsites(blockedWebsites);
             showStatus('Website removed successfully!', 'success');
         } catch (error) {
@@ -133,11 +133,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await chrome.storage.sync.get(['extensionEnabled']);
             const isEnabled = result.extensionEnabled !== false;
             const newState = !isEnabled;
-            
+
+            // Only flip the enabled flag — blockedWebsites and redirectUrl are
+            // intentionally preserved so the user's list survives a disable cycle.
             await chrome.storage.sync.set({ extensionEnabled: newState });
             await updateRedirectRules();
             updateToggleButton(newState);
-            
+
             showStatus(newState ? 'Extension enabled!' : 'Extension disabled!', 'success');
         } catch (error) {
             showStatus('Error toggling extension: ' + error.message, 'error');
@@ -156,7 +158,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function displayWebsites(websites) {
         if (websites.length === 0) {
-            websiteListDiv.innerHTML = '<div style="text-align: center; color: #666; font-size: 12px;">No websites blocked</div>';
+            websiteListDiv.innerHTML = '<div style="text-align: center; color: #666; font-size: 13px;">No websites blocked</div>';
             return;
         }
 
@@ -192,7 +194,7 @@ document.addEventListener('DOMContentLoaded', function() {
         statusDiv.textContent = message;
         statusDiv.className = `status ${type}`;
         statusDiv.style.display = 'block';
-        
+
         setTimeout(() => {
             statusDiv.style.display = 'none';
         }, 3000);

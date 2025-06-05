@@ -163,3 +163,10 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
         updateRedirectRules();
     }
 });
+
+// Clicking the toolbar icon opens the settings page in a new tab. We intentionally
+// do not declare `default_popup` in the manifest — without that, Chrome fires this
+// onClicked event instead of opening a popup.
+chrome.action.onClicked.addListener(() => {
+    chrome.runtime.openOptionsPage();
+});
