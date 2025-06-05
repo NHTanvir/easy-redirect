@@ -1,22 +1,104 @@
 // Background script for Website Redirector extension
 
+// Bump SCHEMA_VERSION whenever the persisted shape of `rules` changes in a way
+// that needs a one-shot migration. Code that reads from storage compares against
+// settings.schemaVersion to decide whether to migrate before reading.
+const SCHEMA_VERSION = 2;
+
+// Rule.type values understood by createRedirectRules. Extended as later PRs land
+// (path, keyword, regex). Anything not in this list is rejected by validation.
+const RULE_TYPES = ['domain', 'wildcard'];
+
 const DEFAULTS = {
     redirectUrl: 'https://www.google.com',
     blockedWebsites: [],
-    extensionEnabled: true
+    rules: [],
+    extensionEnabled: true,
+    schemaVersion: 1
 };
+
+// Stable opaque identifier for a Rule. Prefer crypto.randomUUID() (available in
+// MV3 service workers) but fall back to a timestamp+random combo for unusual
+// environments so rule creation never silently fails to assign an id.
+function generateRuleId() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+    return `r-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+// Factory for the structured Rule object that replaces the bare `blockedWebsites`
+// string. Every field has a sensible default so callers only need to supply a
+// pattern and a type; `opts` can override anything (used by the legacy migration
+// to backfill createdAt, for example).
+function createRule(pattern, type, opts = {}) {
+    return {
+        id: opts.id || generateRuleId(),
+        pattern,
+        type,
+        enabled: opts.enabled !== undefined ? opts.enabled : true,
+        groupId: opts.groupId || 'default',
+        createdAt: opts.createdAt || Date.now(),
+        hitCount: opts.hitCount || 0,
+        lastHitAt: opts.lastHitAt || null
+    };
+}
+
+// One-shot migration from the legacy `blockedWebsites: string[]` shape to the
+// structured `rules[]` array. Idempotent: returns the input untouched once
+// schemaVersion has been bumped to 2. CRITICAL: never deletes blockedWebsites —
+// it is COPIED, not moved, so we retain the legacy data as an untouchable
+// rollback path. Only an explicit user action may clear blockedWebsites.
+function migrateLegacyBlockedWebsites(settings) {
+    if (settings && typeof settings.schemaVersion === 'number' && settings.schemaVersion >= 2) {
+        return settings;
+    }
+
+    const legacy = Array.isArray(settings && settings.blockedWebsites) ? settings.blockedWebsites : [];
+    const existingRules = Array.isArray(settings && settings.rules) ? settings.rules : [];
+    const migratedRules = legacy.map(pattern => createRule(pattern, 'domain'));
+
+    return {
+        ...settings,
+        rules: existingRules.length > 0 ? existingRules : migratedRules,
+        schemaVersion: 2
+    };
+}
 
 chrome.runtime.onInstalled.addListener(async (details) => {
     console.log('Website Redirector onInstalled:', details.reason);
 
     // Order matters: restore from the local backup BEFORE filling in defaults,
     // otherwise a sync that came back empty would get DEFAULTS written over the
-    // top of perfectly good local data.
+    // top of perfectly good local data. The schema migration runs after restore
+    // (so it sees the user's real data) but before initializeMissingDefaults
+    // (so it has the chance to populate rules[] before defaults would).
     await restoreFromLocalIfSyncEmpty();
+    await runSchemaMigration();
     await initializeMissingDefaults();
 
     updateRedirectRules();
 });
+
+// Read current settings, run the legacy→structured migration, and persist the
+// result via persist() so both sync and local mirrors stay aligned. Logs a
+// dry-run summary of what will change before writing anything so the migration
+// is observable in the service-worker console.
+async function runSchemaMigration() {
+    const keys = Object.keys(DEFAULTS);
+    const current = await chrome.storage.sync.get(keys);
+
+    const next = migrateLegacyBlockedWebsites(current);
+    if (next === current) {
+        return;
+    }
+
+    const beforeRules = Array.isArray(current.rules) ? current.rules.length : 0;
+    const afterRules = Array.isArray(next.rules) ? next.rules.length : 0;
+    console.log(`Schema migration dry-run: rules ${beforeRules} -> ${afterRules}, schemaVersion -> ${next.schemaVersion}`);
+
+    await persist({ rules: next.rules, schemaVersion: next.schemaVersion });
+}
 
 async function initializeMissingDefaults() {
     const existing = await chrome.storage.sync.get(Object.keys(DEFAULTS));
@@ -63,21 +145,22 @@ async function restoreFromLocalIfSyncEmpty() {
 
 chrome.runtime.onStartup.addListener(async () => {
     await restoreFromLocalIfSyncEmpty();
+    await runSchemaMigration();
     updateRedirectRules();
 });
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'updateRules') {
-        updateRedirectRulesFromMessage(request.blockedWebsites, request.redirectUrl);
+        updateRedirectRulesFromMessage(request.rules || [], request.redirectUrl);
         sendResponse({ success: true });
     }
 });
 
 async function updateRedirectRules() {
     try {
-        const result = await chrome.storage.sync.get(['blockedWebsites', 'redirectUrl', 'extensionEnabled']);
-        const blockedWebsites = result.blockedWebsites || [];
+        const result = await chrome.storage.sync.get(['rules', 'redirectUrl', 'extensionEnabled']);
+        const rules = Array.isArray(result.rules) ? result.rules : [];
         const redirectUrl = result.redirectUrl || 'https://www.google.com';
         const isEnabled = result.extensionEnabled !== false;
 
@@ -87,103 +170,127 @@ async function updateRedirectRules() {
             return;
         }
 
-        await createRedirectRules(blockedWebsites, redirectUrl);
+        await createRedirectRules(rules, redirectUrl);
     } catch (error) {
         console.error('Error updating redirect rules:', error);
     }
 }
 
-async function updateRedirectRulesFromMessage(blockedWebsites, redirectUrl) {
+async function updateRedirectRulesFromMessage(rules, redirectUrl) {
     try {
-        await createRedirectRules(blockedWebsites, redirectUrl);
+        await createRedirectRules(rules, redirectUrl);
     } catch (error) {
         console.error('Error updating redirect rules from message:', error);
     }
 }
 
-async function createRedirectRules(blockedWebsites, redirectUrl) {
+/*
+ * DNR rule-ID layout
+ * ------------------
+ * Each source Rule reserves a block of 100 IDs so different rule types can
+ * coexist without colliding, and so future types can claim their own offset
+ * without another renumber. The formula is:
+ *
+ *     dnrId = (sourceIndex + 1) * 100 + typeOffset + variantOffset
+ *
+ * Type offsets (must stay stable — DNR persists IDs between worker restarts):
+ *
+ *     domain   : offset  0   variants 0..3 (subdomain, bare, exact, www-exact)
+ *     wildcard : offset 10   variants 0     (single rule using pattern as urlFilter)
+ *     <future> : offset 20+  reserved for path/keyword/regex
+ *
+ * If you add a new type, claim the next free offset and document it here. If a
+ * type needs more than 10 variants, widen the offset spacing — never overlap.
+ */
+const DNR_ID_STRIDE = 100;
+const DNR_TYPE_OFFSETS = {
+    domain: 0,
+    wildcard: 10
+};
+
+async function createRedirectRules(rules, redirectUrl) {
     try {
         // Clear existing rules
         await clearAllRules();
 
-        if (blockedWebsites.length === 0) {
+        if (!Array.isArray(rules) || rules.length === 0) {
             return;
         }
 
-        // Create new rules
-        const rules = [];
-        
-        blockedWebsites.forEach((website, index) => {
-            // Create rules for different URL patterns
-            const baseId = (index + 1) * 10;
-            
-            // Rule for domain with www
-            rules.push({
-                id: baseId,
-                priority: 1,
-                action: {
-                    type: 'redirect',
-                    redirect: { url: redirectUrl }
-                },
-                condition: {
-                    urlFilter: `*://*.${website}/*`,
-                    resourceTypes: ['main_frame']
-                }
-            });
+        // Build DNR rules per source Rule. Disabled rules are skipped here, not
+        // deleted — toggling enabled back to true must restore behaviour without
+        // touching storage. Unknown types log a warning so future contributors
+        // see they need to wire a generator + reserve an offset above.
+        const dnrRules = [];
 
-            // Rule for domain without www
-            rules.push({
-                id: baseId + 1,
-                priority: 1,
-                action: {
-                    type: 'redirect',
-                    redirect: { url: redirectUrl }
-                },
-                condition: {
-                    urlFilter: `*://${website}/*`,
-                    resourceTypes: ['main_frame']
-                }
-            });
+        rules.forEach((rule, index) => {
+            if (!rule || rule.enabled === false) {
+                return;
+            }
 
-            // Rule for exact domain match
-            rules.push({
-                id: baseId + 2,
-                priority: 1,
-                action: {
-                    type: 'redirect',
-                    redirect: { url: redirectUrl }
-                },
-                condition: {
-                    urlFilter: `*://${website}`,
-                    resourceTypes: ['main_frame']
-                }
-            });
+            const baseId = (index + 1) * DNR_ID_STRIDE;
 
-            // Rule for www exact domain match
-            rules.push({
-                id: baseId + 3,
-                priority: 1,
-                action: {
-                    type: 'redirect',
-                    redirect: { url: redirectUrl }
-                },
-                condition: {
-                    urlFilter: `*://www.${website}`,
-                    resourceTypes: ['main_frame']
-                }
-            });
+            if (rule.type === 'domain') {
+                const website = rule.pattern;
+                const offset = baseId + DNR_TYPE_OFFSETS.domain;
+
+                // Rule for domain with www / arbitrary subdomain
+                dnrRules.push({
+                    id: offset,
+                    priority: 1,
+                    action: { type: 'redirect', redirect: { url: redirectUrl } },
+                    condition: { urlFilter: `*://*.${website}/*`, resourceTypes: ['main_frame'] }
+                });
+
+                // Rule for domain without www
+                dnrRules.push({
+                    id: offset + 1,
+                    priority: 1,
+                    action: { type: 'redirect', redirect: { url: redirectUrl } },
+                    condition: { urlFilter: `*://${website}/*`, resourceTypes: ['main_frame'] }
+                });
+
+                // Rule for exact domain match
+                dnrRules.push({
+                    id: offset + 2,
+                    priority: 1,
+                    action: { type: 'redirect', redirect: { url: redirectUrl } },
+                    condition: { urlFilter: `*://${website}`, resourceTypes: ['main_frame'] }
+                });
+
+                // Rule for www exact domain match
+                dnrRules.push({
+                    id: offset + 3,
+                    priority: 1,
+                    action: { type: 'redirect', redirect: { url: redirectUrl } },
+                    condition: { urlFilter: `*://www.${website}`, resourceTypes: ['main_frame'] }
+                });
+            } else if (rule.type === 'wildcard') {
+                // Wildcards forward the user's pattern straight to DNR. The DNR
+                // urlFilter grammar already supports '*' so we don't need to
+                // expand variants the way domain does.
+                const offset = baseId + DNR_TYPE_OFFSETS.wildcard;
+                dnrRules.push({
+                    id: offset,
+                    priority: 1,
+                    action: { type: 'redirect', redirect: { url: redirectUrl } },
+                    condition: { urlFilter: rule.pattern, resourceTypes: ['main_frame'] }
+                });
+            } else {
+                console.warn(`Skipping rule of unsupported type "${rule.type}" (id=${rule.id}); generator not yet wired.`);
+            }
         });
 
         // Add rules in batches to avoid hitting limits
         const batchSize = 50;
-        for (let i = 0; i < rules.length; i += batchSize) {
-            const batch = rules.slice(i, i + batchSize);
+        for (let i = 0; i < dnrRules.length; i += batchSize) {
+            const batch = dnrRules.slice(i, i + batchSize);
             await chrome.declarativeNetRequest.updateDynamicRules({
                 addRules: batch
             });
         }
 
-        console.log(`Created ${rules.length} redirect rules for ${blockedWebsites.length} websites`);
+        console.log(`Created ${dnrRules.length} redirect rules for ${rules.length} source rules`);
     } catch (error) {
         console.error('Error creating redirect rules:', error);
     }
@@ -209,7 +316,7 @@ async function clearAllRules() {
 // the backup stays current even when the popup wrote only to sync.
 chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace !== 'sync') return;
-    const watched = ['blockedWebsites', 'redirectUrl', 'extensionEnabled'];
+    const watched = ['rules', 'blockedWebsites', 'redirectUrl', 'extensionEnabled'];
     const relevant = watched.filter(k => k in changes);
     if (relevant.length === 0) return;
 

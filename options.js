@@ -10,14 +10,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Event listeners
     document.getElementById('saveRedirectUrl').addEventListener('click', saveRedirectUrl);
-    document.getElementById('addWebsite').addEventListener('click', addWebsite);
+    document.getElementById('addWebsite').addEventListener('click', addRule);
     document.getElementById('clearAll').addEventListener('click', clearAllWebsites);
     document.getElementById('toggleBtn').addEventListener('click', toggleExtension);
 
     // Enter key support
     newWebsiteInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
-            addWebsite();
+            addRule();
         }
     });
 
@@ -27,14 +27,56 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // Rule helpers — kept in options.js (mirrored from background.js factory)
+    // so the page can build rule objects without round-tripping to the worker.
+    function generateRuleId() {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+            return crypto.randomUUID();
+        }
+        return `r-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    }
+
+    function createRule(pattern, type, opts = {}) {
+        return {
+            id: opts.id || generateRuleId(),
+            pattern,
+            type,
+            enabled: opts.enabled !== undefined ? opts.enabled : true,
+            groupId: opts.groupId || 'default',
+            createdAt: opts.createdAt || Date.now(),
+            hitCount: opts.hitCount || 0,
+            lastHitAt: opts.lastHitAt || null
+        };
+    }
+
+    function detectRuleType(input) {
+        return input.includes('*') ? 'wildcard' : 'domain';
+    }
+
+    function normalizePattern(input, type) {
+        if (type === 'wildcard') {
+            // Wildcards are passed through with surrounding whitespace stripped;
+            // case is preserved because URL paths and query strings are case
+            // sensitive in general.
+            return input.trim();
+        }
+        // Domain rules are stored bare (no scheme, no www, no trailing slash).
+        return input
+            .trim()
+            .toLowerCase()
+            .replace(/^https?:\/\//, '')
+            .replace(/^www\./, '')
+            .replace(/\/$/, '');
+    }
+
     async function loadData() {
         try {
-            const result = await chrome.storage.sync.get(['redirectUrl', 'blockedWebsites', 'extensionEnabled']);
+            const result = await chrome.storage.sync.get(['redirectUrl', 'rules', 'extensionEnabled']);
 
             redirectUrlInput.value = result.redirectUrl || 'https://www.google.com';
 
-            const blockedWebsites = result.blockedWebsites || [];
-            displayWebsites(blockedWebsites);
+            const rules = Array.isArray(result.rules) ? result.rules : [];
+            displayRules(rules);
 
             const isEnabled = result.extensionEnabled !== false; // Default to true
             updateToggleButton(isEnabled);
@@ -67,63 +109,80 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    async function addWebsite() {
-        const website = newWebsiteInput.value.trim().toLowerCase();
+    function validateInput(raw) {
+        if (!raw || !raw.trim()) {
+            return 'Please enter a website or pattern.';
+        }
+        if (/\s/.test(raw)) {
+            return 'Patterns cannot contain whitespace.';
+        }
+        const trimmed = raw.trim();
+        // Reject "just stars" patterns — they would block literally every URL
+        // and almost certainly aren't what the user meant.
+        if (/^\*+$/.test(trimmed)) {
+            return 'Pattern cannot be only "*". Use something like *.example.com/*.';
+        }
+        return null;
+    }
 
-        if (!website) {
-            showStatus('Please enter a website', 'error');
+    async function addRule() {
+        const raw = newWebsiteInput.value;
+        const validationError = validateInput(raw);
+        if (validationError) {
+            showStatus(validationError, 'error');
             return;
         }
 
+        const type = detectRuleType(raw);
+        const pattern = normalizePattern(raw, type);
+
         try {
-            const result = await chrome.storage.sync.get(['blockedWebsites']);
-            let blockedWebsites = result.blockedWebsites || [];
+            const result = await chrome.storage.sync.get(['rules']);
+            const rules = Array.isArray(result.rules) ? result.rules : [];
 
-            // Clean up the URL
-            let cleanedWebsite = website.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
-
-            if (blockedWebsites.includes(cleanedWebsite)) {
-                showStatus('Website already in the list', 'error');
+            if (rules.some(r => r.pattern === pattern && r.type === type)) {
+                showStatus('That rule is already in the list', 'error');
                 return;
             }
 
-            blockedWebsites.push(cleanedWebsite);
-            await chrome.storage.sync.set({ blockedWebsites });
+            const rule = createRule(pattern, type);
+            const next = [...rules, rule];
+            await chrome.storage.sync.set({ rules: next });
             await updateRedirectRules();
 
-            displayWebsites(blockedWebsites);
+            displayRules(next);
             newWebsiteInput.value = '';
-            showStatus('Website added successfully!', 'success');
+            showStatus('Rule added successfully!', 'success');
         } catch (error) {
-            showStatus('Error adding website: ' + error.message, 'error');
+            showStatus('Error adding rule: ' + error.message, 'error');
         }
     }
 
-    async function removeWebsite(website) {
+    async function removeRule(ruleId) {
         try {
-            const result = await chrome.storage.sync.get(['blockedWebsites']);
-            let blockedWebsites = result.blockedWebsites || [];
+            const result = await chrome.storage.sync.get(['rules']);
+            const rules = Array.isArray(result.rules) ? result.rules : [];
 
-            blockedWebsites = blockedWebsites.filter(site => site !== website);
-            await chrome.storage.sync.set({ blockedWebsites });
+            const next = rules.filter(r => r.id !== ruleId);
+            await chrome.storage.sync.set({ rules: next });
             await updateRedirectRules();
 
-            displayWebsites(blockedWebsites);
-            showStatus('Website removed successfully!', 'success');
+            displayRules(next);
+            showStatus('Rule removed successfully!', 'success');
         } catch (error) {
-            showStatus('Error removing website: ' + error.message, 'error');
+            showStatus('Error removing rule: ' + error.message, 'error');
         }
     }
 
     async function clearAllWebsites() {
-        if (confirm('Are you sure you want to remove all blocked websites?')) {
+        if (confirm('Are you sure you want to remove all blocked rules?')) {
             try {
-                await chrome.storage.sync.set({ blockedWebsites: [] });
+                await chrome.storage.sync.set({ rules: [] });
                 await updateRedirectRules();
-                displayWebsites([]);
-                showStatus('All websites cleared!', 'success');
+                displayRules([]);
+                showStatus('All rules cleared!', 'success');
             } catch (error) {
-                showStatus('Error clearing websites: ' + error.message, 'error');
+                showStatus('Error clearing rules: ' + error.message, 'error');
             }
         }
     }
@@ -134,7 +193,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const isEnabled = result.extensionEnabled !== false;
             const newState = !isEnabled;
 
-            // Only flip the enabled flag — blockedWebsites and redirectUrl are
+            // Only flip the enabled flag — rules and redirectUrl are
             // intentionally preserved so the user's list survives a disable cycle.
             await chrome.storage.sync.set({ extensionEnabled: newState });
             await updateRedirectRules();
@@ -156,33 +215,53 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function displayWebsites(websites) {
-        if (websites.length === 0) {
-            websiteListDiv.innerHTML = '<div style="text-align: center; color: #666; font-size: 13px;">No websites blocked</div>';
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function displayRules(rules) {
+        if (!rules || rules.length === 0) {
+            websiteListDiv.innerHTML = '<div style="text-align: center; color: #666; font-size: 13px;">No rules configured</div>';
             return;
         }
 
-        const websitesHtml = websites.map(website => `
-            <div class="website-item">
-                <span>${website}</span>
-                <button class="remove-btn" onclick="removeWebsite('${website}')">Remove</button>
-            </div>
-        `).join('');
+        const html = rules.map(rule => {
+            const badgeClass = rule.type === 'wildcard' ? 'badge badge-wildcard' : 'badge badge-domain';
+            const badgeLabel = (rule.type || 'domain').toUpperCase();
+            return `
+                <div class="website-item" data-rule-id="${escapeHtml(rule.id)}">
+                    <span class="rule-meta">
+                        <span class="${badgeClass}">${badgeLabel}</span>
+                        <span class="rule-pattern">${escapeHtml(rule.pattern)}</span>
+                    </span>
+                    <button class="remove-btn" data-rule-id="${escapeHtml(rule.id)}">Remove</button>
+                </div>
+            `;
+        }).join('');
 
-        websiteListDiv.innerHTML = websitesHtml;
+        websiteListDiv.innerHTML = html;
+
+        websiteListDiv.querySelectorAll('.remove-btn').forEach(btn => {
+            btn.addEventListener('click', () => removeRule(btn.dataset.ruleId));
+        });
     }
 
     async function updateRedirectRules() {
         try {
-            const result = await chrome.storage.sync.get(['blockedWebsites', 'redirectUrl', 'extensionEnabled']);
-            const blockedWebsites = result.blockedWebsites || [];
+            const result = await chrome.storage.sync.get(['rules', 'redirectUrl', 'extensionEnabled']);
+            const rules = Array.isArray(result.rules) ? result.rules : [];
             const redirectUrl = result.redirectUrl || 'https://www.google.com';
             const isEnabled = result.extensionEnabled !== false;
 
             // Send message to background script to update rules
             chrome.runtime.sendMessage({
                 action: 'updateRules',
-                blockedWebsites: isEnabled ? blockedWebsites : [],
+                rules: isEnabled ? rules : [],
                 redirectUrl: redirectUrl
             });
         } catch (error) {
@@ -200,6 +279,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     }
 
-    // Make removeWebsite available globally
-    window.removeWebsite = removeWebsite;
+    // Expose removeRule for any external callers / debugging.
+    window.removeRule = removeRule;
 });
