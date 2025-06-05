@@ -167,6 +167,57 @@
         .toggle-btn.disabled {
             background: #f44336;
         }
+
+        .mode-section {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .mode-section .mode-copy {
+            flex: 1;
+            min-width: 220px;
+        }
+
+        .mode-section .mode-copy .help-text {
+            margin-top: 2px;
+        }
+
+        .mode-toggle {
+            display: inline-flex;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .mode-toggle button {
+            background: #fff;
+            color: #333;
+            margin-top: 0;
+            border-radius: 0;
+            padding: 8px 14px;
+            font-size: 13px;
+            border-right: 1px solid #ddd;
+        }
+
+        .mode-toggle button:last-child {
+            border-right: none;
+        }
+
+        .mode-toggle button.active {
+            background: #2196F3;
+            color: #fff;
+        }
+
+        .mode-toggle button:hover {
+            background: #e6f0ff;
+        }
+
+        .mode-toggle button.active:hover {
+            background: #1976D2;
+        }
     </style>
 </head>
 <body>
@@ -174,6 +225,20 @@
 
     <div class="toggle-section">
         <button id="toggleBtn" class="toggle-btn">Enable Redirector</button>
+    </div>
+
+    <div class="section mode-section">
+        <div class="mode-copy">
+            <h3 style="margin: 0;">Matching mode</h3>
+            <div class="help-text">
+                <strong>Blocklist</strong> redirects the listed sites and leaves everything else alone.
+                <strong>Allowlist</strong> inverts that: every site is redirected except the ones you list.
+            </div>
+        </div>
+        <div class="mode-toggle" role="group" aria-label="Matching mode">
+            <button id="modeBlocklistBtn" data-mode="blocklist">Blocklist</button>
+            <button id="modeAllowlistBtn" data-mode="allowlist">Allowlist</button>
+        </div>
     </div>
 
     <div class="section">
