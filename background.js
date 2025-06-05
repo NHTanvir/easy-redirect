@@ -17,6 +17,33 @@ const DEFAULTS = {
     schemaVersion: 1
 };
 
+// Stable opaque identifier for a Rule. Prefer crypto.randomUUID() (available in
+// MV3 service workers) but fall back to a timestamp+random combo for unusual
+// environments so rule creation never silently fails to assign an id.
+function generateRuleId() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+    return `r-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+// Factory for the structured Rule object that replaces the bare `blockedWebsites`
+// string. Every field has a sensible default so callers only need to supply a
+// pattern and a type; `opts` can override anything (used by the legacy migration
+// to backfill createdAt, for example).
+function createRule(pattern, type, opts = {}) {
+    return {
+        id: opts.id || generateRuleId(),
+        pattern,
+        type,
+        enabled: opts.enabled !== undefined ? opts.enabled : true,
+        groupId: opts.groupId || 'default',
+        createdAt: opts.createdAt || Date.now(),
+        hitCount: opts.hitCount || 0,
+        lastHitAt: opts.lastHitAt || null
+    };
+}
+
 chrome.runtime.onInstalled.addListener(async (details) => {
     console.log('Website Redirector onInstalled:', details.reason);
 
