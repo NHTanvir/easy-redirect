@@ -1,9 +1,20 @@
 // Background script for Website Redirector extension
 
+// Bump SCHEMA_VERSION whenever the persisted shape of `rules` changes in a way
+// that needs a one-shot migration. Code that reads from storage compares against
+// settings.schemaVersion to decide whether to migrate before reading.
+const SCHEMA_VERSION = 2;
+
+// Rule.type values understood by createRedirectRules. Extended as later PRs land
+// (path, keyword, regex). Anything not in this list is rejected by validation.
+const RULE_TYPES = ['domain', 'wildcard'];
+
 const DEFAULTS = {
     redirectUrl: 'https://www.google.com',
     blockedWebsites: [],
-    extensionEnabled: true
+    rules: [],
+    extensionEnabled: true,
+    schemaVersion: 1
 };
 
 chrome.runtime.onInstalled.addListener(async (details) => {
