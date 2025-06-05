@@ -71,6 +71,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (stripped.includes('/') || stripped.includes('?')) {
             return 'path';
         }
+        // Keyword rules are prefixed with "kw:" — this lets the user block
+        // page titles / body text without the input being mistaken for a
+        // domain name. e.g. "kw:gambling" blocks any page whose title or
+        // visible body contains the word "gambling".
+        if (/^kw:/i.test(stripped)) {
+            return 'keyword';
+        }
         return 'domain';
     }
 
