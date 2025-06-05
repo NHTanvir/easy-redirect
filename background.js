@@ -152,15 +152,15 @@ chrome.runtime.onStartup.addListener(async () => {
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'updateRules') {
-        updateRedirectRulesFromMessage(request.blockedWebsites, request.redirectUrl);
+        updateRedirectRulesFromMessage(request.rules || [], request.redirectUrl);
         sendResponse({ success: true });
     }
 });
 
 async function updateRedirectRules() {
     try {
-        const result = await chrome.storage.sync.get(['blockedWebsites', 'redirectUrl', 'extensionEnabled']);
-        const blockedWebsites = result.blockedWebsites || [];
+        const result = await chrome.storage.sync.get(['rules', 'redirectUrl', 'extensionEnabled']);
+        const rules = Array.isArray(result.rules) ? result.rules : [];
         const redirectUrl = result.redirectUrl || 'https://www.google.com';
         const isEnabled = result.extensionEnabled !== false;
 
@@ -170,103 +170,91 @@ async function updateRedirectRules() {
             return;
         }
 
-        await createRedirectRules(blockedWebsites, redirectUrl);
+        await createRedirectRules(rules, redirectUrl);
     } catch (error) {
         console.error('Error updating redirect rules:', error);
     }
 }
 
-async function updateRedirectRulesFromMessage(blockedWebsites, redirectUrl) {
+async function updateRedirectRulesFromMessage(rules, redirectUrl) {
     try {
-        await createRedirectRules(blockedWebsites, redirectUrl);
+        await createRedirectRules(rules, redirectUrl);
     } catch (error) {
         console.error('Error updating redirect rules from message:', error);
     }
 }
 
-async function createRedirectRules(blockedWebsites, redirectUrl) {
+async function createRedirectRules(rules, redirectUrl) {
     try {
         // Clear existing rules
         await clearAllRules();
 
-        if (blockedWebsites.length === 0) {
+        if (!Array.isArray(rules) || rules.length === 0) {
             return;
         }
 
-        // Create new rules
-        const rules = [];
-        
-        blockedWebsites.forEach((website, index) => {
-            // Create rules for different URL patterns
+        // Build DNR rules per source Rule. Disabled rules are skipped here, not
+        // deleted — toggling enabled back to true must restore behaviour without
+        // touching storage. Non-domain types are placeholders until later commits
+        // in this PR add their generators.
+        const dnrRules = [];
+
+        rules.forEach((rule, index) => {
+            if (!rule || rule.enabled === false) {
+                return;
+            }
+
             const baseId = (index + 1) * 10;
-            
-            // Rule for domain with www
-            rules.push({
-                id: baseId,
-                priority: 1,
-                action: {
-                    type: 'redirect',
-                    redirect: { url: redirectUrl }
-                },
-                condition: {
-                    urlFilter: `*://*.${website}/*`,
-                    resourceTypes: ['main_frame']
-                }
-            });
 
-            // Rule for domain without www
-            rules.push({
-                id: baseId + 1,
-                priority: 1,
-                action: {
-                    type: 'redirect',
-                    redirect: { url: redirectUrl }
-                },
-                condition: {
-                    urlFilter: `*://${website}/*`,
-                    resourceTypes: ['main_frame']
-                }
-            });
+            if (rule.type === 'domain') {
+                const website = rule.pattern;
 
-            // Rule for exact domain match
-            rules.push({
-                id: baseId + 2,
-                priority: 1,
-                action: {
-                    type: 'redirect',
-                    redirect: { url: redirectUrl }
-                },
-                condition: {
-                    urlFilter: `*://${website}`,
-                    resourceTypes: ['main_frame']
-                }
-            });
+                // Rule for domain with www / arbitrary subdomain
+                dnrRules.push({
+                    id: baseId,
+                    priority: 1,
+                    action: { type: 'redirect', redirect: { url: redirectUrl } },
+                    condition: { urlFilter: `*://*.${website}/*`, resourceTypes: ['main_frame'] }
+                });
 
-            // Rule for www exact domain match
-            rules.push({
-                id: baseId + 3,
-                priority: 1,
-                action: {
-                    type: 'redirect',
-                    redirect: { url: redirectUrl }
-                },
-                condition: {
-                    urlFilter: `*://www.${website}`,
-                    resourceTypes: ['main_frame']
-                }
-            });
+                // Rule for domain without www
+                dnrRules.push({
+                    id: baseId + 1,
+                    priority: 1,
+                    action: { type: 'redirect', redirect: { url: redirectUrl } },
+                    condition: { urlFilter: `*://${website}/*`, resourceTypes: ['main_frame'] }
+                });
+
+                // Rule for exact domain match
+                dnrRules.push({
+                    id: baseId + 2,
+                    priority: 1,
+                    action: { type: 'redirect', redirect: { url: redirectUrl } },
+                    condition: { urlFilter: `*://${website}`, resourceTypes: ['main_frame'] }
+                });
+
+                // Rule for www exact domain match
+                dnrRules.push({
+                    id: baseId + 3,
+                    priority: 1,
+                    action: { type: 'redirect', redirect: { url: redirectUrl } },
+                    condition: { urlFilter: `*://www.${website}`, resourceTypes: ['main_frame'] }
+                });
+            } else {
+                console.warn(`Skipping rule of unsupported type "${rule.type}" (id=${rule.id}); generator not yet wired.`);
+            }
         });
 
         // Add rules in batches to avoid hitting limits
         const batchSize = 50;
-        for (let i = 0; i < rules.length; i += batchSize) {
-            const batch = rules.slice(i, i + batchSize);
+        for (let i = 0; i < dnrRules.length; i += batchSize) {
+            const batch = dnrRules.slice(i, i + batchSize);
             await chrome.declarativeNetRequest.updateDynamicRules({
                 addRules: batch
             });
         }
 
-        console.log(`Created ${rules.length} redirect rules for ${blockedWebsites.length} websites`);
+        console.log(`Created ${dnrRules.length} redirect rules for ${rules.length} source rules`);
     } catch (error) {
         console.error('Error creating redirect rules:', error);
     }
@@ -292,7 +280,7 @@ async function clearAllRules() {
 // the backup stays current even when the popup wrote only to sync.
 chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace !== 'sync') return;
-    const watched = ['blockedWebsites', 'redirectUrl', 'extensionEnabled'];
+    const watched = ['rules', 'blockedWebsites', 'redirectUrl', 'extensionEnabled'];
     const relevant = watched.filter(k => k in changes);
     if (relevant.length === 0) return;
 
