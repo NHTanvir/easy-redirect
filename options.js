@@ -124,6 +124,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const path = cleaned.slice(slash + 1);
             return `${host}/${path}`;
         }
+        if (type === 'keyword') {
+            // Strip the "kw:" prefix and normalise to lower-case. Keywords are
+            // matched case-insensitively by default (caseSensitive:false) so
+            // storing in lower-case keeps the stored form predictable.
+            return input.trim().replace(/^kw:/i, '').trim().toLowerCase();
+        }
         // Domain rules are stored bare (no scheme, no www, no trailing slash).
         return input
             .trim()
