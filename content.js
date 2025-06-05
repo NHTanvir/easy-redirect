@@ -10,8 +10,17 @@
 // suppresses the redirect when any of the rule's allowed-keyword exceptions
 // also appears in the same title/body (so a "tutorial" exception keeps a
 // "javascript" rule from firing on a JS tutorial page).
+//
+// Scans are throttled: an initial pass runs at document_idle, then a
+// MutationObserver schedules follow-up passes via requestIdleCallback (with a
+// setTimeout fallback) but no more than once every MIN_SCAN_INTERVAL_MS so a
+// chatty SPA can't pin the CPU on keyword scans.
 (function () {
     'use strict';
+
+    const MIN_SCAN_INTERVAL_MS = 1500;
+    let lastScanAt = 0;
+    let scanScheduled = false;
 
     function escapeRegExp(str) {
         return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -105,10 +114,64 @@
         }
     }
 
+    function runScanNow() {
+        scanScheduled = false;
+        lastScanAt = Date.now();
+        evaluatePage();
+    }
+
+    // Schedule a scan respecting MIN_SCAN_INTERVAL_MS. requestIdleCallback is
+    // used when available so the scan piggybacks on browser idle time, with a
+    // setTimeout fallback for environments that don't have it (older Chrome
+    // versions, some test harnesses).
+    function scheduleScan() {
+        if (scanScheduled) return;
+        scanScheduled = true;
+        const wait = Math.max(0, MIN_SCAN_INTERVAL_MS - (Date.now() - lastScanAt));
+        const fire = () => {
+            if (typeof requestIdleCallback === 'function') {
+                requestIdleCallback(runScanNow, { timeout: 500 });
+            } else {
+                setTimeout(runScanNow, 0);
+            }
+        };
+        if (wait === 0) {
+            fire();
+        } else {
+            setTimeout(fire, wait);
+        }
+    }
+
     // Initial pass once the document has parsed enough to expose a title.
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', evaluatePage, { once: true });
+        document.addEventListener('DOMContentLoaded', scheduleScan, { once: true });
     } else {
-        evaluatePage();
+        scheduleScan();
+    }
+
+    // Re-scan when the document title or major body content changes (SPAs
+    // mutate both without a full navigation). The observer is scoped to
+    // childList + characterData on the title and body so trivial style/class
+    // changes don't trigger scans.
+    function startObservers() {
+        try {
+            if (document.head) {
+                const titleObserver = new MutationObserver(scheduleScan);
+                titleObserver.observe(document.head, { subtree: true, childList: true, characterData: true });
+            }
+            if (document.body) {
+                const bodyObserver = new MutationObserver(scheduleScan);
+                bodyObserver.observe(document.body, { subtree: true, childList: true, characterData: true });
+            }
+        } catch (e) {
+            // Some pages (e.g. very early about:blank) may not yet expose
+            // head/body. The initial scan above will still have run.
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', startObservers, { once: true });
+    } else {
+        startObservers();
     }
 })();
