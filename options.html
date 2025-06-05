@@ -186,12 +186,12 @@
         <h3>Add Block Rule</h3>
         <input type="text" id="newWebsite" placeholder="example.com, reddit.com/r/funny, youtube.com/@channel, or *.example.com/path*">
         <div class="help-text">
-            Plain domains are blocked across all subdomains. Add a path
-            (e.g. <code>reddit.com/r/funny</code>,
-            <code>youtube.com/@somechan</code>, or
-            <code>youtube.com/c/somechan</code>) to block just that section.
-            Use <code>*</code> for wildcards (e.g. <code>*.facebook.com/*</code>
-            or <code>*search*</code>).
+            Plain domains block all subdomains. Add a path to block just a
+            section (e.g. <code>reddit.com/r/funny</code>,
+            <code>youtube.com/@chan</code>). Use <code>*</code> for wildcards
+            (e.g. <code>*.facebook.com/*</code>). Prefix with
+            <code>kw:</code> to block by page title/body keyword
+            (e.g. <code>kw:gambling</code>, <code>kw:news feed</code> — at least 3 chars).
         </div>
         <button id="addWebsite">Add Rule</button>
     </div>
