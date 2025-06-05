@@ -88,6 +88,43 @@
             font-size: 14px;
         }
 
+        .rule-meta {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .rule-pattern {
+            font-family: ui-monospace, Menlo, Consolas, monospace;
+            word-break: break-all;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.4px;
+            color: #fff;
+            flex-shrink: 0;
+        }
+
+        .badge-domain {
+            background: #2196F3;
+        }
+
+        .badge-wildcard {
+            background: #9c27b0;
+        }
+
+        .help-text {
+            color: #666;
+            font-size: 12px;
+            margin-top: 6px;
+        }
+
         .status {
             margin-top: 16px;
             padding: 10px;
@@ -138,15 +175,19 @@
     </div>
 
     <div class="section">
-        <h3>Add Blocked Website</h3>
-        <input type="text" id="newWebsite" placeholder="example.com or https://example.com">
-        <button id="addWebsite">Add Website</button>
+        <h3>Add Block Rule</h3>
+        <input type="text" id="newWebsite" placeholder="example.com or *.example.com/path*">
+        <div class="help-text">
+            Plain domains are blocked across all subdomains. Use <code>*</code> for wildcards
+            (for example <code>*.facebook.com/*</code> or <code>*search*</code>).
+        </div>
+        <button id="addWebsite">Add Rule</button>
     </div>
 
     <div class="section">
-        <h3>Blocked Websites</h3>
+        <h3>Block Rules</h3>
         <div id="websiteList" class="website-list">
-            <div style="text-align: center; color: #666; font-size: 13px;">No websites blocked</div>
+            <div style="text-align: center; color: #666; font-size: 13px;">No rules configured</div>
         </div>
         <button id="clearAll" style="background: #ff9800; margin-top: 10px;">Clear All</button>
     </div>
