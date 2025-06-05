@@ -199,8 +199,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'updateRules') {
         updateRedirectRulesFromMessage(request.rules || [], request.redirectUrl);
         sendResponse({ success: true });
+        return;
+    }
+    if (request.action === 'keywordHit') {
+        // The content script found a keyword in the page title/body. DNR can't
+        // match those so we drive the redirect from here. We re-read storage
+        // so the redirect URL reflects the very latest value, not whatever
+        // shape the page was loaded with.
+        handleKeywordHit(sender, request)
+            .then(() => sendResponse({ success: true }))
+            .catch(err => {
+                console.error('keywordHit handler error:', err);
+                sendResponse({ success: false, error: String(err && err.message || err) });
+            });
+        return true; // keep the message channel open for the async response
     }
 });
+
+async function handleKeywordHit(sender, request) {
+    if (!sender || !sender.tab || typeof sender.tab.id !== 'number') return;
+    const settings = await chrome.storage.sync.get(['redirectUrl', 'extensionEnabled']);
+    if (settings.extensionEnabled === false) return;
+    const target = settings.redirectUrl || 'https://www.google.com';
+    await chrome.tabs.update(sender.tab.id, { url: target });
+}
 
 async function updateRedirectRules() {
     try {
