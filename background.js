@@ -49,6 +49,22 @@ function createRule(pattern, type, opts = {}) {
     };
 }
 
+// Split a stored path-rule pattern into its host and path halves. Patterns are
+// stored canonically as `host/path` (no scheme, no leading www, no leading
+// slash on the path). This helper is shared by the matcher so the splitting
+// rule stays in one place. Returns `{ host: '', path: '' }` for an empty
+// pattern, and `{ host, path: '' }` for a host-only pattern.
+function splitHostAndPath(pattern) {
+    if (typeof pattern !== 'string' || pattern.length === 0) {
+        return { host: '', path: '' };
+    }
+    const slash = pattern.indexOf('/');
+    if (slash === -1) {
+        return { host: pattern, path: '' };
+    }
+    return { host: pattern.slice(0, slash), path: pattern.slice(slash + 1) };
+}
+
 // One-shot migration from the legacy `blockedWebsites: string[]` shape to the
 // structured `rules[]` array. Idempotent: returns the input untouched once
 // schemaVersion has been bumped to 2. CRITICAL: never deletes blockedWebsites —
@@ -285,16 +301,35 @@ async function createRedirectRules(rules, redirectUrl) {
                 });
             } else if (rule.type === 'path') {
                 // Path rules block a specific path under a host (e.g.
-                // "reddit.com/r/funny"). The user's pattern is stored as
-                // host/path verbatim; we wrap it in a urlFilter that matches
-                // any scheme. A trailing `*` keeps deeper paths under the
-                // segment matching too (so /r/funny matches /r/funny/comments/...).
+                // "reddit.com/r/funny"). We split the stored pattern into host
+                // and path, then emit two DNR rules so the path matches whether
+                // the user typed the bare host or browsed via the www subdomain:
+                //
+                //   variant 0: *://<host>/<path>*   (bare host)
+                //   variant 1: *://www.<host>/<path>* (www host)
+                //
+                // The trailing `*` lets deeper paths under the segment match
+                // too — so reddit.com/r/funny also redirects /r/funny/comments
+                // /r/funny/top, etc. The DNR urlFilter grammar treats `/` as a
+                // literal, which is exactly what we want for path pinning.
                 const offset = baseId + DNR_TYPE_OFFSETS.path;
+                const { host, path } = splitHostAndPath(rule.pattern);
+                if (!host) {
+                    console.warn(`Skipping malformed path rule "${rule.pattern}" (id=${rule.id}); no host segment.`);
+                    return;
+                }
+                const filterPath = path ? `/${path}` : '/';
                 dnrRules.push({
                     id: offset,
                     priority: 1,
                     action: { type: 'redirect', redirect: { url: redirectUrl } },
-                    condition: { urlFilter: `*://${rule.pattern}*`, resourceTypes: ['main_frame'] }
+                    condition: { urlFilter: `*://${host}${filterPath}*`, resourceTypes: ['main_frame'] }
+                });
+                dnrRules.push({
+                    id: offset + 1,
+                    priority: 1,
+                    action: { type: 'redirect', redirect: { url: redirectUrl } },
+                    condition: { urlFilter: `*://www.${host}${filterPath}*`, resourceTypes: ['main_frame'] }
                 });
             } else {
                 console.warn(`Skipping rule of unsupported type "${rule.type}" (id=${rule.id}); generator not yet wired.`);
