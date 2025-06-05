@@ -243,7 +243,10 @@ async function updateRedirectRulesFromMessage(rules, redirectUrl) {
  *     domain   : offset  0   variants 0..3 (subdomain, bare, exact, www-exact)
  *     wildcard : offset 10   variants 0     (single rule using pattern as urlFilter)
  *     path     : offset 20   variants 0..1  (bare-host and www-host path match)
- *     <future> : offset 30+  reserved for keyword/regex
+ *     keyword  : offset 30   variants 0     (urlFilter is *<keyword>* — title
+ *                                            and body matches are handled by
+ *                                            content.js, not DNR)
+ *     <future> : offset 40+  reserved for regex et al.
  *
  * If you add a new type, claim the next free offset and document it here. If a
  * type needs more than 10 variants, widen the offset spacing — never overlap.
@@ -252,7 +255,8 @@ const DNR_ID_STRIDE = 100;
 const DNR_TYPE_OFFSETS = {
     domain: 0,
     wildcard: 10,
-    path: 20
+    path: 20,
+    keyword: 30
 };
 
 async function createRedirectRules(rules, redirectUrl) {
@@ -358,6 +362,24 @@ async function createRedirectRules(rules, redirectUrl) {
                     priority: 1,
                     action: { type: 'redirect', redirect: { url: redirectUrl } },
                     condition: { urlFilter: `*://www.${host}${filterTail}*`, resourceTypes: ['main_frame'] }
+                });
+            } else if (rule.type === 'keyword') {
+                // Keyword rules cover two cases: the keyword appears in the
+                // URL (handled here by DNR with a *keyword* substring filter)
+                // and the keyword appears in the page <title> or visible body
+                // text (handled by content.js, which posts a message to this
+                // worker that navigates the tab to redirectUrl). DNR alone
+                // cannot inspect the rendered DOM so both paths are needed.
+                const keyword = (rule.pattern || '').trim();
+                if (!keyword) {
+                    return;
+                }
+                const offset = baseId + DNR_TYPE_OFFSETS.keyword;
+                dnrRules.push({
+                    id: offset,
+                    priority: 1,
+                    action: { type: 'redirect', redirect: { url: redirectUrl } },
+                    condition: { urlFilter: `*${keyword}*`, resourceTypes: ['main_frame'] }
                 });
             } else {
                 console.warn(`Skipping rule of unsupported type "${rule.type}" (id=${rule.id}); generator not yet wired.`);
