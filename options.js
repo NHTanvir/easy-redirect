@@ -77,6 +77,12 @@ document.addEventListener('DOMContentLoaded', function() {
             // Path rules are stored as `host/path`: lower-case host, original
             // path case (paths can be case sensitive on origin servers). Strip
             // scheme, leading www, and any trailing slash on the path itself.
+            //
+            // Channel-style paths like youtube.com/@somechan and
+            // youtube.com/c/somechan must survive verbatim: the `@` prefix and
+            // the `/c/` segment are load-bearing for matching the right URL,
+            // so we keep the original casing for everything to the right of
+            // the host's slash boundary.
             const cleaned = input
                 .trim()
                 .replace(/^https?:\/\//, '')
