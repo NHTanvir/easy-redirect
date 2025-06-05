@@ -9,9 +9,10 @@ const DEFAULTS = {
 chrome.runtime.onInstalled.addListener(async (details) => {
     console.log('Website Redirector onInstalled:', details.reason);
 
-    // Never overwrite existing user data. Only fill in keys that are
-    // genuinely missing — this is what protects against extension/Chrome
-    // updates wiping blockedWebsites back to [].
+    // Order matters: restore from the local backup BEFORE filling in defaults,
+    // otherwise a sync that came back empty would get DEFAULTS written over the
+    // top of perfectly good local data.
+    await restoreFromLocalIfSyncEmpty();
     await initializeMissingDefaults();
 
     updateRedirectRules();
@@ -26,12 +27,42 @@ async function initializeMissingDefaults() {
         }
     }
     if (Object.keys(toSet).length > 0) {
-        await chrome.storage.sync.set(toSet);
+        await persist(toSet);
         console.log('Initialized missing storage defaults:', Object.keys(toSet));
     }
 }
 
-chrome.runtime.onStartup.addListener(() => {
+// Mirror writes to chrome.storage.local so we always have a per-device backup
+// that survives sync quota errors, sync conflicts, and Chrome sign-out.
+async function persist(data) {
+    await Promise.all([
+        chrome.storage.sync.set(data),
+        chrome.storage.local.set(data)
+    ]);
+}
+
+// On every service-worker startup, if sync lost data that local still has,
+// copy local back into sync. This is the recovery path after a sync hiccup.
+async function restoreFromLocalIfSyncEmpty() {
+    const keys = Object.keys(DEFAULTS);
+    const [sync, local] = await Promise.all([
+        chrome.storage.sync.get(keys),
+        chrome.storage.local.get(keys)
+    ]);
+    const restore = {};
+    for (const key of keys) {
+        if (sync[key] === undefined && local[key] !== undefined) {
+            restore[key] = local[key];
+        }
+    }
+    if (Object.keys(restore).length > 0) {
+        await chrome.storage.sync.set(restore);
+        console.log('Restored from local backup:', Object.keys(restore));
+    }
+}
+
+chrome.runtime.onStartup.addListener(async () => {
+    await restoreFromLocalIfSyncEmpty();
     updateRedirectRules();
 });
 
@@ -174,11 +205,25 @@ async function clearAllRules() {
     }
 }
 
-// Update rules when storage changes
+// Update rules when storage changes. We also mirror sync writes into local so
+// the backup stays current even when the popup wrote only to sync.
 chrome.storage.onChanged.addListener((changes, namespace) => {
-    if (namespace === 'sync' && (changes.blockedWebsites || changes.redirectUrl || changes.extensionEnabled)) {
-        updateRedirectRules();
+    if (namespace !== 'sync') return;
+    const watched = ['blockedWebsites', 'redirectUrl', 'extensionEnabled'];
+    const relevant = watched.filter(k => k in changes);
+    if (relevant.length === 0) return;
+
+    const mirror = {};
+    for (const k of relevant) {
+        if (changes[k].newValue !== undefined) {
+            mirror[k] = changes[k].newValue;
+        }
     }
+    if (Object.keys(mirror).length > 0) {
+        chrome.storage.local.set(mirror);
+    }
+
+    updateRedirectRules();
 });
 
 // Clicking the toolbar icon opens the settings page in a new tab. We intentionally
