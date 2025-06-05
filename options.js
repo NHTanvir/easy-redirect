@@ -310,7 +310,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function clearAllWebsites() {
-        if (confirm('Are you sure you want to remove all blocked rules?')) {
+        const result = await chrome.storage.sync.get(['mode']);
+        const mode = MODES.includes(result.mode) ? result.mode : 'blocklist';
+        const label = mode === 'allowlist' ? 'allowed sites' : 'block rules';
+        if (confirm(`Are you sure you want to remove all ${label}?`)) {
             try {
                 await chrome.storage.sync.set({ rules: [] });
                 await updateRedirectRules();
