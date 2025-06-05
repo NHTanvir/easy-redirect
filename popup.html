@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {
+            width: 350px;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            margin: 0;
+        }
+        
+        h1 {
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #f9f9f9;
+        }
+        
+        .section h3 {
+            margin-top: 0;
+            color: #555;
+            font-size: 14px;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 12px;
+            box-sizing: border-box;
+        }
+        
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        
+        button:hover {
+            background: #45a049;
+        }
+        
+        .remove-btn {
+            background: #f44336;
+            padding: 4px 8px;
+            font-size: 10px;
+            margin-left: 10px;
+        }
+        
+        .remove-btn:hover {
+            background: #da190b;
+        }
+        
+        .website-list {
+            max-height: 150px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        
+        .website-item {
+            background: white;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 3px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+        }
+        
+        .status {
+            margin-top: 10px;
+            padding: 8px;
+            border-radius: 3px;
+            text-align: center;
+            font-size: 12px;
+        }
+        
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .toggle-section {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .toggle-btn {
+            background: #2196F3;
+            padding: 10px 20px;
+            font-size: 14px;
+        }
+        
+        .toggle-btn.disabled {
+            background: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚫 Website Redirector</h1>
+    
+    <div class="toggle-section">
+        <button id="toggleBtn" class="toggle-btn">Enable Redirector</button>
+    </div>
+    
+    <div class="section">
+        <h3>🎯 Redirect URL</h3>
+        <input type="text" id="redirectUrl" placeholder="https://example.com/blocked-page">
+        <button id="saveRedirectUrl">Save Redirect URL</button>
+    </div>
+    
+    <div class="section">
+        <h3>🚷 Add Blocked Website</h3>
+        <input type="text" id="newWebsite" placeholder="example.com or https://example.com">
+        <button id="addWebsite">Add Website</button>
+    </div>
+    
+    <div class="section">
+        <h3>📋 Blocked Websites</h3>
+        <div id="websiteList" class="website-list">
+            <div style="text-align: center; color: #666; font-size: 12px;">No websites blocked</div>
+        </div>
+        <button id="clearAll" style="background: #ff9800; margin-top: 10px;">Clear All</button>
+    </div>
+    
+    <div id="status" class="status" style="display: none;"></div>
+    
+    <script src="popup.js"></script>
+</body>
+</html>

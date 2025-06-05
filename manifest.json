@@ -17,19 +17,5 @@
   "action": {
     "default_popup": "popup.html",
     "default_title": "Easy Redirect"
-  },
-  "declarative_net_request": {
-    "rule_resources": [
-      {
-        "id": "redirect_rules",
-        "enabled": true,
-        "path": "rules.json"
-      }
-    ]
-  },
-  "icons": {
-    "16": "icon16.png",
-    "48": "icon48.png",
-    "128": "icon128.png"
   }
 }
