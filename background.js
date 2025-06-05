@@ -122,8 +122,43 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     await runSchemaMigration();
     await initializeMissingDefaults();
 
+    await ensureKeywordContentScriptRegistered();
     updateRedirectRules();
 });
+
+// Content script registration is dynamic instead of declared in manifest.json
+// because we want a single source of truth for the script ID (so we can
+// unregister cleanly on update) and because keyword matching is opt-in
+// behaviour — if the user has no keyword rules we could skip injection
+// entirely. For now we keep it always-registered; the script itself early-
+// exits when there are no keyword rules, which is cheap.
+const KEYWORD_CONTENT_SCRIPT_ID = 'easy-redirect-keyword-content';
+
+async function ensureKeywordContentScriptRegistered() {
+    if (!chrome.scripting || typeof chrome.scripting.getRegisteredContentScripts !== 'function') {
+        return;
+    }
+    try {
+        const existing = await chrome.scripting.getRegisteredContentScripts({
+            ids: [KEYWORD_CONTENT_SCRIPT_ID]
+        });
+        if (Array.isArray(existing) && existing.length > 0) {
+            return; // already registered from a previous startup
+        }
+        await chrome.scripting.registerContentScripts([
+            {
+                id: KEYWORD_CONTENT_SCRIPT_ID,
+                js: ['content.js'],
+                matches: ['<all_urls>'],
+                runAt: 'document_idle',
+                allFrames: false,
+                persistAcrossSessions: true
+            }
+        ]);
+    } catch (err) {
+        console.error('Failed to register keyword content script:', err);
+    }
+}
 
 // Read current settings, run the legacy→structured migration, and persist the
 // result via persist() so both sync and local mirrors stay aligned. Logs a
@@ -191,6 +226,7 @@ async function restoreFromLocalIfSyncEmpty() {
 chrome.runtime.onStartup.addListener(async () => {
     await restoreFromLocalIfSyncEmpty();
     await runSchemaMigration();
+    await ensureKeywordContentScriptRegistered();
     updateRedirectRules();
 });
 
