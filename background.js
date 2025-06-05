@@ -6,13 +6,16 @@
 const SCHEMA_VERSION = 2;
 
 // Rule.type values understood by createRedirectRules. Extended as later PRs land
-// (keyword, regex). Anything not in this list is rejected by validation.
+// (regex). 'keyword' rules match either a URL substring (DNR-driven) or
+// the page <title>/body (content-script-driven — DNR alone can't see titles).
+// Anything not in this list is rejected by validation.
 //
 //   domain   - bare host like "example.com", emitted as a four-variant fan-out.
 //   wildcard - user-supplied pattern containing '*', passed through verbatim.
 //   path     - host+path like "reddit.com/r/funny" or "youtube.com/@channel";
 //              matches main_frame requests under that exact path prefix.
-const RULE_TYPES = ['domain', 'wildcard', 'path'];
+//   keyword  - word/phrase matched in the page title or body via content script.
+const RULE_TYPES = ['domain', 'wildcard', 'path', 'keyword'];
 
 const DEFAULTS = {
     redirectUrl: 'https://www.google.com',
@@ -37,7 +40,7 @@ function generateRuleId() {
 // pattern and a type; `opts` can override anything (used by the legacy migration
 // to backfill createdAt, for example).
 function createRule(pattern, type, opts = {}) {
-    return {
+    const rule = {
         id: opts.id || generateRuleId(),
         pattern,
         type,
@@ -47,6 +50,15 @@ function createRule(pattern, type, opts = {}) {
         hitCount: opts.hitCount || 0,
         lastHitAt: opts.lastHitAt || null
     };
+    // Keyword rules carry optional matching toggles (case-sensitive, whole-word)
+    // and an exceptions list. They default to false/[] so the schema is stable
+    // across rule types — non-keyword rules ignore these fields entirely.
+    if (type === 'keyword') {
+        rule.caseSensitive = opts.caseSensitive === true;
+        rule.wholeWord = opts.wholeWord === true;
+        rule.exceptions = Array.isArray(opts.exceptions) ? opts.exceptions.slice() : [];
+    }
+    return rule;
 }
 
 // Split a stored path-rule pattern into its host and tail halves. Patterns are

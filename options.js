@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function createRule(pattern, type, opts = {}) {
-        return {
+        const rule = {
             id: opts.id || generateRuleId(),
             pattern,
             type,
@@ -47,6 +47,12 @@ document.addEventListener('DOMContentLoaded', function() {
             hitCount: opts.hitCount || 0,
             lastHitAt: opts.lastHitAt || null
         };
+        if (type === 'keyword') {
+            rule.caseSensitive = opts.caseSensitive === true;
+            rule.wholeWord = opts.wholeWord === true;
+            rule.exceptions = Array.isArray(opts.exceptions) ? opts.exceptions.slice() : [];
+        }
+        return rule;
     }
 
     function detectRuleType(input) {
