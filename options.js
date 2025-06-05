@@ -198,6 +198,8 @@ document.addEventListener('DOMContentLoaded', function() {
             await chrome.storage.sync.set({ mode: targetMode });
             await updateRedirectRules();
             updateModeButtons(targetMode);
+            document.getElementById('rulesHeading').textContent =
+                targetMode === 'allowlist' ? 'Allowed Sites (Allowlist mode)' : 'Block Rules';
             showStatus(`Switched to ${targetMode} mode.`, 'success');
         } catch (error) {
             showStatus('Error switching mode: ' + error.message, 'error');
