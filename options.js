@@ -173,6 +173,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (/^\*+$/.test(trimmed)) {
             return 'Pattern cannot be only "*". Use something like *.example.com/*.';
         }
+        // Reject lone-slash path patterns — "example.com/" with nothing after
+        // the slash normalises to a plain domain rule, which confuses users who
+        // expect path scoping. Tell them to omit the trailing slash.
+        if (/^https?:\/\//i.test(trimmed) === false && /^[^/*?]+\/$/.test(trimmed)) {
+            return 'Remove the trailing slash — use "example.com" to block the whole domain.';
+        }
         return null;
     }
 
