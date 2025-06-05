@@ -282,7 +282,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const html = rules.map(rule => {
-            const badgeClass = rule.type === 'wildcard' ? 'badge badge-wildcard' : 'badge badge-domain';
+            const badgeClass = rule.type === 'wildcard' ? 'badge badge-wildcard'
+                : rule.type === 'path' ? 'badge badge-path'
+                : 'badge badge-domain';
             const badgeLabel = (rule.type || 'domain').toUpperCase();
             return `
                 <div class="website-item" data-rule-id="${escapeHtml(rule.id)}">
