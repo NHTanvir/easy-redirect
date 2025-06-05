@@ -309,6 +309,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const html = rules.map(rule => {
             const badgeClass = rule.type === 'wildcard' ? 'badge badge-wildcard'
                 : rule.type === 'path' ? 'badge badge-path'
+                : rule.type === 'keyword' ? 'badge badge-keyword'
                 : 'badge badge-domain';
             const badgeLabel = (rule.type || 'domain').toUpperCase();
             return `
