@@ -18,27 +18,63 @@ Inspect the background service worker via the **service worker** link on the ext
 
 Three components share state through `chrome.storage.sync`:
 
-- **`options.html` + `options.js`** — the user-facing settings page. Opens in a full browser tab (not a popup) either via the toolbar icon or the *Options* link on `chrome://extensions`. Reads/writes `redirectUrl`, `blockedWebsites` (array of bare domains), and `extensionEnabled` to `chrome.storage.sync`. After every write it *also* sends a `{ action: 'updateRules' }` runtime message to the background worker.
+- **`options.html` + `options.js`** — the user-facing settings page. Opens in a full browser tab (not a popup) either via the toolbar icon or the *Options* link on `chrome://extensions`. Reads/writes `redirectUrl`, `rules` (array of structured Rule objects), and `extensionEnabled` to `chrome.storage.sync`. After every write it *also* sends a `{ action: 'updateRules', rules, redirectUrl }` runtime message to the background worker.
 - **`background.js`** — service worker that owns the `declarativeNetRequest` dynamic rules. It rebuilds the rule set on `onInstalled`, `onStartup`, on `chrome.storage.onChanged` for the relevant keys, and on the `updateRules` message from the options page. Rules are always cleared and recreated wholesale (no diffing). Also handles `chrome.action.onClicked` to open the options page — this fires *because* the manifest deliberately omits `default_popup`.
 - **`manifest.json`** — MV3 manifest. Required permissions: `storage`, `declarativeNetRequest`, `activeTab`, plus `<all_urls>` host permission. Uses `options_ui` with `open_in_tab: true` so right-click → Options also lands in a tab.
 
 ### Rule generation (background.js)
 
-For each blocked domain, **four** dynamic rules are generated to cover URL-pattern variants: `*://*.domain/*`, `*://domain/*`, `*://domain`, `*://www.domain`. Rule IDs are assigned as `(index+1)*10 + 0..3`, so adding a 5th URL pattern requires bumping the multiplier to avoid ID collisions. Rules redirect only `main_frame` requests. Rules are added in batches of 50 to stay under MV3 dynamic-rule limits.
+Source rules in `rules[]` are translated to DNR dynamic rules at runtime. Each source rule reserves a block of `DNR_ID_STRIDE = 100` IDs so different rule types can claim distinct offsets without colliding:
+
+```
+dnrId = (sourceIndex + 1) * 100 + typeOffset + variantOffset
+```
+
+Current type offsets (must stay stable — DNR persists IDs across worker restarts):
+
+- `domain` — offset `0`, four variants `0..3` (`*://*.domain/*`, `*://domain/*`, `*://domain`, `*://www.domain`).
+- `wildcard` — offset `10`, single variant `0`, urlFilter is the user's pattern verbatim.
+
+Future types (`path`, `keyword`, `regex`) claim the next free offset (`20+`); if a type ever needs more than 10 variants, widen the offset spacing rather than overlapping. Rules redirect only `main_frame` requests and are added in batches of 50 to stay under MV3 dynamic-rule limits. Rules with `enabled === false` are skipped at DNR emit time but not deleted from storage.
 
 ### Storage shape
 
 ```
 {
   redirectUrl: string,          // full URL, default 'https://www.google.com'
-  blockedWebsites: string[],    // bare domains, lowercased, no scheme/www/trailing slash
-  extensionEnabled: boolean     // default true; when false, all rules are cleared
+  rules: Rule[],                // structured rules (see below)
+  blockedWebsites: string[],    // LEGACY — preserved post-migration, not consumed
+  extensionEnabled: boolean,    // default true; when false, all rules are cleared
+  schemaVersion: number         // bumped to 2 once migration has run
 }
 ```
 
-The options page normalizes input by stripping `https?://`, leading `www.`, and trailing `/` before storing (see `addWebsite` in `options.js`). Keep the stored form bare — `background.js` builds the `*://...` patterns assuming bare domains.
+A `Rule` is:
 
-User data is intentionally sticky: toggling the extension off only flips `extensionEnabled` to `false` and clears the runtime rules — `redirectUrl` and `blockedWebsites` stay in storage. The only paths that delete user-entered data are the per-row Remove button and Clear All. Don't add disable-time wipes.
+```
+{
+  id: string,                   // crypto.randomUUID() or fallback timestamp+random
+  pattern: string,              // domain (bare) or wildcard pattern (preserved verbatim)
+  type: 'domain' | 'wildcard',  // future: 'path' | 'keyword' | 'regex'
+  enabled: boolean,             // false skips DNR emission but keeps the rule in storage
+  groupId: string,              // 'default' until #7 introduces groups
+  createdAt: number,            // ms epoch
+  hitCount: number,             // 0 until #27 wires the counter
+  lastHitAt: number | null
+}
+```
+
+### Schema migration
+
+On install and startup, `background.js` runs `migrateLegacyBlockedWebsites()` after `restoreFromLocalIfSyncEmpty()` but before `initializeMissingDefaults()`. The migration:
+
+1. Returns the settings unchanged if `schemaVersion >= 2` (idempotent).
+2. Otherwise, builds a `rules[]` of `type:'domain'` entries from `blockedWebsites` via `createRule()`, bumps `schemaVersion` to `2`, and persists through `persist()` so the local mirror tracks the migration.
+3. **Never deletes `blockedWebsites`** — the legacy string array is preserved as an untouchable rollback path; only the Remove / Clear All buttons may delete user data.
+
+The options page normalizes input by stripping `https?://`, leading `www.`, and trailing `/` for domain rules (see `normalizePattern` in `options.js`). Wildcard input (anything containing `*`) is preserved verbatim except for surrounding whitespace, because URL paths and query strings are case sensitive.
+
+User data is intentionally sticky: toggling the extension off only flips `extensionEnabled` to `false` and clears the runtime rules — `redirectUrl`, `rules`, and `blockedWebsites` all stay in storage. The only paths that delete user-entered data are the per-row Remove button and Clear All. Don't add disable-time wipes.
 
 ### Durability invariant — DO NOT REGRESS
 
@@ -50,6 +86,10 @@ Two safety nets back this up in `background.js`:
 2. `onInstalled` and `onStartup` call `restoreFromLocalIfSyncEmpty()` before anything else. If `sync` came back empty for a key that `local` still has, we copy it back. Only **after** restore do defaults get filled in, so a transient empty `sync` read can't cause defaults to clobber the local backup.
 
 If you add a new persisted key, add it to `DEFAULTS` in `background.js` so it participates in both safety nets.
+
+### Input validation
+
+`options.js#validateInput` rejects empty strings, patterns containing whitespace, and patterns that are only one or more `*` characters (which would block every URL). The check runs before any rule is created or written to storage, so invalid input never reaches `chrome.storage.sync`.
 
 ### Dual update path — keep in sync
 

@@ -109,10 +109,27 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function validateInput(raw) {
+        if (!raw || !raw.trim()) {
+            return 'Please enter a website or pattern.';
+        }
+        if (/\s/.test(raw)) {
+            return 'Patterns cannot contain whitespace.';
+        }
+        const trimmed = raw.trim();
+        // Reject "just stars" patterns — they would block literally every URL
+        // and almost certainly aren't what the user meant.
+        if (/^\*+$/.test(trimmed)) {
+            return 'Pattern cannot be only "*". Use something like *.example.com/*.';
+        }
+        return null;
+    }
+
     async function addRule() {
         const raw = newWebsiteInput.value;
-        if (!raw || !raw.trim()) {
-            showStatus('Please enter a website or pattern', 'error');
+        const validationError = validateInput(raw);
+        if (validationError) {
+            showStatus(validationError, 'error');
             return;
         }
 
