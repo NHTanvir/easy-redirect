@@ -44,6 +44,27 @@ function createRule(pattern, type, opts = {}) {
     };
 }
 
+// One-shot migration from the legacy `blockedWebsites: string[]` shape to the
+// structured `rules[]` array. Idempotent: returns the input untouched once
+// schemaVersion has been bumped to 2. CRITICAL: never deletes blockedWebsites —
+// it is COPIED, not moved, so we retain the legacy data as an untouchable
+// rollback path. Only an explicit user action may clear blockedWebsites.
+function migrateLegacyBlockedWebsites(settings) {
+    if (settings && typeof settings.schemaVersion === 'number' && settings.schemaVersion >= 2) {
+        return settings;
+    }
+
+    const legacy = Array.isArray(settings && settings.blockedWebsites) ? settings.blockedWebsites : [];
+    const existingRules = Array.isArray(settings && settings.rules) ? settings.rules : [];
+    const migratedRules = legacy.map(pattern => createRule(pattern, 'domain'));
+
+    return {
+        ...settings,
+        rules: existingRules.length > 0 ? existingRules : migratedRules,
+        schemaVersion: 2
+    };
+}
+
 chrome.runtime.onInstalled.addListener(async (details) => {
     console.log('Website Redirector onInstalled:', details.reason);
 
