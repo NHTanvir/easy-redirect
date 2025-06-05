@@ -184,6 +184,30 @@ async function updateRedirectRulesFromMessage(rules, redirectUrl) {
     }
 }
 
+/*
+ * DNR rule-ID layout
+ * ------------------
+ * Each source Rule reserves a block of 100 IDs so different rule types can
+ * coexist without colliding, and so future types can claim their own offset
+ * without another renumber. The formula is:
+ *
+ *     dnrId = (sourceIndex + 1) * 100 + typeOffset + variantOffset
+ *
+ * Type offsets (must stay stable — DNR persists IDs between worker restarts):
+ *
+ *     domain   : offset  0   variants 0..3 (subdomain, bare, exact, www-exact)
+ *     wildcard : offset 10   variants 0     (single rule using pattern as urlFilter)
+ *     <future> : offset 20+  reserved for path/keyword/regex
+ *
+ * If you add a new type, claim the next free offset and document it here. If a
+ * type needs more than 10 variants, widen the offset spacing — never overlap.
+ */
+const DNR_ID_STRIDE = 100;
+const DNR_TYPE_OFFSETS = {
+    domain: 0,
+    wildcard: 10
+};
+
 async function createRedirectRules(rules, redirectUrl) {
     try {
         // Clear existing rules
@@ -195,8 +219,8 @@ async function createRedirectRules(rules, redirectUrl) {
 
         // Build DNR rules per source Rule. Disabled rules are skipped here, not
         // deleted — toggling enabled back to true must restore behaviour without
-        // touching storage. Non-domain types are placeholders until later commits
-        // in this PR add their generators.
+        // touching storage. Unknown types log a warning so future contributors
+        // see they need to wire a generator + reserve an offset above.
         const dnrRules = [];
 
         rules.forEach((rule, index) => {
@@ -204,14 +228,15 @@ async function createRedirectRules(rules, redirectUrl) {
                 return;
             }
 
-            const baseId = (index + 1) * 10;
+            const baseId = (index + 1) * DNR_ID_STRIDE;
 
             if (rule.type === 'domain') {
                 const website = rule.pattern;
+                const offset = baseId + DNR_TYPE_OFFSETS.domain;
 
                 // Rule for domain with www / arbitrary subdomain
                 dnrRules.push({
-                    id: baseId,
+                    id: offset,
                     priority: 1,
                     action: { type: 'redirect', redirect: { url: redirectUrl } },
                     condition: { urlFilter: `*://*.${website}/*`, resourceTypes: ['main_frame'] }
@@ -219,7 +244,7 @@ async function createRedirectRules(rules, redirectUrl) {
 
                 // Rule for domain without www
                 dnrRules.push({
-                    id: baseId + 1,
+                    id: offset + 1,
                     priority: 1,
                     action: { type: 'redirect', redirect: { url: redirectUrl } },
                     condition: { urlFilter: `*://${website}/*`, resourceTypes: ['main_frame'] }
@@ -227,7 +252,7 @@ async function createRedirectRules(rules, redirectUrl) {
 
                 // Rule for exact domain match
                 dnrRules.push({
-                    id: baseId + 2,
+                    id: offset + 2,
                     priority: 1,
                     action: { type: 'redirect', redirect: { url: redirectUrl } },
                     condition: { urlFilter: `*://${website}`, resourceTypes: ['main_frame'] }
@@ -235,10 +260,21 @@ async function createRedirectRules(rules, redirectUrl) {
 
                 // Rule for www exact domain match
                 dnrRules.push({
-                    id: baseId + 3,
+                    id: offset + 3,
                     priority: 1,
                     action: { type: 'redirect', redirect: { url: redirectUrl } },
                     condition: { urlFilter: `*://www.${website}`, resourceTypes: ['main_frame'] }
+                });
+            } else if (rule.type === 'wildcard') {
+                // Wildcards forward the user's pattern straight to DNR. The DNR
+                // urlFilter grammar already supports '*' so we don't need to
+                // expand variants the way domain does.
+                const offset = baseId + DNR_TYPE_OFFSETS.wildcard;
+                dnrRules.push({
+                    id: offset,
+                    priority: 1,
+                    action: { type: 'redirect', redirect: { url: redirectUrl } },
+                    condition: { urlFilter: rule.pattern, resourceTypes: ['main_frame'] }
                 });
             } else {
                 console.warn(`Skipping rule of unsupported type "${rule.type}" (id=${rule.id}); generator not yet wired.`);
