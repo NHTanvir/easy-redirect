@@ -6,8 +6,13 @@
 const SCHEMA_VERSION = 2;
 
 // Rule.type values understood by createRedirectRules. Extended as later PRs land
-// (path, keyword, regex). Anything not in this list is rejected by validation.
-const RULE_TYPES = ['domain', 'wildcard'];
+// (keyword, regex). Anything not in this list is rejected by validation.
+//
+//   domain   - bare host like "example.com", emitted as a four-variant fan-out.
+//   wildcard - user-supplied pattern containing '*', passed through verbatim.
+//   path     - host+path like "reddit.com/r/funny" or "youtube.com/@channel";
+//              matches main_frame requests under that exact path prefix.
+const RULE_TYPES = ['domain', 'wildcard', 'path'];
 
 const DEFAULTS = {
     redirectUrl: 'https://www.google.com',
@@ -197,7 +202,8 @@ async function updateRedirectRulesFromMessage(rules, redirectUrl) {
  *
  *     domain   : offset  0   variants 0..3 (subdomain, bare, exact, www-exact)
  *     wildcard : offset 10   variants 0     (single rule using pattern as urlFilter)
- *     <future> : offset 20+  reserved for path/keyword/regex
+ *     path     : offset 20   variants 0..1  (bare-host and www-host path match)
+ *     <future> : offset 30+  reserved for keyword/regex
  *
  * If you add a new type, claim the next free offset and document it here. If a
  * type needs more than 10 variants, widen the offset spacing — never overlap.
@@ -205,7 +211,8 @@ async function updateRedirectRulesFromMessage(rules, redirectUrl) {
 const DNR_ID_STRIDE = 100;
 const DNR_TYPE_OFFSETS = {
     domain: 0,
-    wildcard: 10
+    wildcard: 10,
+    path: 20
 };
 
 async function createRedirectRules(rules, redirectUrl) {
@@ -275,6 +282,19 @@ async function createRedirectRules(rules, redirectUrl) {
                     priority: 1,
                     action: { type: 'redirect', redirect: { url: redirectUrl } },
                     condition: { urlFilter: rule.pattern, resourceTypes: ['main_frame'] }
+                });
+            } else if (rule.type === 'path') {
+                // Path rules block a specific path under a host (e.g.
+                // "reddit.com/r/funny"). The user's pattern is stored as
+                // host/path verbatim; we wrap it in a urlFilter that matches
+                // any scheme. A trailing `*` keeps deeper paths under the
+                // segment matching too (so /r/funny matches /r/funny/comments/...).
+                const offset = baseId + DNR_TYPE_OFFSETS.path;
+                dnrRules.push({
+                    id: offset,
+                    priority: 1,
+                    action: { type: 'redirect', redirect: { url: redirectUrl } },
+                    condition: { urlFilter: `*://${rule.pattern}*`, resourceTypes: ['main_frame'] }
                 });
             } else {
                 console.warn(`Skipping rule of unsupported type "${rule.type}" (id=${rule.id}); generator not yet wired.`);
