@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function createRule(pattern, type, opts = {}) {
-        return {
+        const rule = {
             id: opts.id || generateRuleId(),
             pattern,
             type,
@@ -47,6 +47,12 @@ document.addEventListener('DOMContentLoaded', function() {
             hitCount: opts.hitCount || 0,
             lastHitAt: opts.lastHitAt || null
         };
+        if (type === 'keyword') {
+            rule.caseSensitive = opts.caseSensitive === true;
+            rule.wholeWord = opts.wholeWord === true;
+            rule.exceptions = Array.isArray(opts.exceptions) ? opts.exceptions.slice() : [];
+        }
+        return rule;
     }
 
     function detectRuleType(input) {
@@ -64,6 +70,13 @@ document.addEventListener('DOMContentLoaded', function() {
             .replace(/^www\./, '');
         if (stripped.includes('/') || stripped.includes('?')) {
             return 'path';
+        }
+        // Keyword rules are prefixed with "kw:" — this lets the user block
+        // page titles / body text without the input being mistaken for a
+        // domain name. e.g. "kw:gambling" blocks any page whose title or
+        // visible body contains the word "gambling".
+        if (/^kw:/i.test(stripped)) {
+            return 'keyword';
         }
         return 'domain';
     }
@@ -110,6 +123,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const host = cleaned.slice(0, slash).toLowerCase();
             const path = cleaned.slice(slash + 1);
             return `${host}/${path}`;
+        }
+        if (type === 'keyword') {
+            // Strip the "kw:" prefix and normalise to lower-case. Keywords are
+            // matched case-insensitively by default (caseSensitive:false) so
+            // storing in lower-case keeps the stored form predictable.
+            return input.trim().replace(/^kw:/i, '').trim().toLowerCase();
         }
         // Domain rules are stored bare (no scheme, no www, no trailing slash).
         return input
@@ -178,6 +197,14 @@ document.addEventListener('DOMContentLoaded', function() {
         // expect path scoping. Tell them to omit the trailing slash.
         if (/^https?:\/\//i.test(trimmed) === false && /^[^/*?]+\/$/.test(trimmed)) {
             return 'Remove the trailing slash — use "example.com" to block the whole domain.';
+        }
+        // Keyword rules must have at least 3 characters after the "kw:" prefix
+        // so they don't match unintentionally short substrings across all pages.
+        if (/^kw:/i.test(trimmed)) {
+            const kw = trimmed.replace(/^kw:/i, '').trim();
+            if (kw.length < 3) {
+                return 'Keyword must be at least 3 characters (e.g. kw:gambling).';
+            }
         }
         return null;
     }
@@ -290,6 +317,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const html = rules.map(rule => {
             const badgeClass = rule.type === 'wildcard' ? 'badge badge-wildcard'
                 : rule.type === 'path' ? 'badge badge-path'
+                : rule.type === 'keyword' ? 'badge badge-keyword'
                 : 'badge badge-domain';
             const badgeLabel = (rule.type || 'domain').toUpperCase();
             return `
