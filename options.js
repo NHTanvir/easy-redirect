@@ -198,6 +198,14 @@ document.addEventListener('DOMContentLoaded', function() {
         if (/^https?:\/\//i.test(trimmed) === false && /^[^/*?]+\/$/.test(trimmed)) {
             return 'Remove the trailing slash — use "example.com" to block the whole domain.';
         }
+        // Keyword rules must have at least 3 characters after the "kw:" prefix
+        // so they don't match unintentionally short substrings across all pages.
+        if (/^kw:/i.test(trimmed)) {
+            const kw = trimmed.replace(/^kw:/i, '').trim();
+            if (kw.length < 3) {
+                return 'Keyword must be at least 3 characters (e.g. kw:gambling).';
+            }
+        }
         return null;
     }
 
