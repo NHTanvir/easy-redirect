@@ -1,18 +1,35 @@
 // Background script for Website Redirector extension
 
-chrome.runtime.onInstalled.addListener(() => {
-    console.log('Website Redirector extension installed');
-    
-    // Set default values
-    chrome.storage.sync.set({
-        redirectUrl: 'https://www.google.com',
-        blockedWebsites: [],
-        extensionEnabled: true
-    });
-    
-    // Initialize redirect rules
+const DEFAULTS = {
+    redirectUrl: 'https://www.google.com',
+    blockedWebsites: [],
+    extensionEnabled: true
+};
+
+chrome.runtime.onInstalled.addListener(async (details) => {
+    console.log('Website Redirector onInstalled:', details.reason);
+
+    // Never overwrite existing user data. Only fill in keys that are
+    // genuinely missing — this is what protects against extension/Chrome
+    // updates wiping blockedWebsites back to [].
+    await initializeMissingDefaults();
+
     updateRedirectRules();
 });
+
+async function initializeMissingDefaults() {
+    const existing = await chrome.storage.sync.get(Object.keys(DEFAULTS));
+    const toSet = {};
+    for (const [key, value] of Object.entries(DEFAULTS)) {
+        if (existing[key] === undefined) {
+            toSet[key] = value;
+        }
+    }
+    if (Object.keys(toSet).length > 0) {
+        await chrome.storage.sync.set(toSet);
+        console.log('Initialized missing storage defaults:', Object.keys(toSet));
+    }
+}
 
 chrome.runtime.onStartup.addListener(() => {
     updateRedirectRules();
