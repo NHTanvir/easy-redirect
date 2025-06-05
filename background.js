@@ -70,12 +70,35 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 
     // Order matters: restore from the local backup BEFORE filling in defaults,
     // otherwise a sync that came back empty would get DEFAULTS written over the
-    // top of perfectly good local data.
+    // top of perfectly good local data. The schema migration runs after restore
+    // (so it sees the user's real data) but before initializeMissingDefaults
+    // (so it has the chance to populate rules[] before defaults would).
     await restoreFromLocalIfSyncEmpty();
+    await runSchemaMigration();
     await initializeMissingDefaults();
 
     updateRedirectRules();
 });
+
+// Read current settings, run the legacy→structured migration, and persist the
+// result via persist() so both sync and local mirrors stay aligned. Logs a
+// dry-run summary of what will change before writing anything so the migration
+// is observable in the service-worker console.
+async function runSchemaMigration() {
+    const keys = Object.keys(DEFAULTS);
+    const current = await chrome.storage.sync.get(keys);
+
+    const next = migrateLegacyBlockedWebsites(current);
+    if (next === current) {
+        return;
+    }
+
+    const beforeRules = Array.isArray(current.rules) ? current.rules.length : 0;
+    const afterRules = Array.isArray(next.rules) ? next.rules.length : 0;
+    console.log(`Schema migration dry-run: rules ${beforeRules} -> ${afterRules}, schemaVersion -> ${next.schemaVersion}`);
+
+    await persist({ rules: next.rules, schemaVersion: next.schemaVersion });
+}
 
 async function initializeMissingDefaults() {
     const existing = await chrome.storage.sync.get(Object.keys(DEFAULTS));
@@ -122,6 +145,7 @@ async function restoreFromLocalIfSyncEmpty() {
 
 chrome.runtime.onStartup.addListener(async () => {
     await restoreFromLocalIfSyncEmpty();
+    await runSchemaMigration();
     updateRedirectRules();
 });
 
