@@ -35,7 +35,12 @@ const DEFAULTS = {
     // its own array (not in rules[]) so it can survive Clear All and so the
     // extension page itself can stay reachable when allowlist mode is on.
     alwaysAllowed: [],
-    schemaVersion: 1
+    schemaVersion: 1,
+    // Named groups that rules can be organised into. Always has at least one
+    // entry (the 'default' group) so rules with groupId='default' always have
+    // a home. Participates in persist() and restoreFromLocalIfSyncEmpty() like
+    // every other key in DEFAULTS.
+    groups: [{ id: 'default', name: 'Default', color: '#2196F3', enabled: true, redirectUrl: null }]
 };
 
 // Stable opaque identifier for a Rule. Prefer crypto.randomUUID() (available in
@@ -74,6 +79,23 @@ function createRule(pattern, type, opts = {}) {
         rule.wholeWord = opts.wholeWord === true;
     }
     return rule;
+}
+
+// Factory for the structured Group object that organises rules into named lists.
+// Groups can be toggled independently; rules whose groupId matches a disabled
+// group are silently skipped at DNR emit time but kept in storage untouched.
+// `opts` mirrors the full persisted shape so callers can reconstruct existing
+// groups (e.g. during migration) by passing all fields through opts.
+function createGroup(name, opts = {}) {
+    return {
+        id: opts.id || generateRuleId(),
+        name: String(name || 'Group').trim() || 'Group',
+        color: opts.color || '#2196F3',
+        enabled: opts.enabled !== undefined ? opts.enabled : true,
+        redirectUrl: opts.redirectUrl || null,
+        createdAt: opts.createdAt || Date.now(),
+        schedule: opts.schedule || null
+    };
 }
 
 // Split a stored path-rule pattern into its host and tail halves. Patterns are
