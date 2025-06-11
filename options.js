@@ -280,6 +280,36 @@ document.addEventListener('DOMContentLoaded', function() {
         return null;
     }
 
+    // Validate a regex pattern against chrome.declarativeNetRequest.isRegexSupported
+    // so we surface a user-friendly error before the rule reaches DNR. Falls back
+    // to a plain JS RegExp compile check when the DNR API is unavailable (e.g.
+    // in tests or older Chrome builds).
+    async function validateRegex(pattern) {
+        if (!pattern || !pattern.trim()) {
+            return 'Regex pattern cannot be empty.';
+        }
+        try {
+            if (chrome.declarativeNetRequest && typeof chrome.declarativeNetRequest.isRegexSupported === 'function') {
+                const result = await chrome.declarativeNetRequest.isRegexSupported({
+                    regex: pattern,
+                    isCaseSensitive: false
+                });
+                if (!result.isSupported) {
+                    return `Regex not supported by Chrome DNR: ${result.reason || 'unknown reason'}`;
+                }
+                return null;
+            }
+        } catch (_e) {
+            // Fall through to JS-level check
+        }
+        try {
+            new RegExp(pattern); // eslint-disable-line no-new
+        } catch (err) {
+            return `Invalid regex: ${err.message}`;
+        }
+        return null;
+    }
+
     async function addRule() {
         const raw = newWebsiteInput.value;
         const validationError = validateInput(raw);
@@ -290,6 +320,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const type = detectRuleType(raw);
         const pattern = normalizePattern(raw, type);
+
+        // Regex patterns require an extra async validation step against DNR.
+        if (type === 'regex') {
+            const regexError = await validateRegex(pattern);
+            if (regexError) {
+                showStatus(regexError, 'error');
+                return;
+            }
+        }
 
         try {
             const result = await chrome.storage.sync.get(['rules']);
