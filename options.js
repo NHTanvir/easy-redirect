@@ -9,6 +9,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const MODES = ['blocklist', 'allowlist'];
 
+    // Active group state — tracks which group tab is currently selected so
+    // displayRules() can filter to only that group's rules. Starts as 'default'
+    // and is updated whenever the user clicks a different tab.
+    let currentGroups = [];
+    let activeGroupId = 'default';
+
     // Load saved data
     loadData();
 
@@ -69,6 +75,20 @@ document.addEventListener('DOMContentLoaded', function() {
             rule.wholeWord = opts.wholeWord === true;
         }
         return rule;
+    }
+
+    // Mirror of background.js createGroup(). Kept in options.js so the page can
+    // build group objects locally without round-tripping to the service worker.
+    function createGroup(name, opts = {}) {
+        return {
+            id: opts.id || generateRuleId(),
+            name: String(name || 'Group').trim() || 'Group',
+            color: opts.color || '#2196F3',
+            enabled: opts.enabled !== undefined ? opts.enabled : true,
+            redirectUrl: opts.redirectUrl || null,
+            createdAt: opts.createdAt || Date.now(),
+            schedule: opts.schedule || null
+        };
     }
 
     function detectRuleType(input) {
@@ -177,12 +197,21 @@ document.addEventListener('DOMContentLoaded', function() {
     async function loadData() {
         try {
             const result = await chrome.storage.sync.get([
-                'redirectUrl', 'rules', 'extensionEnabled', 'mode', 'alwaysAllowed'
+                'redirectUrl', 'rules', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups'
             ]);
 
             redirectUrlInput.value = result.redirectUrl || 'https://www.google.com';
 
             const rules = Array.isArray(result.rules) ? result.rules : [];
+
+            // Seed group state so renderGroupTabs / displayRules have the full
+            // list before any user interaction. Always ensure Default exists.
+            currentGroups = Array.isArray(result.groups) ? result.groups : [];
+            if (!currentGroups.some(g => g.id === 'default')) {
+                currentGroups = [createGroup('Default', { id: 'default', color: '#2196F3' }), ...currentGroups];
+            }
+
+            renderGroupTabs(currentGroups);
             displayRules(rules);
 
             const isEnabled = result.extensionEnabled !== false; // Default to true
@@ -195,6 +224,71 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             showStatus('Error loading data: ' + error.message, 'error');
         }
+    }
+
+    function renderGroupTabs(groups) {
+        const container = document.getElementById('groupTabs');
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        groups.forEach(group => {
+            // Wrapper holds the tab button plus optional controls for non-default groups.
+            const wrapper = document.createElement('span');
+            wrapper.style.cssText = 'display:inline-flex;align-items:center;gap:2px;';
+
+            const btn = document.createElement('button');
+            btn.className = 'group-tab' + (group.id === activeGroupId ? ' active' : '');
+            if (group.enabled === false) {
+                btn.style.opacity = '0.45';
+                btn.title = `${group.name} (disabled)`;
+            }
+            btn.style.borderLeftColor = group.color || '#2196F3';
+            btn.textContent = group.name;
+            btn.dataset.groupId = group.id;
+            btn.addEventListener('click', async () => {
+                activeGroupId = group.id;
+                renderGroupTabs(currentGroups);
+                const result = await chrome.storage.sync.get(['rules']);
+                displayRules(Array.isArray(result.rules) ? result.rules : []);
+                renderGroupRedirectField(group);
+            });
+            wrapper.appendChild(btn);
+
+            // Toggle + delete controls — only for non-default groups.
+            if (group.id !== 'default') {
+                const toggleCtrl = document.createElement('button');
+                toggleCtrl.style.cssText =
+                    'font-size:10px;padding:2px 5px;margin-top:0;background:#78909c;border-radius:10px;';
+                toggleCtrl.title = group.enabled === false ? 'Enable group' : 'Disable group';
+                toggleCtrl.textContent = group.enabled === false ? '▶' : '⏸';
+                toggleCtrl.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleGroupEnabled(group.id);
+                });
+                wrapper.appendChild(toggleCtrl);
+
+                const delCtrl = document.createElement('button');
+                delCtrl.style.cssText =
+                    'font-size:10px;padding:2px 5px;margin-top:0;background:#f44336;border-radius:10px;';
+                delCtrl.title = 'Delete group';
+                delCtrl.textContent = '×';
+                delCtrl.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteGroup(group.id);
+                });
+                wrapper.appendChild(delCtrl);
+            }
+
+            container.appendChild(wrapper);
+        });
+
+        // "+" button to create a new group
+        const addBtn = document.createElement('button');
+        addBtn.className = 'group-tab-add';
+        addBtn.textContent = '+ New Group';
+        addBtn.addEventListener('click', createNewGroup);
+        container.appendChild(addBtn);
     }
 
     function updateModeButtons(mode) {
@@ -526,9 +620,15 @@ document.addEventListener('DOMContentLoaded', function() {
             .replace(/'/g, '&#39;');
     }
 
-    function displayRules(rules) {
-        if (!rules || rules.length === 0) {
-            websiteListDiv.innerHTML = '<div style="text-align: center; color: #666; font-size: 13px;">No rules configured</div>';
+    function displayRules(allRules) {
+        // Filter to only the rules belonging to the active group.
+        const rules = (allRules || []).filter(r => {
+            const gid = r.groupId || 'default';
+            return gid === activeGroupId;
+        });
+
+        if (rules.length === 0) {
+            websiteListDiv.innerHTML = '<div style="text-align: center; color: #666; font-size: 13px;">No rules in this group</div>';
             return;
         }
 
@@ -546,6 +646,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     <button class="remove-exception-btn" data-rule-id="${escapeHtml(rule.id)}" data-exc-index="${i}" title="Remove exception">&times;</button>
                 </span>
             `).join('');
+            // Build group dropdown options for this rule row.
+            const groupOptions = currentGroups.map(g =>
+                `<option value="${escapeHtml(g.id)}" ${g.id === (rule.groupId || 'default') ? 'selected' : ''}>${escapeHtml(g.name)}</option>`
+            ).join('');
             return `
                 <div class="website-item" data-rule-id="${escapeHtml(rule.id)}">
                     <div class="rule-main-row">
@@ -554,6 +658,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <span class="rule-pattern">${escapeHtml(rule.pattern)}</span>
                         </span>
                         <span class="rule-actions">
+                            <select class="rule-group-select" data-rule-id="${escapeHtml(rule.id)}" title="Move to group">${groupOptions}</select>
                             <button class="add-exception-btn" data-rule-id="${escapeHtml(rule.id)}" title="Add exception">+ except</button>
                             <button class="remove-btn" data-rule-id="${escapeHtml(rule.id)}">Remove</button>
                         </span>
@@ -574,6 +679,172 @@ document.addEventListener('DOMContentLoaded', function() {
         websiteListDiv.querySelectorAll('.remove-exception-btn').forEach(btn => {
             btn.addEventListener('click', () => removeException(btn.dataset.ruleId, parseInt(btn.dataset.excIndex, 10)));
         });
+        // Group dropdown — move a rule to a different group on change.
+        websiteListDiv.querySelectorAll('.rule-group-select').forEach(sel => {
+            sel.addEventListener('change', () => moveRuleToGroup(sel.dataset.ruleId, sel.value));
+        });
+    }
+
+    // Move a rule to a different group by updating its groupId in storage.
+    async function moveRuleToGroup(ruleId, newGroupId) {
+        try {
+            const result = await chrome.storage.sync.get(['rules']);
+            const rules = Array.isArray(result.rules) ? result.rules : [];
+            const next = rules.map(r => r.id === ruleId ? { ...r, groupId: newGroupId } : r);
+            await chrome.storage.sync.set({ rules: next });
+            await updateRedirectRules();
+            displayRules(next);
+        } catch (error) {
+            showStatus('Error moving rule: ' + error.message, 'error');
+        }
+    }
+
+    // Show or hide the per-group redirect URL field below the group tabs.
+    // When the active group has a redirectUrl override set, it is shown in the
+    // input; clearing it saves null so the global redirect URL takes over again.
+    function renderGroupRedirectField(group) {
+        const container = document.getElementById('groupRedirectField');
+        if (!container) return;
+        if (!group || group.id === 'default') {
+            container.style.display = 'none';
+            return;
+        }
+        container.style.display = 'block';
+        container.innerHTML = `
+            <label style="display:block;margin-bottom:4px;color:#555;">
+                Redirect URL for group <strong>${escapeHtml(group.name)}</strong>
+                <span style="color:#888;font-weight:normal;">(overrides global; leave blank to use global)</span>
+            </label>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <input type="text" id="groupRedirectInput" value="${escapeHtml(group.redirectUrl || '')}"
+                    placeholder="https://example.com/blocked" style="flex:1;margin-top:0;">
+                <button id="saveGroupRedirect" style="margin-top:0;white-space:nowrap;">Save</button>
+            </div>
+            <div style="margin-top:6px;font-size:12px;color:#999;">
+                Schedule: <em>(coming soon — scheduled activation is planned for a future release)</em>
+            </div>
+        `;
+        document.getElementById('saveGroupRedirect').addEventListener('click', async () => {
+            const raw = (document.getElementById('groupRedirectInput').value || '').trim();
+            let url = raw;
+            if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'https://' + url;
+            }
+            try {
+                const result = await chrome.storage.sync.get(['groups']);
+                const groups = Array.isArray(result.groups) ? result.groups : [];
+                const updated = groups.map(g =>
+                    g.id === group.id ? { ...g, redirectUrl: url || null } : g
+                );
+                await chrome.storage.sync.set({ groups: updated });
+                currentGroups = updated;
+                await updateRedirectRules();
+                showStatus(
+                    url ? `Redirect URL for "${group.name}" set to ${url}.` : `Redirect URL for "${group.name}" cleared.`,
+                    'success'
+                );
+            } catch (error) {
+                showStatus('Error saving group redirect URL: ' + error.message, 'error');
+            }
+        });
+    }
+
+    // Prompt the user for a name and color, then create and persist a new group.
+    // Uses the browser's built-in prompt() / confirm() so no extra HTML is needed.
+    async function createNewGroup() {
+        const name = prompt('Group name:', 'New Group');
+        if (name === null) return; // user cancelled
+        const trimmedName = name.trim();
+        if (!trimmedName) {
+            showStatus('Group name cannot be empty.', 'error');
+            return;
+        }
+
+        const color = prompt('Group color (hex, e.g. #E91E63):', '#2196F3');
+        const trimmedColor = (color || '').trim() || '#2196F3';
+
+        const group = createGroup(trimmedName, { color: trimmedColor });
+
+        try {
+            const result = await chrome.storage.sync.get(['groups']);
+            const groups = Array.isArray(result.groups) ? result.groups : [];
+            const next = [...groups, group];
+            await chrome.storage.sync.set({ groups: next });
+            currentGroups = next;
+            activeGroupId = group.id;
+            renderGroupTabs(currentGroups);
+            const rulesResult = await chrome.storage.sync.get(['rules']);
+            displayRules(Array.isArray(rulesResult.rules) ? rulesResult.rules : []);
+            showStatus(`Group "${group.name}" created.`, 'success');
+        } catch (error) {
+            showStatus('Error creating group: ' + error.message, 'error');
+        }
+    }
+
+    // Delete a group by id. Refuses to delete the 'default' group. All rules
+    // belonging to the deleted group are re-homed to 'default' so no user data
+    // is lost — this is a move, not a delete.
+    async function deleteGroup(groupId) {
+        if (groupId === 'default') {
+            showStatus('The Default group cannot be deleted.', 'error');
+            return;
+        }
+        const group = currentGroups.find(g => g.id === groupId);
+        const groupName = group ? group.name : groupId;
+        const ok = confirm(
+            `Delete group "${groupName}"?\n\nAll its rules will be moved to the Default group. This cannot be undone.`
+        );
+        if (!ok) return;
+
+        try {
+            const result = await chrome.storage.sync.get(['rules', 'groups']);
+            const rules = Array.isArray(result.rules) ? result.rules : [];
+            const groups = Array.isArray(result.groups) ? result.groups : [];
+
+            // Move rules from deleted group to 'default'
+            const updatedRules = rules.map(r =>
+                r.groupId === groupId ? { ...r, groupId: 'default' } : r
+            );
+            const updatedGroups = groups.filter(g => g.id !== groupId);
+
+            await chrome.storage.sync.set({ rules: updatedRules, groups: updatedGroups });
+            await updateRedirectRules();
+
+            currentGroups = updatedGroups;
+            if (activeGroupId === groupId) {
+                activeGroupId = 'default';
+            }
+            renderGroupTabs(currentGroups);
+            displayRules(updatedRules);
+            showStatus(`Group "${groupName}" deleted; its rules moved to Default.`, 'success');
+        } catch (error) {
+            showStatus('Error deleting group: ' + error.message, 'error');
+        }
+    }
+
+    // Flip the enabled flag of a non-default group, persist the change, and
+    // trigger a DNR rule rebuild so disabled-group rules stop redirecting.
+    async function toggleGroupEnabled(groupId) {
+        try {
+            const result = await chrome.storage.sync.get(['groups']);
+            const groups = Array.isArray(result.groups) ? result.groups : [];
+            const updated = groups.map(g =>
+                g.id === groupId ? { ...g, enabled: g.enabled === false ? true : false } : g
+            );
+            await chrome.storage.sync.set({ groups: updated });
+            currentGroups = updated;
+            await updateRedirectRules();
+            renderGroupTabs(currentGroups);
+            const rulesResult = await chrome.storage.sync.get(['rules']);
+            displayRules(Array.isArray(rulesResult.rules) ? rulesResult.rules : []);
+            const toggled = updated.find(g => g.id === groupId);
+            showStatus(
+                `Group "${toggled ? toggled.name : groupId}" ${toggled && toggled.enabled !== false ? 'enabled' : 'disabled'}.`,
+                'success'
+            );
+        } catch (error) {
+            showStatus('Error toggling group: ' + error.message, 'error');
+        }
     }
 
     async function updateRedirectRules() {
@@ -593,7 +864,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 rules: isEnabled ? rules : [],
                 redirectUrl: redirectUrl,
                 mode: mode,
-                alwaysAllowed: alwaysAllowed
+                alwaysAllowed: alwaysAllowed,
+                groups: currentGroups
             });
         } catch (error) {
             console.error('Error updating redirect rules:', error);

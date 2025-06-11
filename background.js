@@ -35,7 +35,12 @@ const DEFAULTS = {
     // its own array (not in rules[]) so it can survive Clear All and so the
     // extension page itself can stay reachable when allowlist mode is on.
     alwaysAllowed: [],
-    schemaVersion: 1
+    schemaVersion: 1,
+    // Named groups that rules can be organised into. Always has at least one
+    // entry (the 'default' group) so rules with groupId='default' always have
+    // a home. Participates in persist() and restoreFromLocalIfSyncEmpty() like
+    // every other key in DEFAULTS.
+    groups: [{ id: 'default', name: 'Default', color: '#2196F3', enabled: true, redirectUrl: null }]
 };
 
 // Stable opaque identifier for a Rule. Prefer crypto.randomUUID() (available in
@@ -74,6 +79,23 @@ function createRule(pattern, type, opts = {}) {
         rule.wholeWord = opts.wholeWord === true;
     }
     return rule;
+}
+
+// Factory for the structured Group object that organises rules into named lists.
+// Groups can be toggled independently; rules whose groupId matches a disabled
+// group are silently skipped at DNR emit time but kept in storage untouched.
+// `opts` mirrors the full persisted shape so callers can reconstruct existing
+// groups (e.g. during migration) by passing all fields through opts.
+function createGroup(name, opts = {}) {
+    return {
+        id: opts.id || generateRuleId(),
+        name: String(name || 'Group').trim() || 'Group',
+        color: opts.color || '#2196F3',
+        enabled: opts.enabled !== undefined ? opts.enabled : true,
+        redirectUrl: opts.redirectUrl || null,
+        createdAt: opts.createdAt || Date.now(),
+        schedule: opts.schedule || null
+    };
 }
 
 // Split a stored path-rule pattern into its host and tail halves. Patterns are
@@ -179,20 +201,42 @@ async function ensureKeywordContentScriptRegistered() {
 // result via persist() so both sync and local mirrors stay aligned. Logs a
 // dry-run summary of what will change before writing anything so the migration
 // is observable in the service-worker console.
+//
+// Also backfills groupId='default' on any rules that are missing it (e.g.
+// rules created before #7) and ensures the groups[] array always contains at
+// least the Default group so rules with groupId='default' always have a home.
 async function runSchemaMigration() {
     const keys = Object.keys(DEFAULTS);
     const current = await chrome.storage.sync.get(keys);
 
-    const next = migrateLegacyBlockedWebsites(current);
-    if (next === current) {
+    let next = migrateLegacyBlockedWebsites(current);
+
+    // Backfill groupId='default' on rules that predate groups (created before #7).
+    const existingRules = Array.isArray(next.rules) ? next.rules : [];
+    const rulesNeedGroupId = existingRules.some(r => !r.groupId);
+    const backfilledRules = rulesNeedGroupId
+        ? existingRules.map(r => r.groupId ? r : { ...r, groupId: 'default' })
+        : existingRules;
+
+    // Ensure groups[] always has the Default group. If the key is missing or
+    // the Default entry was somehow removed, re-insert it at position 0.
+    const existingGroups = Array.isArray(next.groups) ? next.groups : [];
+    const hasDefault = existingGroups.some(g => g.id === 'default');
+    const groups = hasDefault ? existingGroups
+        : [createGroup('Default', { id: 'default', color: '#2196F3' }), ...existingGroups];
+
+    const changed = next !== current || rulesNeedGroupId || !hasDefault;
+    if (!changed) {
         return;
     }
 
+    next = { ...next, rules: backfilledRules, groups };
+
     const beforeRules = Array.isArray(current.rules) ? current.rules.length : 0;
     const afterRules = Array.isArray(next.rules) ? next.rules.length : 0;
-    console.log(`Schema migration dry-run: rules ${beforeRules} -> ${afterRules}, schemaVersion -> ${next.schemaVersion}`);
+    console.log(`Schema migration dry-run: rules ${beforeRules} -> ${afterRules}, schemaVersion -> ${next.schemaVersion}, groups -> ${groups.length}`);
 
-    await persist({ rules: next.rules, schemaVersion: next.schemaVersion });
+    await persist({ rules: next.rules, schemaVersion: next.schemaVersion, groups: next.groups });
 }
 
 async function initializeMissingDefaults() {
@@ -250,7 +294,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'updateRules') {
         const opts = {
             mode: MODES.includes(request.mode) ? request.mode : 'blocklist',
-            alwaysAllowed: Array.isArray(request.alwaysAllowed) ? request.alwaysAllowed : []
+            alwaysAllowed: Array.isArray(request.alwaysAllowed) ? request.alwaysAllowed : [],
+            groups: Array.isArray(request.groups) ? request.groups : []
         };
         updateRedirectRulesFromMessage(request.rules || [], request.redirectUrl, opts);
         sendResponse({ success: true });
@@ -282,13 +327,14 @@ async function handleKeywordHit(sender, request) {
 async function updateRedirectRules() {
     try {
         const result = await chrome.storage.sync.get([
-            'rules', 'redirectUrl', 'extensionEnabled', 'mode', 'alwaysAllowed'
+            'rules', 'redirectUrl', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups'
         ]);
         const rules = Array.isArray(result.rules) ? result.rules : [];
         const redirectUrl = result.redirectUrl || 'https://www.google.com';
         const isEnabled = result.extensionEnabled !== false;
         const mode = MODES.includes(result.mode) ? result.mode : 'blocklist';
         const alwaysAllowed = Array.isArray(result.alwaysAllowed) ? result.alwaysAllowed : [];
+        const groups = Array.isArray(result.groups) ? result.groups : [];
 
         if (!isEnabled) {
             // Clear all rules if extension is disabled
@@ -296,7 +342,7 @@ async function updateRedirectRules() {
             return;
         }
 
-        await createRedirectRules(rules, redirectUrl, { mode, alwaysAllowed });
+        await createRedirectRules(rules, redirectUrl, { mode, alwaysAllowed, groups });
     } catch (error) {
         console.error('Error updating redirect rules:', error);
     }
@@ -413,6 +459,13 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
         const mode = MODES.includes(opts.mode) ? opts.mode : 'blocklist';
         const alwaysAllowed = Array.isArray(opts.alwaysAllowed) ? opts.alwaysAllowed : [];
 
+        // Build a lookup map from groupId -> group so we can resolve per-group
+        // settings (enabled flag, redirectUrl override) in O(1) per rule. Rules
+        // whose groupId does not match any group are treated as belonging to the
+        // Default group and are always emitted (safe fallback for old data).
+        const groups = Array.isArray(opts.groups) ? opts.groups : [];
+        const groupMap = new Map(groups.map(g => [g.id, g]));
+
         // Build DNR rules. Disabled source rules are skipped here, not deleted —
         // toggling enabled back to true must restore behaviour without touching
         // storage. Unknown types log a warning so future contributors see they
@@ -435,13 +488,25 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
                 return;
             }
 
+            // Skip rules whose group is explicitly disabled. Rules with an
+            // unknown or missing groupId fall through (treated as Default).
+            const group = groupMap.get(rule.groupId);
+            if (group && group.enabled === false) {
+                return;
+            }
+
+            // Redirect URL precedence: rule.redirectUrl > group.redirectUrl > global.
+            const effectiveRedirectUrl = (rule.redirectUrl) ||
+                (group && group.redirectUrl) ||
+                redirectUrl;
+
             const baseId = (index + 1) * DNR_ID_STRIDE;
             // In blocklist mode the rule redirects to the configured URL; in
             // allowlist mode the same pattern instead becomes a higher-priority
             // 'allow' rule that overrides the catch-all redirect.
             const ruleAction = mode === 'allowlist'
                 ? { type: 'allow' }
-                : { type: 'redirect', redirect: { url: redirectUrl } };
+                : { type: 'redirect', redirect: { url: effectiveRedirectUrl } };
 
             if (rule.type === 'domain') {
                 const conditions = buildDomainConditions(rule.pattern);
@@ -628,7 +693,7 @@ async function clearAllRules() {
 // the backup stays current even when the popup wrote only to sync.
 chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace !== 'sync') return;
-    const watched = ['rules', 'blockedWebsites', 'redirectUrl', 'extensionEnabled', 'mode', 'alwaysAllowed'];
+    const watched = ['rules', 'blockedWebsites', 'redirectUrl', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups'];
     const relevant = watched.filter(k => k in changes);
     if (relevant.length === 0) return;
 
