@@ -699,8 +699,52 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Stub — implemented fully in commit 11.
-    function renderGroupRedirectField(/* group */) {}
+    // Show or hide the per-group redirect URL field below the group tabs.
+    // When the active group has a redirectUrl override set, it is shown in the
+    // input; clearing it saves null so the global redirect URL takes over again.
+    function renderGroupRedirectField(group) {
+        const container = document.getElementById('groupRedirectField');
+        if (!container) return;
+        if (!group || group.id === 'default') {
+            container.style.display = 'none';
+            return;
+        }
+        container.style.display = 'block';
+        container.innerHTML = `
+            <label style="display:block;margin-bottom:4px;color:#555;">
+                Redirect URL for group <strong>${escapeHtml(group.name)}</strong>
+                <span style="color:#888;font-weight:normal;">(overrides global; leave blank to use global)</span>
+            </label>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <input type="text" id="groupRedirectInput" value="${escapeHtml(group.redirectUrl || '')}"
+                    placeholder="https://example.com/blocked" style="flex:1;margin-top:0;">
+                <button id="saveGroupRedirect" style="margin-top:0;white-space:nowrap;">Save</button>
+            </div>
+        `;
+        document.getElementById('saveGroupRedirect').addEventListener('click', async () => {
+            const raw = (document.getElementById('groupRedirectInput').value || '').trim();
+            let url = raw;
+            if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'https://' + url;
+            }
+            try {
+                const result = await chrome.storage.sync.get(['groups']);
+                const groups = Array.isArray(result.groups) ? result.groups : [];
+                const updated = groups.map(g =>
+                    g.id === group.id ? { ...g, redirectUrl: url || null } : g
+                );
+                await chrome.storage.sync.set({ groups: updated });
+                currentGroups = updated;
+                await updateRedirectRules();
+                showStatus(
+                    url ? `Redirect URL for "${group.name}" set to ${url}.` : `Redirect URL for "${group.name}" cleared.`,
+                    'success'
+                );
+            } catch (error) {
+                showStatus('Error saving group redirect URL: ' + error.message, 'error');
+            }
+        });
+    }
 
     // Prompt the user for a name and color, then create and persist a new group.
     // Uses the browser's built-in prompt() / confirm() so no extra HTML is needed.
@@ -817,7 +861,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 rules: isEnabled ? rules : [],
                 redirectUrl: redirectUrl,
                 mode: mode,
-                alwaysAllowed: alwaysAllowed
+                alwaysAllowed: alwaysAllowed,
+                groups: currentGroups
             });
         } catch (error) {
             console.error('Error updating redirect rules:', error);
