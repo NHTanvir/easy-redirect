@@ -63,7 +63,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function detectRuleType(input) {
-        if (input.includes('*')) {
+        const trimmed = input.trim();
+        // Regex rules are prefixed with "r/" (shorthand) or delimited as
+        // "/pattern/" (full delimiter form). Both forms signal that the user
+        // wants a DNR regexFilter rule rather than a urlFilter rule.
+        // Examples: r/facebook\.com, /twitter\.com/
+        if (/^r\//.test(trimmed) || /^\/.*\/$/.test(trimmed)) {
+            return 'regex';
+        }
+        if (trimmed.includes('*')) {
             return 'wildcard';
         }
         // After stripping scheme + leading www, anything containing a "/" or
@@ -71,8 +79,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // youtube.com/@somechan, example.com?v=foo). The "?" case lets users
         // target a specific query string against the bare host. Bare hosts
         // have neither and fall through to the legacy domain type.
-        const stripped = input
-            .trim()
+        const stripped = trimmed
             .replace(/^https?:\/\//, '')
             .replace(/^www\./, '');
         if (stripped.includes('/') || stripped.includes('?')) {
@@ -89,6 +96,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function normalizePattern(input, type) {
+        if (type === 'regex') {
+            // Strip the "r/" prefix or surrounding "/" delimiters, leaving the
+            // raw regex string that will be passed as regexFilter to DNR.
+            const trimmed = input.trim();
+            if (/^r\//.test(trimmed)) {
+                return trimmed.slice(2); // remove "r/"
+            }
+            if (/^\/.*\/$/.test(trimmed)) {
+                return trimmed.slice(1, -1); // remove leading and trailing "/"
+            }
+            return trimmed;
+        }
         if (type === 'wildcard') {
             // Wildcards are passed through with surrounding whitespace stripped;
             // case is preserved because URL paths and query strings are case
