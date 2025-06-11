@@ -27,6 +27,14 @@ document.addEventListener('DOMContentLoaded', function() {
     modeAllowlistBtn.addEventListener('click', () => switchMode('allowlist'));
     document.getElementById('regexTestBtn').addEventListener('click', testRegexAgainstUrl);
 
+    const shortcutsLink = document.getElementById('shortcutsLink');
+    if (shortcutsLink) {
+        shortcutsLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            chrome.tabs.create({ url: 'chrome://extensions/shortcuts' });
+        });
+    }
+
     // Show the regex test row only when the input looks like a regex rule.
     newWebsiteInput.addEventListener('input', function() {
         const raw = newWebsiteInput.value.trim();
