@@ -226,6 +226,36 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function renderGroupTabs(groups) {
+        const container = document.getElementById('groupTabs');
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        groups.forEach(group => {
+            const btn = document.createElement('button');
+            btn.className = 'group-tab' + (group.id === activeGroupId ? ' active' : '');
+            btn.style.borderLeftColor = group.color || '#2196F3';
+            btn.textContent = group.name;
+            btn.dataset.groupId = group.id;
+            btn.addEventListener('click', async () => {
+                activeGroupId = group.id;
+                renderGroupTabs(currentGroups);
+                const result = await chrome.storage.sync.get(['rules']);
+                displayRules(Array.isArray(result.rules) ? result.rules : []);
+                renderGroupRedirectField(group);
+            });
+            container.appendChild(btn);
+        });
+
+        // "+" button to create a new group
+        const addBtn = document.createElement('button');
+        addBtn.className = 'group-tab-add';
+        addBtn.textContent = '+ New Group';
+        addBtn.addEventListener('click', createNewGroup);
+        container.appendChild(addBtn);
+    }
+
     function updateModeButtons(mode) {
         const isAllow = mode === 'allowlist';
         modeBlocklistBtn.classList.toggle('active', !isAllow);
@@ -555,9 +585,15 @@ document.addEventListener('DOMContentLoaded', function() {
             .replace(/'/g, '&#39;');
     }
 
-    function displayRules(rules) {
-        if (!rules || rules.length === 0) {
-            websiteListDiv.innerHTML = '<div style="text-align: center; color: #666; font-size: 13px;">No rules configured</div>';
+    function displayRules(allRules) {
+        // Filter to only the rules belonging to the active group.
+        const rules = (allRules || []).filter(r => {
+            const gid = r.groupId || 'default';
+            return gid === activeGroupId;
+        });
+
+        if (rules.length === 0) {
+            websiteListDiv.innerHTML = '<div style="text-align: center; color: #666; font-size: 13px;">No rules in this group</div>';
             return;
         }
 
@@ -604,6 +640,9 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.addEventListener('click', () => removeException(btn.dataset.ruleId, parseInt(btn.dataset.excIndex, 10)));
         });
     }
+
+    // Stub — implemented fully in commit 11.
+    function renderGroupRedirectField(/* group */) {}
 
     async function updateRedirectRules() {
         try {

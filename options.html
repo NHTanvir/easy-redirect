@@ -275,6 +275,53 @@
         .mode-toggle button.active:hover {
             background: #1976D2;
         }
+
+        .group-tabs {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+
+        .group-tab {
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+            background: #f5f5f5;
+            color: #333;
+            margin-top: 0;
+            border-left: 4px solid #2196F3;
+            transition: background 0.15s;
+        }
+
+        .group-tab.active {
+            background: #e3f2fd;
+            color: #0d47a1;
+            font-weight: 600;
+        }
+
+        .group-tab:hover:not(.active) {
+            background: #ececec;
+        }
+
+        .group-tab-add {
+            background: transparent;
+            border: 1px dashed #aaa;
+            color: #666;
+            border-radius: 20px;
+            padding: 5px 12px;
+            font-size: 13px;
+            cursor: pointer;
+            margin-top: 0;
+        }
+
+        .group-tab-add:hover {
+            background: #f0f0f0;
+            border-color: #888;
+        }
     </style>
 </head>
 <body>
@@ -333,6 +380,7 @@
 
     <div class="section">
         <h3 id="rulesHeading">Block Rules</h3>
+        <div id="groupTabs" class="group-tabs"></div>
         <div id="websiteList" class="website-list">
             <div style="text-align: center; color: #666; font-size: 13px;">No rules configured</div>
         </div>
