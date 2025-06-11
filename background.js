@@ -15,7 +15,7 @@ const SCHEMA_VERSION = 2;
 //   path     - host+path like "reddit.com/r/funny" or "youtube.com/@channel";
 //              matches main_frame requests under that exact path prefix.
 //   keyword  - word/phrase matched in the page title or body via content script.
-const RULE_TYPES = ['domain', 'wildcard', 'path', 'keyword'];
+const RULE_TYPES = ['domain', 'wildcard', 'path', 'keyword', 'regex'];
 
 // Top-level matching mode. In 'blocklist' the rules[] array enumerates patterns
 // to redirect; in 'allowlist' the same rules[] enumerates patterns to permit
@@ -348,8 +348,15 @@ const DNR_TYPE_OFFSETS = {
     domain: 0,
     wildcard: 10,
     path: 20,
-    keyword: 30
+    keyword: 30,
+    regex: 40
 };
+
+// Cap on how many regex rules can be active at once. Chrome's DNR imposes a
+// global cap on regex-filter rules (currently 1000 per extension) and they are
+// costlier to evaluate than urlFilter rules, so we enforce a conservative local
+// limit. Rules beyond the cap are skipped with a console.warn.
+const REGEX_RULES_MAX = 10;
 const DNR_CATCH_ALL_ID = 1;
 const DNR_ALWAYS_ALLOWED_ID_BASE = 2;
 const DNR_ALWAYS_ALLOWED_MAX = 49; // IDs 2..50 inclusive
