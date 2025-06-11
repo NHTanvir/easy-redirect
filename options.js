@@ -642,7 +642,40 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Stub — implemented fully in commit 11.
+    // Stub — implemented fully in commit 11.
     function renderGroupRedirectField(/* group */) {}
+
+    // Prompt the user for a name and color, then create and persist a new group.
+    // Uses the browser's built-in prompt() / confirm() so no extra HTML is needed.
+    async function createNewGroup() {
+        const name = prompt('Group name:', 'New Group');
+        if (name === null) return; // user cancelled
+        const trimmedName = name.trim();
+        if (!trimmedName) {
+            showStatus('Group name cannot be empty.', 'error');
+            return;
+        }
+
+        const color = prompt('Group color (hex, e.g. #E91E63):', '#2196F3');
+        const trimmedColor = (color || '').trim() || '#2196F3';
+
+        const group = createGroup(trimmedName, { color: trimmedColor });
+
+        try {
+            const result = await chrome.storage.sync.get(['groups']);
+            const groups = Array.isArray(result.groups) ? result.groups : [];
+            const next = [...groups, group];
+            await chrome.storage.sync.set({ groups: next });
+            currentGroups = next;
+            activeGroupId = group.id;
+            renderGroupTabs(currentGroups);
+            const rulesResult = await chrome.storage.sync.get(['rules']);
+            displayRules(Array.isArray(rulesResult.rules) ? rulesResult.rules : []);
+            showStatus(`Group "${group.name}" created.`, 'success');
+        } catch (error) {
+            showStatus('Error creating group: ' + error.message, 'error');
+        }
+    }
 
     async function updateRedirectRules() {
         try {
