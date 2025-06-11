@@ -68,14 +68,21 @@ A `Rule` is:
 {
   id: string,                   // crypto.randomUUID() or fallback timestamp+random
   pattern: string,              // domain (bare) or wildcard pattern (preserved verbatim)
-  type: 'domain' | 'wildcard' | 'path',  // future: 'keyword' | 'regex'
+  type: 'domain'|'wildcard'|'path'|'keyword',  // future: 'regex'
   enabled: boolean,             // false skips DNR emission but keeps the rule in storage
   groupId: string,              // 'default' until #7 introduces groups
   createdAt: number,            // ms epoch
   hitCount: number,             // 0 until #27 wires the counter
-  lastHitAt: number | null
+  lastHitAt: number | null,
+  exceptions: string[],         // URL patterns exempt from redirect for this rule
+  caseSensitive?: boolean,      // keyword rules only
+  wholeWord?: boolean           // keyword rules only
 }
 ```
+
+### Per-rule exceptions
+
+Every rule carries an `exceptions[]` array of URL patterns that are exempt from redirect even when the parent rule matches. In `background.js`, these are emitted as `priority: PRIORITY_EXCEPTION (= 4)` DNR allow rules at ID offsets `90..99` within the rule's 100-ID block — they shadow the parent's redirect (priority 2) and the allowlist catch-all (priority 1). The UI shows exceptions as green tags under each rule row with a `+ except` button.
 
 ### Schema migration
 

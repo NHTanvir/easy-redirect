@@ -53,10 +53,11 @@ document.addEventListener('DOMContentLoaded', function() {
             hitCount: opts.hitCount || 0,
             lastHitAt: opts.lastHitAt || null
         };
+        // All rule types support exceptions[] (mirrors background.js createRule).
+        rule.exceptions = Array.isArray(opts.exceptions) ? opts.exceptions.slice() : [];
         if (type === 'keyword') {
             rule.caseSensitive = opts.caseSensitive === true;
             rule.wholeWord = opts.wholeWord === true;
-            rule.exceptions = Array.isArray(opts.exceptions) ? opts.exceptions.slice() : [];
         }
         return rule;
     }
@@ -309,6 +310,71 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function validateException(exc, parentRule) {
+        if (!exc || !exc.trim()) return 'Exception cannot be empty.';
+        if (/\s/.test(exc) && !/^kw:/i.test(exc)) return 'Exceptions cannot contain whitespace (use %20 for URL spaces).';
+        // For domain rules, validate that the exception is a sub-path or
+        // subdomain of the parent — a completely unrelated domain would never
+        // be reached by the parent redirect so the exception would do nothing.
+        if (parentRule && parentRule.type === 'domain') {
+            const parent = parentRule.pattern;
+            const cleaned = exc.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/^\*\*?\./, '');
+            if (!cleaned.startsWith(parent) && !cleaned.includes(`.${parent}`)) {
+                return `Exception "${exc}" does not appear to fall under "${parent}". It will still be saved but may have no effect.`;
+            }
+        }
+        return null;
+    }
+
+    async function promptAddException(ruleId) {
+        const exc = prompt('Add exception — enter a URL, path, or pattern that should NOT be redirected even when the parent rule matches:\n(e.g. reddit.com/r/programming  or  *.reddit.com/r/aww/*)');
+        if (exc === null || !exc.trim()) return;
+        await addException(ruleId, exc.trim());
+    }
+
+    async function addException(ruleId, exception) {
+        try {
+            const result = await chrome.storage.sync.get(['rules']);
+            const rules = Array.isArray(result.rules) ? result.rules : [];
+            const parentRule = rules.find(r => r.id === ruleId);
+            const warning = validateException(exception, parentRule);
+            if (warning) {
+                showStatus(warning, 'error');
+                return;
+            }
+            const next = rules.map(r => {
+                if (r.id !== ruleId) return r;
+                const exceptions = Array.isArray(r.exceptions) ? r.exceptions : [];
+                if (exceptions.includes(exception)) return r;
+                return { ...r, exceptions: [...exceptions, exception] };
+            });
+            await chrome.storage.sync.set({ rules: next });
+            await updateRedirectRules();
+            displayRules(next);
+            showStatus('Exception added.', 'success');
+        } catch (error) {
+            showStatus('Error adding exception: ' + error.message, 'error');
+        }
+    }
+
+    async function removeException(ruleId, excIndex) {
+        try {
+            const result = await chrome.storage.sync.get(['rules']);
+            const rules = Array.isArray(result.rules) ? result.rules : [];
+            const next = rules.map(r => {
+                if (r.id !== ruleId) return r;
+                const exceptions = Array.isArray(r.exceptions) ? r.exceptions : [];
+                return { ...r, exceptions: exceptions.filter((_, i) => i !== excIndex) };
+            });
+            await chrome.storage.sync.set({ rules: next });
+            await updateRedirectRules();
+            displayRules(next);
+            showStatus('Exception removed.', 'success');
+        } catch (error) {
+            showStatus('Error removing exception: ' + error.message, 'error');
+        }
+    }
+
     async function clearAllWebsites() {
         const result = await chrome.storage.sync.get(['mode']);
         const mode = MODES.includes(result.mode) ? result.mode : 'blocklist';
@@ -374,13 +440,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 : rule.type === 'keyword' ? 'badge badge-keyword'
                 : 'badge badge-domain';
             const badgeLabel = (rule.type || 'domain').toUpperCase();
+            const exceptions = Array.isArray(rule.exceptions) ? rule.exceptions : [];
+            const exceptionItems = exceptions.map((exc, i) => `
+                <span class="exception-tag">
+                    ${escapeHtml(exc)}
+                    <button class="remove-exception-btn" data-rule-id="${escapeHtml(rule.id)}" data-exc-index="${i}" title="Remove exception">&times;</button>
+                </span>
+            `).join('');
             return `
                 <div class="website-item" data-rule-id="${escapeHtml(rule.id)}">
-                    <span class="rule-meta">
-                        <span class="${badgeClass}">${badgeLabel}</span>
-                        <span class="rule-pattern">${escapeHtml(rule.pattern)}</span>
-                    </span>
-                    <button class="remove-btn" data-rule-id="${escapeHtml(rule.id)}">Remove</button>
+                    <div class="rule-main-row">
+                        <span class="rule-meta">
+                            <span class="${badgeClass}">${badgeLabel}</span>
+                            <span class="rule-pattern">${escapeHtml(rule.pattern)}</span>
+                        </span>
+                        <span class="rule-actions">
+                            <button class="add-exception-btn" data-rule-id="${escapeHtml(rule.id)}" title="Add exception">+ except</button>
+                            <button class="remove-btn" data-rule-id="${escapeHtml(rule.id)}">Remove</button>
+                        </span>
+                    </div>
+                    ${exceptions.length > 0 ? `<div class="exception-list">${exceptionItems}</div>` : ''}
                 </div>
             `;
         }).join('');
@@ -389,6 +468,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
         websiteListDiv.querySelectorAll('.remove-btn').forEach(btn => {
             btn.addEventListener('click', () => removeRule(btn.dataset.ruleId));
+        });
+        websiteListDiv.querySelectorAll('.add-exception-btn').forEach(btn => {
+            btn.addEventListener('click', () => promptAddException(btn.dataset.ruleId));
+        });
+        websiteListDiv.querySelectorAll('.remove-exception-btn').forEach(btn => {
+            btn.addEventListener('click', () => removeException(btn.dataset.ruleId, parseInt(btn.dataset.excIndex, 10)));
         });
     }
 
@@ -428,4 +513,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Expose removeRule for any external callers / debugging.
     window.removeRule = removeRule;
+    window.addException = addException;
+    window.removeException = removeException;
 });

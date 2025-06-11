@@ -63,13 +63,15 @@ function createRule(pattern, type, opts = {}) {
         hitCount: opts.hitCount || 0,
         lastHitAt: opts.lastHitAt || null
     };
-    // Keyword rules carry optional matching toggles (case-sensitive, whole-word)
-    // and an exceptions list. They default to false/[] so the schema is stable
-    // across rule types — non-keyword rules ignore these fields entirely.
+    // Every rule type carries an exceptions[] list — URL patterns that should
+    // NOT be redirected even though the parent rule would match. Exceptions are
+    // emitted as higher-priority DNR allow rules at offsets 90..99 within the
+    // rule's 100-ID block, so they shadow the parent redirect automatically.
+    rule.exceptions = Array.isArray(opts.exceptions) ? opts.exceptions.slice() : [];
+    // Keyword rules additionally carry matching toggles (case-sensitive, whole-word).
     if (type === 'keyword') {
         rule.caseSensitive = opts.caseSensitive === true;
         rule.wholeWord = opts.wholeWord === true;
-        rule.exceptions = Array.isArray(opts.exceptions) ? opts.exceptions.slice() : [];
     }
     return rule;
 }
@@ -352,13 +354,37 @@ const DNR_CATCH_ALL_ID = 1;
 const DNR_ALWAYS_ALLOWED_ID_BASE = 2;
 const DNR_ALWAYS_ALLOWED_MAX = 49; // IDs 2..50 inclusive
 
+// Exception (allow-rule) offset inside a source rule's 100-ID block.
+// Allow rules for exceptions are emitted at offsets 90..99, leaving room for up
+// to DNR_MAX_EXCEPTIONS_PER_RULE exceptions per source rule while staying clear
+// of the type offsets (currently 0..30). If a rule has more exceptions than the
+// cap, the extras are silently ignored with a console.warn.
+const DNR_EXCEPTION_OFFSET = 90;
+const DNR_MAX_EXCEPTIONS_PER_RULE = 10;
+
 // Priority math (higher wins on DNR):
 //   1 — catch-all redirect (allowlist mode only)
 //   2 — per-Rule allow (allowlist mode)  / per-Rule redirect (blocklist mode)
 //   3 — alwaysAllowed pinned allow (both modes; always-on)
+//   4 — per-Rule exception allow (both modes — must beat PRIORITY_RULE redirects)
 const PRIORITY_CATCH_ALL = 1;
 const PRIORITY_RULE = 2;
 const PRIORITY_ALWAYS_ALLOWED = 3;
+const PRIORITY_EXCEPTION = 4;
+
+// Build a DNR urlFilter for an exception pattern. Patterns that already contain
+// a '*' are treated as verbatim DNR urlFilters (after stripping any http scheme
+// prefix); bare host/path strings get a `*://` prefix so they match both http
+// and https, and a trailing `*` so sub-paths are also exempt.
+function buildExceptionFilter(exception) {
+    const trimmed = String(exception || '').trim();
+    if (!trimmed) return null;
+    if (trimmed.includes('*')) {
+        return trimmed.replace(/^https?:\/\//, '');
+    }
+    const noScheme = trimmed.replace(/^https?:\/\//, '');
+    return `*://${noScheme}*`;
+}
 
 // Build the DNR condition variants for a domain pattern (matches the prior
 // blocklist layout: subdomain, bare, exact, www-exact). Returned as an array so
@@ -490,6 +516,25 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
             } else {
                 console.warn(`Skipping rule of unsupported type "${rule.type}" (id=${rule.id}); generator not yet wired.`);
             }
+
+            // Per-rule exceptions — emitted as PRIORITY_EXCEPTION allow rules so they
+            // shadow the parent redirect (or, in allowlist mode, they shadow the
+            // catch-all too because PRIORITY_EXCEPTION > PRIORITY_CATCH_ALL). Capped
+            // at DNR_MAX_EXCEPTIONS_PER_RULE; extras are logged and dropped.
+            const exceptions = Array.isArray(rule.exceptions) ? rule.exceptions : [];
+            if (exceptions.length > DNR_MAX_EXCEPTIONS_PER_RULE) {
+                console.warn(`Rule "${rule.pattern}" has ${exceptions.length} exceptions; only the first ${DNR_MAX_EXCEPTIONS_PER_RULE} will be active.`);
+            }
+            exceptions.slice(0, DNR_MAX_EXCEPTIONS_PER_RULE).forEach((exc, excIdx) => {
+                const urlFilter = buildExceptionFilter(exc);
+                if (!urlFilter) return;
+                dnrRules.push({
+                    id: baseId + DNR_EXCEPTION_OFFSET + excIdx,
+                    priority: PRIORITY_EXCEPTION,
+                    action: { type: 'allow' },
+                    condition: { urlFilter, resourceTypes: ['main_frame'] }
+                });
+            });
         });
 
         // alwaysAllowed patterns get the highest priority so they stay reachable

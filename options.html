@@ -83,9 +83,62 @@
             border-radius: 4px;
             border: 1px solid #eee;
             display: flex;
+            flex-direction: column;
+            font-size: 14px;
+        }
+
+        .rule-main-row {
+            display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 14px;
+        }
+
+        .rule-actions {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .add-exception-btn {
+            background: #78909c;
+            color: #fff;
+            padding: 3px 8px;
+            font-size: 11px;
+            margin-top: 0;
+        }
+
+        .add-exception-btn:hover {
+            background: #546e7a;
+        }
+
+        .exception-list {
+            margin-top: 6px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .exception-tag {
+            background: #e8f5e9;
+            border: 1px solid #a5d6a7;
+            border-radius: 10px;
+            padding: 2px 6px;
+            font-size: 11px;
+            color: #2e7d32;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .remove-exception-btn {
+            background: transparent;
+            border: none;
+            color: #c62828;
+            cursor: pointer;
+            font-size: 13px;
+            padding: 0;
+            margin: 0;
+            line-height: 1;
         }
 
         .rule-meta {
