@@ -677,6 +677,47 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Delete a group by id. Refuses to delete the 'default' group. All rules
+    // belonging to the deleted group are re-homed to 'default' so no user data
+    // is lost — this is a move, not a delete.
+    async function deleteGroup(groupId) {
+        if (groupId === 'default') {
+            showStatus('The Default group cannot be deleted.', 'error');
+            return;
+        }
+        const group = currentGroups.find(g => g.id === groupId);
+        const groupName = group ? group.name : groupId;
+        const ok = confirm(
+            `Delete group "${groupName}"?\n\nAll its rules will be moved to the Default group. This cannot be undone.`
+        );
+        if (!ok) return;
+
+        try {
+            const result = await chrome.storage.sync.get(['rules', 'groups']);
+            const rules = Array.isArray(result.rules) ? result.rules : [];
+            const groups = Array.isArray(result.groups) ? result.groups : [];
+
+            // Move rules from deleted group to 'default'
+            const updatedRules = rules.map(r =>
+                r.groupId === groupId ? { ...r, groupId: 'default' } : r
+            );
+            const updatedGroups = groups.filter(g => g.id !== groupId);
+
+            await chrome.storage.sync.set({ rules: updatedRules, groups: updatedGroups });
+            await updateRedirectRules();
+
+            currentGroups = updatedGroups;
+            if (activeGroupId === groupId) {
+                activeGroupId = 'default';
+            }
+            renderGroupTabs(currentGroups);
+            displayRules(updatedRules);
+            showStatus(`Group "${groupName}" deleted; its rules moved to Default.`, 'success');
+        } catch (error) {
+            showStatus('Error deleting group: ' + error.message, 'error');
+        }
+    }
+
     async function updateRedirectRules() {
         try {
             const result = await chrome.storage.sync.get([
