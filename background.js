@@ -457,6 +457,13 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
         const mode = MODES.includes(opts.mode) ? opts.mode : 'blocklist';
         const alwaysAllowed = Array.isArray(opts.alwaysAllowed) ? opts.alwaysAllowed : [];
 
+        // Build a lookup map from groupId -> group so we can resolve per-group
+        // settings (enabled flag, redirectUrl override) in O(1) per rule. Rules
+        // whose groupId does not match any group are treated as belonging to the
+        // Default group and are always emitted (safe fallback for old data).
+        const groups = Array.isArray(opts.groups) ? opts.groups : [];
+        const groupMap = new Map(groups.map(g => [g.id, g]));
+
         // Build DNR rules. Disabled source rules are skipped here, not deleted —
         // toggling enabled back to true must restore behaviour without touching
         // storage. Unknown types log a warning so future contributors see they
@@ -479,13 +486,25 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
                 return;
             }
 
+            // Skip rules whose group is explicitly disabled. Rules with an
+            // unknown or missing groupId fall through (treated as Default).
+            const group = groupMap.get(rule.groupId);
+            if (group && group.enabled === false) {
+                return;
+            }
+
+            // Redirect URL precedence: rule.redirectUrl > group.redirectUrl > global.
+            const effectiveRedirectUrl = (rule.redirectUrl) ||
+                (group && group.redirectUrl) ||
+                redirectUrl;
+
             const baseId = (index + 1) * DNR_ID_STRIDE;
             // In blocklist mode the rule redirects to the configured URL; in
             // allowlist mode the same pattern instead becomes a higher-priority
             // 'allow' rule that overrides the catch-all redirect.
             const ruleAction = mode === 'allowlist'
                 ? { type: 'allow' }
-                : { type: 'redirect', redirect: { url: redirectUrl } };
+                : { type: 'redirect', redirect: { url: effectiveRedirectUrl } };
 
             if (rule.type === 'domain') {
                 const conditions = buildDomainConditions(rule.pattern);
