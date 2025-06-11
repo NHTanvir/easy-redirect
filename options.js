@@ -309,6 +309,22 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function validateException(exc, parentRule) {
+        if (!exc || !exc.trim()) return 'Exception cannot be empty.';
+        if (/\s/.test(exc) && !/^kw:/i.test(exc)) return 'Exceptions cannot contain whitespace (use %20 for URL spaces).';
+        // For domain rules, validate that the exception is a sub-path or
+        // subdomain of the parent — a completely unrelated domain would never
+        // be reached by the parent redirect so the exception would do nothing.
+        if (parentRule && parentRule.type === 'domain') {
+            const parent = parentRule.pattern;
+            const cleaned = exc.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/^\*\*?\./, '');
+            if (!cleaned.startsWith(parent) && !cleaned.includes(`.${parent}`)) {
+                return `Exception "${exc}" does not appear to fall under "${parent}". It will still be saved but may have no effect.`;
+            }
+        }
+        return null;
+    }
+
     async function promptAddException(ruleId) {
         const exc = prompt('Add exception — enter a URL, path, or pattern that should NOT be redirected even when the parent rule matches:\n(e.g. reddit.com/r/programming  or  *.reddit.com/r/aww/*)');
         if (exc === null || !exc.trim()) return;
@@ -319,6 +335,12 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const result = await chrome.storage.sync.get(['rules']);
             const rules = Array.isArray(result.rules) ? result.rules : [];
+            const parentRule = rules.find(r => r.id === ruleId);
+            const warning = validateException(exception, parentRule);
+            if (warning) {
+                showStatus(warning, 'error');
+                return;
+            }
             const next = rules.map(r => {
                 if (r.id !== ruleId) return r;
                 const exceptions = Array.isArray(r.exceptions) ? r.exceptions : [];
