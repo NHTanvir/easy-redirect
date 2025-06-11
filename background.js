@@ -520,6 +520,32 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
                     action: { type: 'redirect', redirect: { url: redirectUrl } },
                     condition: { urlFilter: `*${keyword}*`, resourceTypes: ['main_frame'] }
                 });
+            } else if (rule.type === 'regex') {
+                // Regex rules use DNR's native regexFilter field. Each source
+                // rule maps to a single DNR rule at offset 40. We cap total
+                // active regex rules at REGEX_RULES_MAX to stay within Chrome's
+                // per-extension regex-rule quota and keep match performance sane.
+                // Rules beyond the cap are skipped with a warning; users should
+                // be informed by the UI that the cap exists.
+                const regexOffset = baseId + DNR_TYPE_OFFSETS.regex;
+                const currentRegexCount = dnrRules.filter(r => r.condition && r.condition.regexFilter).length;
+                if (currentRegexCount >= REGEX_RULES_MAX) {
+                    console.warn(
+                        `Regex rule cap (${REGEX_RULES_MAX}) reached. ` +
+                        `Skipping regex rule "${rule.pattern}" (id=${rule.id}).`
+                    );
+                } else {
+                    dnrRules.push({
+                        id: regexOffset,
+                        priority: PRIORITY_RULE,
+                        action: ruleAction,
+                        condition: {
+                            regexFilter: rule.pattern,
+                            resourceTypes: ['main_frame'],
+                            isUrlFilterCaseSensitive: false
+                        }
+                    });
+                }
             } else {
                 console.warn(`Skipping rule of unsupported type "${rule.type}" (id=${rule.id}); generator not yet wired.`);
             }
