@@ -294,7 +294,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'updateRules') {
         const opts = {
             mode: MODES.includes(request.mode) ? request.mode : 'blocklist',
-            alwaysAllowed: Array.isArray(request.alwaysAllowed) ? request.alwaysAllowed : []
+            alwaysAllowed: Array.isArray(request.alwaysAllowed) ? request.alwaysAllowed : [],
+            groups: Array.isArray(request.groups) ? request.groups : []
         };
         updateRedirectRulesFromMessage(request.rules || [], request.redirectUrl, opts);
         sendResponse({ success: true });
@@ -326,13 +327,14 @@ async function handleKeywordHit(sender, request) {
 async function updateRedirectRules() {
     try {
         const result = await chrome.storage.sync.get([
-            'rules', 'redirectUrl', 'extensionEnabled', 'mode', 'alwaysAllowed'
+            'rules', 'redirectUrl', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups'
         ]);
         const rules = Array.isArray(result.rules) ? result.rules : [];
         const redirectUrl = result.redirectUrl || 'https://www.google.com';
         const isEnabled = result.extensionEnabled !== false;
         const mode = MODES.includes(result.mode) ? result.mode : 'blocklist';
         const alwaysAllowed = Array.isArray(result.alwaysAllowed) ? result.alwaysAllowed : [];
+        const groups = Array.isArray(result.groups) ? result.groups : [];
 
         if (!isEnabled) {
             // Clear all rules if extension is disabled
@@ -340,7 +342,7 @@ async function updateRedirectRules() {
             return;
         }
 
-        await createRedirectRules(rules, redirectUrl, { mode, alwaysAllowed });
+        await createRedirectRules(rules, redirectUrl, { mode, alwaysAllowed, groups });
     } catch (error) {
         console.error('Error updating redirect rules:', error);
     }
@@ -691,7 +693,7 @@ async function clearAllRules() {
 // the backup stays current even when the popup wrote only to sync.
 chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace !== 'sync') return;
-    const watched = ['rules', 'blockedWebsites', 'redirectUrl', 'extensionEnabled', 'mode', 'alwaysAllowed'];
+    const watched = ['rules', 'blockedWebsites', 'redirectUrl', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups'];
     const relevant = watched.filter(k => k in changes);
     if (relevant.length === 0) return;
 
