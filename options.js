@@ -19,6 +19,15 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('toggleBtn').addEventListener('click', toggleExtension);
     modeBlocklistBtn.addEventListener('click', () => switchMode('blocklist'));
     modeAllowlistBtn.addEventListener('click', () => switchMode('allowlist'));
+    document.getElementById('regexTestBtn').addEventListener('click', testRegexAgainstUrl);
+
+    // Show the regex test row only when the input looks like a regex rule.
+    newWebsiteInput.addEventListener('input', function() {
+        const raw = newWebsiteInput.value.trim();
+        const isRegex = /^r\//.test(raw) || /^\/.*\/$/.test(raw);
+        document.getElementById('regexTestRow').style.display = isRegex ? 'block' : 'none';
+        document.getElementById('regexTestResult').textContent = '';
+    });
 
     // Enter key support
     newWebsiteInput.addEventListener('keypress', function(e) {
@@ -308,6 +317,37 @@ document.addEventListener('DOMContentLoaded', function() {
             return `Invalid regex: ${err.message}`;
         }
         return null;
+    }
+
+    // Test the regex currently in the input box against a user-supplied sample URL.
+    // Provides instant feedback before committing the rule to storage.
+    function testRegexAgainstUrl() {
+        const raw = newWebsiteInput.value.trim();
+        const pattern = normalizePattern(raw, 'regex');
+        const testUrl = document.getElementById('regexTestUrl').value.trim();
+        const resultDiv = document.getElementById('regexTestResult');
+
+        if (!pattern) {
+            resultDiv.textContent = 'Enter a regex pattern first.';
+            resultDiv.style.color = '#c62828';
+            return;
+        }
+        if (!testUrl) {
+            resultDiv.textContent = 'Enter a URL to test against.';
+            resultDiv.style.color = '#c62828';
+            return;
+        }
+        try {
+            const re = new RegExp(pattern, 'i');
+            const matched = re.test(testUrl);
+            resultDiv.textContent = matched
+                ? `Matches — this URL would be redirected.`
+                : `No match — this URL would NOT be redirected.`;
+            resultDiv.style.color = matched ? '#155724' : '#856404';
+        } catch (err) {
+            resultDiv.textContent = `Invalid regex: ${err.message}`;
+            resultDiv.style.color = '#c62828';
+        }
     }
 
     async function addRule() {
