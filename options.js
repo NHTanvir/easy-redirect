@@ -513,4 +513,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Expose removeRule for any external callers / debugging.
     window.removeRule = removeRule;
+    window.addException = addException;
+    window.removeException = removeException;
 });
