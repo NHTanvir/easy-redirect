@@ -201,20 +201,42 @@ async function ensureKeywordContentScriptRegistered() {
 // result via persist() so both sync and local mirrors stay aligned. Logs a
 // dry-run summary of what will change before writing anything so the migration
 // is observable in the service-worker console.
+//
+// Also backfills groupId='default' on any rules that are missing it (e.g.
+// rules created before #7) and ensures the groups[] array always contains at
+// least the Default group so rules with groupId='default' always have a home.
 async function runSchemaMigration() {
     const keys = Object.keys(DEFAULTS);
     const current = await chrome.storage.sync.get(keys);
 
-    const next = migrateLegacyBlockedWebsites(current);
-    if (next === current) {
+    let next = migrateLegacyBlockedWebsites(current);
+
+    // Backfill groupId='default' on rules that predate groups (created before #7).
+    const existingRules = Array.isArray(next.rules) ? next.rules : [];
+    const rulesNeedGroupId = existingRules.some(r => !r.groupId);
+    const backfilledRules = rulesNeedGroupId
+        ? existingRules.map(r => r.groupId ? r : { ...r, groupId: 'default' })
+        : existingRules;
+
+    // Ensure groups[] always has the Default group. If the key is missing or
+    // the Default entry was somehow removed, re-insert it at position 0.
+    const existingGroups = Array.isArray(next.groups) ? next.groups : [];
+    const hasDefault = existingGroups.some(g => g.id === 'default');
+    const groups = hasDefault ? existingGroups
+        : [createGroup('Default', { id: 'default', color: '#2196F3' }), ...existingGroups];
+
+    const changed = next !== current || rulesNeedGroupId || !hasDefault;
+    if (!changed) {
         return;
     }
 
+    next = { ...next, rules: backfilledRules, groups };
+
     const beforeRules = Array.isArray(current.rules) ? current.rules.length : 0;
     const afterRules = Array.isArray(next.rules) ? next.rules.length : 0;
-    console.log(`Schema migration dry-run: rules ${beforeRules} -> ${afterRules}, schemaVersion -> ${next.schemaVersion}`);
+    console.log(`Schema migration dry-run: rules ${beforeRules} -> ${afterRules}, schemaVersion -> ${next.schemaVersion}, groups -> ${groups.length}`);
 
-    await persist({ rules: next.rules, schemaVersion: next.schemaVersion });
+    await persist({ rules: next.rules, schemaVersion: next.schemaVersion, groups: next.groups });
 }
 
 async function initializeMissingDefaults() {
