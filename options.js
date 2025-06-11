@@ -9,6 +9,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const MODES = ['blocklist', 'allowlist'];
 
+    // Active group state — tracks which group tab is currently selected so
+    // displayRules() can filter to only that group's rules. Starts as 'default'
+    // and is updated whenever the user clicks a different tab.
+    let currentGroups = [];
+    let activeGroupId = 'default';
+
     // Load saved data
     loadData();
 
@@ -69,6 +75,20 @@ document.addEventListener('DOMContentLoaded', function() {
             rule.wholeWord = opts.wholeWord === true;
         }
         return rule;
+    }
+
+    // Mirror of background.js createGroup(). Kept in options.js so the page can
+    // build group objects locally without round-tripping to the service worker.
+    function createGroup(name, opts = {}) {
+        return {
+            id: opts.id || generateRuleId(),
+            name: String(name || 'Group').trim() || 'Group',
+            color: opts.color || '#2196F3',
+            enabled: opts.enabled !== undefined ? opts.enabled : true,
+            redirectUrl: opts.redirectUrl || null,
+            createdAt: opts.createdAt || Date.now(),
+            schedule: opts.schedule || null
+        };
     }
 
     function detectRuleType(input) {
@@ -177,12 +197,21 @@ document.addEventListener('DOMContentLoaded', function() {
     async function loadData() {
         try {
             const result = await chrome.storage.sync.get([
-                'redirectUrl', 'rules', 'extensionEnabled', 'mode', 'alwaysAllowed'
+                'redirectUrl', 'rules', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups'
             ]);
 
             redirectUrlInput.value = result.redirectUrl || 'https://www.google.com';
 
             const rules = Array.isArray(result.rules) ? result.rules : [];
+
+            // Seed group state so renderGroupTabs / displayRules have the full
+            // list before any user interaction. Always ensure Default exists.
+            currentGroups = Array.isArray(result.groups) ? result.groups : [];
+            if (!currentGroups.some(g => g.id === 'default')) {
+                currentGroups = [createGroup('Default', { id: 'default', color: '#2196F3' }), ...currentGroups];
+            }
+
+            renderGroupTabs(currentGroups);
             displayRules(rules);
 
             const isEnabled = result.extensionEnabled !== false; // Default to true
