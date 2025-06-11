@@ -720,6 +720,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     placeholder="https://example.com/blocked" style="flex:1;margin-top:0;">
                 <button id="saveGroupRedirect" style="margin-top:0;white-space:nowrap;">Save</button>
             </div>
+            <div style="margin-top:6px;font-size:12px;color:#999;">
+                Schedule: <em>(coming soon — scheduled activation is planned for a future release)</em>
+            </div>
         `;
         document.getElementById('saveGroupRedirect').addEventListener('click', async () => {
             const raw = (document.getElementById('groupRedirectInput').value || '').trim();
