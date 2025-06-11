@@ -611,6 +611,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     <button class="remove-exception-btn" data-rule-id="${escapeHtml(rule.id)}" data-exc-index="${i}" title="Remove exception">&times;</button>
                 </span>
             `).join('');
+            // Build group dropdown options for this rule row.
+            const groupOptions = currentGroups.map(g =>
+                `<option value="${escapeHtml(g.id)}" ${g.id === (rule.groupId || 'default') ? 'selected' : ''}>${escapeHtml(g.name)}</option>`
+            ).join('');
             return `
                 <div class="website-item" data-rule-id="${escapeHtml(rule.id)}">
                     <div class="rule-main-row">
@@ -619,6 +623,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <span class="rule-pattern">${escapeHtml(rule.pattern)}</span>
                         </span>
                         <span class="rule-actions">
+                            <select class="rule-group-select" data-rule-id="${escapeHtml(rule.id)}" title="Move to group">${groupOptions}</select>
                             <button class="add-exception-btn" data-rule-id="${escapeHtml(rule.id)}" title="Add exception">+ except</button>
                             <button class="remove-btn" data-rule-id="${escapeHtml(rule.id)}">Remove</button>
                         </span>
@@ -639,9 +644,26 @@ document.addEventListener('DOMContentLoaded', function() {
         websiteListDiv.querySelectorAll('.remove-exception-btn').forEach(btn => {
             btn.addEventListener('click', () => removeException(btn.dataset.ruleId, parseInt(btn.dataset.excIndex, 10)));
         });
+        // Group dropdown — move a rule to a different group on change.
+        websiteListDiv.querySelectorAll('.rule-group-select').forEach(sel => {
+            sel.addEventListener('change', () => moveRuleToGroup(sel.dataset.ruleId, sel.value));
+        });
     }
 
-    // Stub — implemented fully in commit 11.
+    // Move a rule to a different group by updating its groupId in storage.
+    async function moveRuleToGroup(ruleId, newGroupId) {
+        try {
+            const result = await chrome.storage.sync.get(['rules']);
+            const rules = Array.isArray(result.rules) ? result.rules : [];
+            const next = rules.map(r => r.id === ruleId ? { ...r, groupId: newGroupId } : r);
+            await chrome.storage.sync.set({ rules: next });
+            await updateRedirectRules();
+            displayRules(next);
+        } catch (error) {
+            showStatus('Error moving rule: ' + error.message, 'error');
+        }
+    }
+
     // Stub — implemented fully in commit 11.
     function renderGroupRedirectField(/* group */) {}
 
