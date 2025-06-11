@@ -46,9 +46,21 @@ Future types (`keyword`, `regex`) claim the next free offset (`30+`); if a type 
   rules: Rule[],                // structured rules (see below)
   blockedWebsites: string[],    // LEGACY — preserved post-migration, not consumed
   extensionEnabled: boolean,    // default true; when false, all rules are cleared
+  mode: 'blocklist'|'allowlist',// default 'blocklist'; see Allowlist mode below
+  alwaysAllowed: string[],      // patterns exempt from redirect in both modes
   schemaVersion: number         // bumped to 2 once migration has run
 }
 ```
+
+### Allowlist mode
+
+When `mode === 'allowlist'`, the semantics of `rules[]` invert: every URL is redirected *except* the ones matching a rule. DNR achieves this by:
+
+1. A catch-all redirect at rule ID 1 (priority 1, urlFilter `*`).
+2. Per-rule allow entries at IDs ≥ 2 (priority 2, `allow` action) — these win over the catch-all.
+3. `alwaysAllowed[]` patterns at IDs in the 2–50 range (priority 3) — these are exempt in both modes and protect the extension options page.
+
+Switching modes never deletes `rules[]`; the same array just changes meaning. The options-page section heading and Clear All confirmation text update to reflect the current mode.
 
 A `Rule` is:
 

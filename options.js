@@ -4,6 +4,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const websiteListDiv = document.getElementById('websiteList');
     const statusDiv = document.getElementById('status');
     const toggleBtn = document.getElementById('toggleBtn');
+    const modeBlocklistBtn = document.getElementById('modeBlocklistBtn');
+    const modeAllowlistBtn = document.getElementById('modeAllowlistBtn');
+
+    const MODES = ['blocklist', 'allowlist'];
 
     // Load saved data
     loadData();
@@ -13,6 +17,8 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('addWebsite').addEventListener('click', addRule);
     document.getElementById('clearAll').addEventListener('click', clearAllWebsites);
     document.getElementById('toggleBtn').addEventListener('click', toggleExtension);
+    modeBlocklistBtn.addEventListener('click', () => switchMode('blocklist'));
+    modeAllowlistBtn.addEventListener('click', () => switchMode('allowlist'));
 
     // Enter key support
     newWebsiteInput.addEventListener('keypress', function(e) {
@@ -141,7 +147,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function loadData() {
         try {
-            const result = await chrome.storage.sync.get(['redirectUrl', 'rules', 'extensionEnabled']);
+            const result = await chrome.storage.sync.get([
+                'redirectUrl', 'rules', 'extensionEnabled', 'mode', 'alwaysAllowed'
+            ]);
 
             redirectUrlInput.value = result.redirectUrl || 'https://www.google.com';
 
@@ -150,8 +158,51 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const isEnabled = result.extensionEnabled !== false; // Default to true
             updateToggleButton(isEnabled);
+
+            const mode = MODES.includes(result.mode) ? result.mode : 'blocklist';
+            updateModeButtons(mode);
+            document.getElementById('rulesHeading').textContent =
+                mode === 'allowlist' ? 'Allowed Sites (Allowlist mode)' : 'Block Rules';
         } catch (error) {
             showStatus('Error loading data: ' + error.message, 'error');
+        }
+    }
+
+    function updateModeButtons(mode) {
+        const isAllow = mode === 'allowlist';
+        modeBlocklistBtn.classList.toggle('active', !isAllow);
+        modeAllowlistBtn.classList.toggle('active', isAllow);
+    }
+
+    async function switchMode(targetMode) {
+        if (!MODES.includes(targetMode)) {
+            return;
+        }
+        try {
+            const result = await chrome.storage.sync.get(['mode']);
+            const currentMode = MODES.includes(result.mode) ? result.mode : 'blocklist';
+            if (currentMode === targetMode) {
+                return;
+            }
+
+            if (targetMode === 'allowlist') {
+                const ok = confirm(
+                    'Switch to allowlist mode?\n\n' +
+                    'Every site will be redirected EXCEPT the ones you have listed. ' +
+                    'This is destructive to general browsing. Your existing rules are kept; ' +
+                    'they will now act as exceptions rather than blocks.'
+                );
+                if (!ok) return;
+            }
+
+            await chrome.storage.sync.set({ mode: targetMode });
+            await updateRedirectRules();
+            updateModeButtons(targetMode);
+            document.getElementById('rulesHeading').textContent =
+                targetMode === 'allowlist' ? 'Allowed Sites (Allowlist mode)' : 'Block Rules';
+            showStatus(`Switched to ${targetMode} mode.`, 'success');
+        } catch (error) {
+            showStatus('Error switching mode: ' + error.message, 'error');
         }
     }
 
@@ -259,7 +310,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function clearAllWebsites() {
-        if (confirm('Are you sure you want to remove all blocked rules?')) {
+        const result = await chrome.storage.sync.get(['mode']);
+        const mode = MODES.includes(result.mode) ? result.mode : 'blocklist';
+        const label = mode === 'allowlist' ? 'allowed sites' : 'block rules';
+        if (confirm(`Are you sure you want to remove all ${label}?`)) {
             try {
                 await chrome.storage.sync.set({ rules: [] });
                 await updateRedirectRules();
@@ -340,16 +394,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function updateRedirectRules() {
         try {
-            const result = await chrome.storage.sync.get(['rules', 'redirectUrl', 'extensionEnabled']);
+            const result = await chrome.storage.sync.get([
+                'rules', 'redirectUrl', 'extensionEnabled', 'mode', 'alwaysAllowed'
+            ]);
             const rules = Array.isArray(result.rules) ? result.rules : [];
             const redirectUrl = result.redirectUrl || 'https://www.google.com';
             const isEnabled = result.extensionEnabled !== false;
+            const mode = MODES.includes(result.mode) ? result.mode : 'blocklist';
+            const alwaysAllowed = Array.isArray(result.alwaysAllowed) ? result.alwaysAllowed : [];
 
             // Send message to background script to update rules
             chrome.runtime.sendMessage({
                 action: 'updateRules',
                 rules: isEnabled ? rules : [],
-                redirectUrl: redirectUrl
+                redirectUrl: redirectUrl,
+                mode: mode,
+                alwaysAllowed: alwaysAllowed
             });
         } catch (error) {
             console.error('Error updating redirect rules:', error);
