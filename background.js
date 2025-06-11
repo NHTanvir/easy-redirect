@@ -721,6 +721,26 @@ chrome.action.onClicked.addListener(() => {
     chrome.runtime.openOptionsPage();
 });
 
+// Placeholder for the lockdown check that #11 will wire. Returns false until
+// the real implementation lands so the toggle shortcut behaves normally.
+function isLockedDown() { return false; /* wired in #11 */ }
+
+chrome.commands.onCommand.addListener(async (command) => {
+    if (command === 'open-settings') {
+        chrome.runtime.openOptionsPage();
+    }
+    if (command === 'toggle-extension') {
+        // TODO: check lockdown state when #11 lands — if locked, skip toggle
+        if (isLockedDown()) return;
+        const result = await chrome.storage.sync.get(['extensionEnabled']);
+        const isEnabled = result.extensionEnabled !== false;
+        const newState = !isEnabled;
+        await persist({ extensionEnabled: newState });
+        setActionIcon(newState);
+        updateRedirectRules();
+    }
+});
+
 function setActionIcon(enabled) {
     const variant = enabled ? '' : '-disabled';
     chrome.action.setIcon({
