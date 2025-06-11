@@ -354,13 +354,37 @@ const DNR_CATCH_ALL_ID = 1;
 const DNR_ALWAYS_ALLOWED_ID_BASE = 2;
 const DNR_ALWAYS_ALLOWED_MAX = 49; // IDs 2..50 inclusive
 
+// Exception (allow-rule) offset inside a source rule's 100-ID block.
+// Allow rules for exceptions are emitted at offsets 90..99, leaving room for up
+// to DNR_MAX_EXCEPTIONS_PER_RULE exceptions per source rule while staying clear
+// of the type offsets (currently 0..30). If a rule has more exceptions than the
+// cap, the extras are silently ignored with a console.warn.
+const DNR_EXCEPTION_OFFSET = 90;
+const DNR_MAX_EXCEPTIONS_PER_RULE = 10;
+
 // Priority math (higher wins on DNR):
 //   1 — catch-all redirect (allowlist mode only)
 //   2 — per-Rule allow (allowlist mode)  / per-Rule redirect (blocklist mode)
 //   3 — alwaysAllowed pinned allow (both modes; always-on)
+//   4 — per-Rule exception allow (both modes — must beat PRIORITY_RULE redirects)
 const PRIORITY_CATCH_ALL = 1;
 const PRIORITY_RULE = 2;
 const PRIORITY_ALWAYS_ALLOWED = 3;
+const PRIORITY_EXCEPTION = 4;
+
+// Build a DNR urlFilter for an exception pattern. Patterns that already contain
+// a '*' are treated as verbatim DNR urlFilters (after stripping any http scheme
+// prefix); bare host/path strings get a `*://` prefix so they match both http
+// and https, and a trailing `*` so sub-paths are also exempt.
+function buildExceptionFilter(exception) {
+    const trimmed = String(exception || '').trim();
+    if (!trimmed) return null;
+    if (trimmed.includes('*')) {
+        return trimmed.replace(/^https?:\/\//, '');
+    }
+    const noScheme = trimmed.replace(/^https?:\/\//, '');
+    return `*://${noScheme}*`;
+}
 
 // Build the DNR condition variants for a domain pattern (matches the prior
 // blocklist layout: subdomain, bare, exact, www-exact). Returned as an array so
