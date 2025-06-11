@@ -496,6 +496,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const badgeClass = rule.type === 'wildcard' ? 'badge badge-wildcard'
                 : rule.type === 'path' ? 'badge badge-path'
                 : rule.type === 'keyword' ? 'badge badge-keyword'
+                : rule.type === 'regex' ? 'badge badge-regex'
                 : 'badge badge-domain';
             const badgeLabel = (rule.type || 'domain').toUpperCase();
             const exceptions = Array.isArray(rule.exceptions) ? rule.exceptions : [];
