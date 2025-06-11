@@ -233,8 +233,16 @@ document.addEventListener('DOMContentLoaded', function() {
         container.innerHTML = '';
 
         groups.forEach(group => {
+            // Wrapper holds the tab button plus optional controls for non-default groups.
+            const wrapper = document.createElement('span');
+            wrapper.style.cssText = 'display:inline-flex;align-items:center;gap:2px;';
+
             const btn = document.createElement('button');
             btn.className = 'group-tab' + (group.id === activeGroupId ? ' active' : '');
+            if (group.enabled === false) {
+                btn.style.opacity = '0.45';
+                btn.title = `${group.name} (disabled)`;
+            }
             btn.style.borderLeftColor = group.color || '#2196F3';
             btn.textContent = group.name;
             btn.dataset.groupId = group.id;
@@ -245,7 +253,34 @@ document.addEventListener('DOMContentLoaded', function() {
                 displayRules(Array.isArray(result.rules) ? result.rules : []);
                 renderGroupRedirectField(group);
             });
-            container.appendChild(btn);
+            wrapper.appendChild(btn);
+
+            // Toggle + delete controls — only for non-default groups.
+            if (group.id !== 'default') {
+                const toggleCtrl = document.createElement('button');
+                toggleCtrl.style.cssText =
+                    'font-size:10px;padding:2px 5px;margin-top:0;background:#78909c;border-radius:10px;';
+                toggleCtrl.title = group.enabled === false ? 'Enable group' : 'Disable group';
+                toggleCtrl.textContent = group.enabled === false ? '▶' : '⏸';
+                toggleCtrl.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleGroupEnabled(group.id);
+                });
+                wrapper.appendChild(toggleCtrl);
+
+                const delCtrl = document.createElement('button');
+                delCtrl.style.cssText =
+                    'font-size:10px;padding:2px 5px;margin-top:0;background:#f44336;border-radius:10px;';
+                delCtrl.title = 'Delete group';
+                delCtrl.textContent = '×';
+                delCtrl.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteGroup(group.id);
+                });
+                wrapper.appendChild(delCtrl);
+            }
+
+            container.appendChild(wrapper);
         });
 
         // "+" button to create a new group
@@ -737,6 +772,31 @@ document.addEventListener('DOMContentLoaded', function() {
             showStatus(`Group "${groupName}" deleted; its rules moved to Default.`, 'success');
         } catch (error) {
             showStatus('Error deleting group: ' + error.message, 'error');
+        }
+    }
+
+    // Flip the enabled flag of a non-default group, persist the change, and
+    // trigger a DNR rule rebuild so disabled-group rules stop redirecting.
+    async function toggleGroupEnabled(groupId) {
+        try {
+            const result = await chrome.storage.sync.get(['groups']);
+            const groups = Array.isArray(result.groups) ? result.groups : [];
+            const updated = groups.map(g =>
+                g.id === groupId ? { ...g, enabled: g.enabled === false ? true : false } : g
+            );
+            await chrome.storage.sync.set({ groups: updated });
+            currentGroups = updated;
+            await updateRedirectRules();
+            renderGroupTabs(currentGroups);
+            const rulesResult = await chrome.storage.sync.get(['rules']);
+            displayRules(Array.isArray(rulesResult.rules) ? rulesResult.rules : []);
+            const toggled = updated.find(g => g.id === groupId);
+            showStatus(
+                `Group "${toggled ? toggled.name : groupId}" ${toggled && toggled.enabled !== false ? 'enabled' : 'disabled'}.`,
+                'success'
+            );
+        } catch (error) {
+            showStatus('Error toggling group: ' + error.message, 'error');
         }
     }
 
