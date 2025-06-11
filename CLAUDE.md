@@ -50,9 +50,32 @@ If a type ever needs more than 10 variants, widen the offset spacing rather than
   extensionEnabled: boolean,    // default true; when false, all rules are cleared
   mode: 'blocklist'|'allowlist',// default 'blocklist'; see Allowlist mode below
   alwaysAllowed: string[],      // patterns exempt from redirect in both modes
-  schemaVersion: number         // bumped to 2 once migration has run
+  schemaVersion: number,        // bumped to 2 once migration has run
+  groups: Group[]               // named rule groups; always has at least Default
 }
 ```
+
+A `Group` is:
+
+```
+{
+  id: string,                   // crypto.randomUUID() or fallback; 'default' for Default
+  name: string,                 // display name, e.g. 'Work', 'Social Media'
+  color: string,                // hex color for the tab left-border, default '#2196F3'
+  enabled: boolean,             // false means all rules in this group are skipped at DNR emit
+  redirectUrl: string | null,   // per-group redirect URL override (null = use global)
+  createdAt: number,            // ms epoch
+  schedule: null                // reserved for #8 (scheduled activation); always null for now
+}
+```
+
+Redirect URL precedence: `rule.redirectUrl` > `group.redirectUrl` > global `redirectUrl`.
+
+The `groups` key lives in `DEFAULTS` so it participates in `persist()` and
+`restoreFromLocalIfSyncEmpty()` from the start. `runSchemaMigration()` ensures the
+Default group entry always exists and backfills `groupId='default'` on any rules
+that predate #7. The 'default' group can never be deleted; all other groups can, and
+their rules migrate to 'default' automatically.
 
 ### Allowlist mode
 
