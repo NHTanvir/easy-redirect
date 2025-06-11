@@ -516,6 +516,25 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
             } else {
                 console.warn(`Skipping rule of unsupported type "${rule.type}" (id=${rule.id}); generator not yet wired.`);
             }
+
+            // Per-rule exceptions — emitted as PRIORITY_EXCEPTION allow rules so they
+            // shadow the parent redirect (or, in allowlist mode, they shadow the
+            // catch-all too because PRIORITY_EXCEPTION > PRIORITY_CATCH_ALL). Capped
+            // at DNR_MAX_EXCEPTIONS_PER_RULE; extras are logged and dropped.
+            const exceptions = Array.isArray(rule.exceptions) ? rule.exceptions : [];
+            if (exceptions.length > DNR_MAX_EXCEPTIONS_PER_RULE) {
+                console.warn(`Rule "${rule.pattern}" has ${exceptions.length} exceptions; only the first ${DNR_MAX_EXCEPTIONS_PER_RULE} will be active.`);
+            }
+            exceptions.slice(0, DNR_MAX_EXCEPTIONS_PER_RULE).forEach((exc, excIdx) => {
+                const urlFilter = buildExceptionFilter(exc);
+                if (!urlFilter) return;
+                dnrRules.push({
+                    id: baseId + DNR_EXCEPTION_OFFSET + excIdx,
+                    priority: PRIORITY_EXCEPTION,
+                    action: { type: 'allow' },
+                    condition: { urlFilter, resourceTypes: ['main_frame'] }
+                });
+            });
         });
 
         // alwaysAllowed patterns get the highest priority so they stay reachable
