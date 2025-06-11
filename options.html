@@ -306,14 +306,17 @@
 
     <div class="section">
         <h3>Add Block Rule</h3>
-        <input type="text" id="newWebsite" placeholder="example.com  or  reddit.com/r/funny  or  *.site.com/*  or  kw:keyword">
+        <input type="text" id="newWebsite" placeholder="example.com  or  reddit.com/r/funny  or  *.site.com/*  or  r/regex.*">
         <div class="help-text">
             Plain domains block all subdomains. Add a path to block just a
             section (e.g. <code>reddit.com/r/funny</code>,
             <code>youtube.com/@chan</code>). Use <code>*</code> for wildcards
             (e.g. <code>*.facebook.com/*</code>). Prefix with
             <code>kw:</code> to block by page title/body keyword
-            (e.g. <code>kw:gambling</code>, <code>kw:news feed</code> — at least 3 chars).
+            (e.g. <code>kw:gambling</code> — at least 3 chars).
+            For full regex power, prefix with <code>r/</code> or wrap in
+            <code>/…/</code> (e.g. <code>r/(facebook|instagram)\.com</code>,
+            <code>/news.*\.html$/</code>). Up to 10 regex rules are active at once.
         </div>
         <button id="addWebsite">Add Rule</button>
     </div>
