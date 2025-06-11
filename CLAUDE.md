@@ -21,6 +21,7 @@ Three components share state through `chrome.storage.sync`:
 - **`options.html` + `options.js`** — the user-facing settings page. Opens in a full browser tab (not a popup) either via the toolbar icon or the *Options* link on `chrome://extensions`. Reads/writes `redirectUrl`, `rules` (array of structured Rule objects), and `extensionEnabled` to `chrome.storage.sync`. After every write it *also* sends a `{ action: 'updateRules', rules, redirectUrl }` runtime message to the background worker.
 - **`background.js`** — service worker that owns the `declarativeNetRequest` dynamic rules. It rebuilds the rule set on `onInstalled`, `onStartup`, on `chrome.storage.onChanged` for the relevant keys, and on the `updateRules` message from the options page. Rules are always cleared and recreated wholesale (no diffing). Also handles `chrome.action.onClicked` to open the options page — this fires *because* the manifest deliberately omits `default_popup`.
 - **`manifest.json`** — MV3 manifest. Required permissions: `storage`, `declarativeNetRequest`, `activeTab`, plus `<all_urls>` host permission. Uses `options_ui` with `open_in_tab: true` so right-click → Options also lands in a tab.
+- **`icons/`** — 16/32/48/128px PNG icons. Blue enabled variants and grey disabled variants. `background.js#setActionIcon(enabled)` swaps them when the extension is toggled.
 
 ### Rule generation (background.js)
 
