@@ -53,10 +53,11 @@ document.addEventListener('DOMContentLoaded', function() {
             hitCount: opts.hitCount || 0,
             lastHitAt: opts.lastHitAt || null
         };
+        // All rule types support exceptions[] (mirrors background.js createRule).
+        rule.exceptions = Array.isArray(opts.exceptions) ? opts.exceptions.slice() : [];
         if (type === 'keyword') {
             rule.caseSensitive = opts.caseSensitive === true;
             rule.wholeWord = opts.wholeWord === true;
-            rule.exceptions = Array.isArray(opts.exceptions) ? opts.exceptions.slice() : [];
         }
         return rule;
     }
