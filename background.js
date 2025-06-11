@@ -147,6 +147,14 @@ function migrateLegacyBlockedWebsites(settings) {
     };
 }
 
+function registerContextMenus() {
+    // Context menus do not persist across service-worker restarts — recreate every time.
+    chrome.contextMenus.removeAll(() => {
+        chrome.contextMenus.create({ id: 'block-site', title: 'Block this site', contexts: ['page', 'link'] });
+        chrome.contextMenus.create({ id: 'block-url',  title: 'Block this URL',  contexts: ['page', 'link'] });
+    });
+}
+
 chrome.runtime.onInstalled.addListener(async (details) => {
     console.log('Website Redirector onInstalled:', details.reason);
 
@@ -161,6 +169,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 
     await ensureKeywordContentScriptRegistered();
     updateRedirectRules();
+    registerContextMenus();
 });
 
 // Content script registration is dynamic instead of declared in manifest.json
@@ -287,6 +296,7 @@ chrome.runtime.onStartup.addListener(async () => {
     await runSchemaMigration();
     await ensureKeywordContentScriptRegistered();
     updateRedirectRules();
+    registerContextMenus();
 });
 
 // Listen for messages from popup
