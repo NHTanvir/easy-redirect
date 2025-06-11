@@ -35,8 +35,10 @@ Current type offsets (must stay stable — DNR persists IDs across worker restar
 - `domain` — offset `0`, four variants `0..3` (`*://*.domain/*`, `*://domain/*`, `*://domain`, `*://www.domain`).
 - `wildcard` — offset `10`, single variant `0`, urlFilter is the user's pattern verbatim.
 - `path` — offset `20`, two variants `0..1` (bare host+path, www host+path). Pattern stored as `host/path` or `host?query`.
+- `keyword` — offset `30`, single variant `0`. URL substring match via DNR (`*keyword*`); page-title/body matching is handled by `content.js`.
+- `regex` — offset `40`, single variant `0`. Uses DNR's `regexFilter` field (case-insensitive). Capped at 10 active regex rules (`REGEX_RULES_MAX`). Validated before storage via `chrome.declarativeNetRequest.isRegexSupported`. Input uses `r/pattern` shorthand or `/pattern/` delimiter form.
 
-Future types (`keyword`, `regex`) claim the next free offset (`30+`); if a type ever needs more than 10 variants, widen the offset spacing rather than overlapping. Rules redirect only `main_frame` requests and are added in batches of 50 to stay under MV3 dynamic-rule limits. Rules with `enabled === false` are skipped at DNR emit time but not deleted from storage.
+If a type ever needs more than 10 variants, widen the offset spacing rather than overlapping. Rules redirect only `main_frame` requests and are added in batches of 50 to stay under MV3 dynamic-rule limits. Rules with `enabled === false` are skipped at DNR emit time but not deleted from storage.
 
 ### Storage shape
 
@@ -68,7 +70,7 @@ A `Rule` is:
 {
   id: string,                   // crypto.randomUUID() or fallback timestamp+random
   pattern: string,              // domain (bare) or wildcard pattern (preserved verbatim)
-  type: 'domain'|'wildcard'|'path'|'keyword',  // future: 'regex'
+  type: 'domain'|'wildcard'|'path'|'keyword'|'regex',
   enabled: boolean,             // false skips DNR emission but keeps the rule in storage
   groupId: string,              // 'default' until #7 introduces groups
   createdAt: number,            // ms epoch

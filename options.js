@@ -19,6 +19,15 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('toggleBtn').addEventListener('click', toggleExtension);
     modeBlocklistBtn.addEventListener('click', () => switchMode('blocklist'));
     modeAllowlistBtn.addEventListener('click', () => switchMode('allowlist'));
+    document.getElementById('regexTestBtn').addEventListener('click', testRegexAgainstUrl);
+
+    // Show the regex test row only when the input looks like a regex rule.
+    newWebsiteInput.addEventListener('input', function() {
+        const raw = newWebsiteInput.value.trim();
+        const isRegex = /^r\//.test(raw) || /^\/.*\/$/.test(raw);
+        document.getElementById('regexTestRow').style.display = isRegex ? 'block' : 'none';
+        document.getElementById('regexTestResult').textContent = '';
+    });
 
     // Enter key support
     newWebsiteInput.addEventListener('keypress', function(e) {
@@ -63,7 +72,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function detectRuleType(input) {
-        if (input.includes('*')) {
+        const trimmed = input.trim();
+        // Regex rules are prefixed with "r/" (shorthand) or delimited as
+        // "/pattern/" (full delimiter form). Both forms signal that the user
+        // wants a DNR regexFilter rule rather than a urlFilter rule.
+        // Examples: r/facebook\.com, /twitter\.com/
+        if (/^r\//.test(trimmed) || /^\/.*\/$/.test(trimmed)) {
+            return 'regex';
+        }
+        if (trimmed.includes('*')) {
             return 'wildcard';
         }
         // After stripping scheme + leading www, anything containing a "/" or
@@ -71,8 +88,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // youtube.com/@somechan, example.com?v=foo). The "?" case lets users
         // target a specific query string against the bare host. Bare hosts
         // have neither and fall through to the legacy domain type.
-        const stripped = input
-            .trim()
+        const stripped = trimmed
             .replace(/^https?:\/\//, '')
             .replace(/^www\./, '');
         if (stripped.includes('/') || stripped.includes('?')) {
@@ -89,6 +105,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function normalizePattern(input, type) {
+        if (type === 'regex') {
+            // Strip the "r/" prefix or surrounding "/" delimiters, leaving the
+            // raw regex string that will be passed as regexFilter to DNR.
+            const trimmed = input.trim();
+            if (/^r\//.test(trimmed)) {
+                return trimmed.slice(2); // remove "r/"
+            }
+            if (/^\/.*\/$/.test(trimmed)) {
+                return trimmed.slice(1, -1); // remove leading and trailing "/"
+            }
+            return trimmed;
+        }
         if (type === 'wildcard') {
             // Wildcards are passed through with surrounding whitespace stripped;
             // case is preserved because URL paths and query strings are case
@@ -261,6 +289,67 @@ document.addEventListener('DOMContentLoaded', function() {
         return null;
     }
 
+    // Validate a regex pattern against chrome.declarativeNetRequest.isRegexSupported
+    // so we surface a user-friendly error before the rule reaches DNR. Falls back
+    // to a plain JS RegExp compile check when the DNR API is unavailable (e.g.
+    // in tests or older Chrome builds).
+    async function validateRegex(pattern) {
+        if (!pattern || !pattern.trim()) {
+            return 'Regex pattern cannot be empty.';
+        }
+        try {
+            if (chrome.declarativeNetRequest && typeof chrome.declarativeNetRequest.isRegexSupported === 'function') {
+                const result = await chrome.declarativeNetRequest.isRegexSupported({
+                    regex: pattern,
+                    isCaseSensitive: false
+                });
+                if (!result.isSupported) {
+                    return `Regex not supported by Chrome DNR: ${result.reason || 'unknown reason'}`;
+                }
+                return null;
+            }
+        } catch (_e) {
+            // Fall through to JS-level check
+        }
+        try {
+            new RegExp(pattern); // eslint-disable-line no-new
+        } catch (err) {
+            return `Invalid regex: ${err.message}`;
+        }
+        return null;
+    }
+
+    // Test the regex currently in the input box against a user-supplied sample URL.
+    // Provides instant feedback before committing the rule to storage.
+    function testRegexAgainstUrl() {
+        const raw = newWebsiteInput.value.trim();
+        const pattern = normalizePattern(raw, 'regex');
+        const testUrl = document.getElementById('regexTestUrl').value.trim();
+        const resultDiv = document.getElementById('regexTestResult');
+
+        if (!pattern) {
+            resultDiv.textContent = 'Enter a regex pattern first.';
+            resultDiv.style.color = '#c62828';
+            return;
+        }
+        if (!testUrl) {
+            resultDiv.textContent = 'Enter a URL to test against.';
+            resultDiv.style.color = '#c62828';
+            return;
+        }
+        try {
+            const re = new RegExp(pattern, 'i');
+            const matched = re.test(testUrl);
+            resultDiv.textContent = matched
+                ? `Matches — this URL would be redirected.`
+                : `No match — this URL would NOT be redirected.`;
+            resultDiv.style.color = matched ? '#155724' : '#856404';
+        } catch (err) {
+            resultDiv.textContent = `Invalid regex: ${err.message}`;
+            resultDiv.style.color = '#c62828';
+        }
+    }
+
     async function addRule() {
         const raw = newWebsiteInput.value;
         const validationError = validateInput(raw);
@@ -271,6 +360,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const type = detectRuleType(raw);
         const pattern = normalizePattern(raw, type);
+
+        // Regex patterns require an extra async validation step against DNR.
+        if (type === 'regex') {
+            const regexError = await validateRegex(pattern);
+            if (regexError) {
+                showStatus(regexError, 'error');
+                return;
+            }
+        }
 
         try {
             const result = await chrome.storage.sync.get(['rules']);
@@ -438,6 +536,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const badgeClass = rule.type === 'wildcard' ? 'badge badge-wildcard'
                 : rule.type === 'path' ? 'badge badge-path'
                 : rule.type === 'keyword' ? 'badge badge-keyword'
+                : rule.type === 'regex' ? 'badge badge-regex'
                 : 'badge badge-domain';
             const badgeLabel = (rule.type || 'domain').toUpperCase();
             const exceptions = Array.isArray(rule.exceptions) ? rule.exceptions : [];

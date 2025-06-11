@@ -180,6 +180,10 @@
             background: #e53935;
         }
 
+        .badge-regex {
+            background: #37474f;
+        }
+
         .help-text {
             color: #666;
             font-size: 12px;
@@ -302,16 +306,29 @@
 
     <div class="section">
         <h3>Add Block Rule</h3>
-        <input type="text" id="newWebsite" placeholder="example.com  or  reddit.com/r/funny  or  *.site.com/*  or  kw:keyword">
+        <input type="text" id="newWebsite" placeholder="example.com  or  reddit.com/r/funny  or  *.site.com/*  or  r/regex.*">
         <div class="help-text">
             Plain domains block all subdomains. Add a path to block just a
             section (e.g. <code>reddit.com/r/funny</code>,
             <code>youtube.com/@chan</code>). Use <code>*</code> for wildcards
             (e.g. <code>*.facebook.com/*</code>). Prefix with
             <code>kw:</code> to block by page title/body keyword
-            (e.g. <code>kw:gambling</code>, <code>kw:news feed</code> — at least 3 chars).
+            (e.g. <code>kw:gambling</code> — at least 3 chars).
+            For full regex power, prefix with <code>r/</code> or wrap in
+            <code>/…/</code> (e.g. <code>r/(facebook|instagram)\.com</code>,
+            <code>/news.*\.html$/</code>). Up to 10 regex rules are active at once.
         </div>
         <button id="addWebsite">Add Rule</button>
+        <div id="regexTestRow" style="display:none; margin-top: 10px;">
+            <label style="font-size: 13px; color: #555; display: block; margin-bottom: 4px;">
+                Test regex against a URL:
+            </label>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="text" id="regexTestUrl" placeholder="https://example.com/page" style="flex: 1; margin-top: 0;">
+                <button id="regexTestBtn" style="margin-top: 0; white-space: nowrap;">Test</button>
+            </div>
+            <div id="regexTestResult" class="help-text" style="margin-top: 4px;"></div>
+        </div>
     </div>
 
     <div class="section">
