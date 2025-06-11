@@ -63,13 +63,15 @@ function createRule(pattern, type, opts = {}) {
         hitCount: opts.hitCount || 0,
         lastHitAt: opts.lastHitAt || null
     };
-    // Keyword rules carry optional matching toggles (case-sensitive, whole-word)
-    // and an exceptions list. They default to false/[] so the schema is stable
-    // across rule types — non-keyword rules ignore these fields entirely.
+    // Every rule type carries an exceptions[] list — URL patterns that should
+    // NOT be redirected even though the parent rule would match. Exceptions are
+    // emitted as higher-priority DNR allow rules at offsets 90..99 within the
+    // rule's 100-ID block, so they shadow the parent redirect automatically.
+    rule.exceptions = Array.isArray(opts.exceptions) ? opts.exceptions.slice() : [];
+    // Keyword rules additionally carry matching toggles (case-sensitive, whole-word).
     if (type === 'keyword') {
         rule.caseSensitive = opts.caseSensitive === true;
         rule.wholeWord = opts.wholeWord === true;
-        rule.exceptions = Array.isArray(opts.exceptions) ? opts.exceptions.slice() : [];
     }
     return rule;
 }
