@@ -339,10 +339,12 @@ async function updateRedirectRules() {
         if (!isEnabled) {
             // Clear all rules if extension is disabled
             await clearAllRules();
+            setActionIcon(false);
             return;
         }
 
         await createRedirectRules(rules, redirectUrl, { mode, alwaysAllowed, groups });
+        setActionIcon(true);
     } catch (error) {
         console.error('Error updating redirect rules:', error);
     }
@@ -707,6 +709,8 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
         chrome.storage.local.set(mirror);
     }
 
+    if ('extensionEnabled' in changes) { setActionIcon(changes.extensionEnabled.newValue !== false); }
+
     updateRedirectRules();
 });
 
@@ -716,3 +720,15 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 chrome.action.onClicked.addListener(() => {
     chrome.runtime.openOptionsPage();
 });
+
+function setActionIcon(enabled) {
+    const variant = enabled ? '' : '-disabled';
+    chrome.action.setIcon({
+        path: {
+            16: `icons/icon-16${variant}.png`,
+            32: `icons/icon-32${variant}.png`,
+            48: `icons/icon-48${variant}.png`,
+            128: `icons/icon-128${variant}.png`
+        }
+    });
+}
