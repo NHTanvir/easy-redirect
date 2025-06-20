@@ -147,11 +147,23 @@ function migrateLegacyBlockedWebsites(settings) {
     };
 }
 
-function registerContextMenus() {
-    // Context menus do not persist across service-worker restarts — recreate every time.
-    chrome.contextMenus.removeAll(() => {
-        chrome.contextMenus.create({ id: 'block-site', title: 'Block this site', contexts: ['page', 'link'] });
-        chrome.contextMenus.create({ id: 'block-url',  title: 'Block this URL',  contexts: ['page', 'link'] });
+async function registerContextMenus() {
+    chrome.contextMenus.removeAll(async () => {
+        // Parent items
+        chrome.contextMenus.create({ id: 'block-site', title: 'Block this site', contexts: ['page','link'] });
+        chrome.contextMenus.create({ id: 'block-url',  title: 'Block this URL',  contexts: ['page','link'] });
+
+        // Group submenu under block-site
+        const result = await chrome.storage.sync.get(['groups']);
+        const groups = Array.isArray(result.groups) ? result.groups : [{ id: 'default', name: 'Default' }];
+        groups.forEach(g => {
+            chrome.contextMenus.create({
+                id: `block-site-group-${g.id}`,
+                parentId: 'block-site',
+                title: `→ ${g.name}`,
+                contexts: ['page','link']
+            });
+        });
     });
 }
 
@@ -791,5 +803,12 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     }
     if (info.menuItemId === 'block-url') {
         await addRuleFromBackground(pageUrl, 'wildcard');
+    }
+    if (info.menuItemId.startsWith('block-site-group-')) {
+        const groupId = info.menuItemId.replace('block-site-group-', '');
+        try {
+            const host = new URL(pageUrl).hostname.replace(/^www\./, '');
+            if (host) await addRuleFromBackground(host, 'domain', groupId);
+        } catch (e) {}
     }
 });
