@@ -60,6 +60,38 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Search input — re-render the list on every keystroke so the filter is live.
+    const ruleSearchInput = document.getElementById('ruleSearch');
+    if (ruleSearchInput) {
+        ruleSearchInput.addEventListener('input', () => {
+            chrome.storage.sync.get(['rules'], result => {
+                displayRules(Array.isArray(result.rules) ? result.rules : []);
+            });
+        });
+        // Clear search on Escape.
+        ruleSearchInput.addEventListener('keydown', e => {
+            if (e.key === 'Escape') {
+                ruleSearchInput.value = '';
+                chrome.storage.sync.get(['rules'], result => {
+                    displayRules(Array.isArray(result.rules) ? result.rules : []);
+                });
+            }
+        });
+    }
+
+    // Press "/" anywhere on the page to jump focus to the rule search box,
+    // unless the user is already typing in another input/textarea.
+    document.addEventListener('keydown', function(e) {
+        if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+        const tag = document.activeElement && document.activeElement.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        e.preventDefault();
+        if (ruleSearchInput) {
+            ruleSearchInput.focus();
+            ruleSearchInput.select();
+        }
+    });
+
     // Show the regex test row only when the input looks like a regex rule.
     newWebsiteInput.addEventListener('input', function() {
         const raw = newWebsiteInput.value.trim();
@@ -669,19 +701,50 @@ document.addEventListener('DOMContentLoaded', function() {
             .replace(/'/g, '&#39;');
     }
 
+    // Wrap the first occurrence of `query` in `text` with a <mark> highlight
+    // span. Both are compared case-insensitively. Returns the escaped HTML
+    // string. If query is empty the plain-escaped text is returned unchanged.
+    function highlightMatch(text, query) {
+        const escaped = escapeHtml(text);
+        if (!query) return escaped;
+        const idx = text.toLowerCase().indexOf(query.toLowerCase());
+        if (idx === -1) return escaped;
+        return (
+            escapeHtml(text.slice(0, idx)) +
+            '<mark style="background:#fff176;border-radius:2px;padding:0 1px;">' +
+            escapeHtml(text.slice(idx, idx + query.length)) +
+            '</mark>' +
+            escapeHtml(text.slice(idx + query.length))
+        );
+    }
+
     function displayRules(allRules) {
         // Filter to only the rules belonging to the active group.
-        const rules = (allRules || []).filter(r => {
+        let rules = (allRules || []).filter(r => {
             const gid = r.groupId || 'default';
             return gid === activeGroupId;
         });
+
+        // Apply search filter: match against pattern and group name (case-insensitive).
+        const searchInput = document.getElementById('ruleSearch');
+        const searchQuery = searchInput ? searchInput.value.trim().toLowerCase() : '';
+        if (searchQuery) {
+            rules = rules.filter(r => {
+                const groupName = (currentGroups.find(g => g.id === (r.groupId || 'default')) || {}).name || '';
+                return r.pattern.toLowerCase().includes(searchQuery) ||
+                    groupName.toLowerCase().includes(searchQuery);
+            });
+        }
 
         // Show or hide bulk actions bar based on whether there are rules to show.
         const bulkActionsEl = document.getElementById('bulkActions');
         if (bulkActionsEl) bulkActionsEl.style.display = rules.length > 0 ? 'flex' : 'none';
 
         if (rules.length === 0) {
-            websiteListDiv.innerHTML = '<div style="text-align: center; color: #666; font-size: 13px;">No rules in this group</div>';
+            const emptyMsg = searchQuery
+                ? `No rules match "<strong>${escapeHtml(searchQuery)}</strong>"`
+                : 'No rules in this group';
+            websiteListDiv.innerHTML = `<div style="text-align: center; color: #666; font-size: 13px;">${emptyMsg}</div>`;
             return;
         }
 
@@ -711,7 +774,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <span class="rule-meta">
                             <input type="checkbox" class="rule-select-checkbox" data-rule-id="${escapeHtml(rule.id)}" style="margin:0 4px 0 0;cursor:pointer;" title="Select this rule">
                             <span class="${badgeClass}">${badgeLabel}</span>
-                            <span class="rule-pattern">${escapeHtml(rule.pattern)}</span>
+                            <span class="rule-pattern">${highlightMatch(rule.pattern, searchQuery)}</span>
                         </span>
                         <span class="rule-actions">
                             <button class="${toggleClass}" data-rule-id="${escapeHtml(rule.id)}" title="${isEnabled ? 'Disable this rule' : 'Enable this rule'}">${isEnabled ? 'On' : 'Off'}</button>

@@ -141,6 +141,14 @@ If you add a new persisted key, add it to `DEFAULTS` in `background.js` so it pa
 
 When the options page mutates storage it triggers redirect-rule updates **twice**: once via the explicit `sendMessage({action:'updateRules'})` and once via the `chrome.storage.onChanged` listener in `background.js`. This is redundant but harmless because rule creation is idempotent (clear-then-recreate). If you change one path, change both, or remove one deliberately.
 
+### Rule search / filter
+
+A search box (`#ruleSearch`) sits above the bulk-actions bar in the Block Rules section. Typing in it live-filters the visible rule list to rules whose `pattern` or group name contains the query (case-insensitive). The filter runs inside `displayRules()` after the active-group filter — it reads `ruleSearch.value` directly, so any caller that re-invokes `displayRules()` (e.g. the search `input` listener) will pick up the current query automatically.
+
+`highlightMatch(text, query)` wraps the first matching substring in a `<mark>` element (yellow background). It is applied to the rule-pattern span in the `displayRules()` template.
+
+Pressing `/` anywhere on the options page (except when another input already has focus) moves focus to `#ruleSearch`. Pressing `Escape` inside the search box clears the query and resets the list.
+
 ### Per-rule enable/disable toggle
 
 Every rule row in the options page shows an **On / Off** button. Clicking it calls `toggleRule(ruleId)` in `options.js`, which flips `rule.enabled` in storage and immediately calls `updateRedirectRules()`. Disabled rules (`enabled === false`) are kept in `rules[]` but skipped at DNR emit time in `background.js` — the user can re-enable them at any time without re-entering the pattern.
