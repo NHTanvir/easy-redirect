@@ -79,6 +79,26 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Sort direction toggle button — flips between ascending and descending.
+    const sortDirBtn = document.getElementById('sortDirBtn');
+    if (sortDirBtn) {
+        // Restore persisted direction preference on page load.
+        chrome.storage.local.get(['sortDir'], lr => {
+            if (lr.sortDir) {
+                sortDir = lr.sortDir;
+                sortDirBtn.textContent = sortDir === 'asc' ? '↑' : '↓';
+            }
+        });
+        sortDirBtn.addEventListener('click', () => {
+            sortDir = sortDir === 'desc' ? 'asc' : 'desc';
+            sortDirBtn.textContent = sortDir === 'asc' ? '↑' : '↓';
+            chrome.storage.local.set({ sortDir });
+            chrome.storage.sync.get(['rules'], result => {
+                displayRules(Array.isArray(result.rules) ? result.rules : []);
+            });
+        });
+    }
+
     // Press "/" anywhere on the page to jump focus to the rule search box,
     // unless the user is already typing in another input/textarea.
     document.addEventListener('keydown', function(e) {
@@ -716,6 +736,35 @@ document.addEventListener('DOMContentLoaded', function() {
             '</mark>' +
             escapeHtml(text.slice(idx + query.length))
         );
+    }
+
+    // Sort order applied to the rule list. Persisted to chrome.storage.local so it
+    // survives page reloads. Default is 'newest' (chronological descending).
+    let currentSortOrder = 'newest';
+    let sortDir = 'desc'; // 'asc' or 'desc'; flips the sort order
+
+    // Apply the current sort to a rules array. Uses createdAt as a stable
+    // secondary key so ties are always broken consistently.
+    function sortRules(rules) {
+        const arr = rules.slice();
+        switch (currentSortOrder) {
+            case 'oldest':
+                arr.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+                break;
+            case 'az':
+                arr.sort((a, b) => a.pattern.localeCompare(b.pattern) || (a.createdAt || 0) - (b.createdAt || 0));
+                break;
+            case 'za':
+                arr.sort((a, b) => b.pattern.localeCompare(a.pattern) || (a.createdAt || 0) - (b.createdAt || 0));
+                break;
+            case 'most-blocked':
+                arr.sort((a, b) => (b.hitCount || 0) - (a.hitCount || 0) || (b.createdAt || 0) - (a.createdAt || 0));
+                break;
+            default: // 'newest'
+                arr.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        }
+        if (sortDir === 'asc') arr.reverse();
+        return arr;
     }
 
     function displayRules(allRules) {
