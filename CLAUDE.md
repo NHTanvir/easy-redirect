@@ -144,3 +144,7 @@ When the options page mutates storage it triggers redirect-rule updates **twice*
 ### Keyboard shortcuts
 
 Keyboard shortcuts are declared under `commands` in `manifest.json`. background.js `chrome.commands.onCommand` handles `open-settings` (opens options page) and `toggle-extension` (flips enabled state). Default bindings: Ctrl+Shift+B / Ctrl+Shift+Y.
+
+### Context menu
+
+background.js registers two context menu items ('Block this site' and 'Block this URL') recreated on every install/startup. `addRuleFromBackground(pattern, type, groupId)` handles the write. A desktop notification confirms each add. A submenu lists groups for direct targeting.

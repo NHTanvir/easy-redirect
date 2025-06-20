@@ -147,6 +147,26 @@ function migrateLegacyBlockedWebsites(settings) {
     };
 }
 
+async function registerContextMenus() {
+    chrome.contextMenus.removeAll(async () => {
+        // Parent items
+        chrome.contextMenus.create({ id: 'block-site', title: 'Block this site', contexts: ['page','link'] });
+        chrome.contextMenus.create({ id: 'block-url',  title: 'Block this URL',  contexts: ['page','link'] });
+
+        // Group submenu under block-site
+        const result = await chrome.storage.sync.get(['groups']);
+        const groups = Array.isArray(result.groups) ? result.groups : [{ id: 'default', name: 'Default' }];
+        groups.forEach(g => {
+            chrome.contextMenus.create({
+                id: `block-site-group-${g.id}`,
+                parentId: 'block-site',
+                title: `→ ${g.name}`,
+                contexts: ['page','link']
+            });
+        });
+    });
+}
+
 chrome.runtime.onInstalled.addListener(async (details) => {
     console.log('Website Redirector onInstalled:', details.reason);
 
@@ -161,6 +181,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 
     await ensureKeywordContentScriptRegistered();
     updateRedirectRules();
+    registerContextMenus();
 });
 
 // Content script registration is dynamic instead of declared in manifest.json
@@ -287,6 +308,7 @@ chrome.runtime.onStartup.addListener(async () => {
     await runSchemaMigration();
     await ensureKeywordContentScriptRegistered();
     updateRedirectRules();
+    registerContextMenus();
 });
 
 // Listen for messages from popup
@@ -752,3 +774,41 @@ function setActionIcon(enabled) {
         }
     });
 }
+
+async function addRuleFromBackground(pattern, type, groupId) {
+    const result = await chrome.storage.sync.get(['rules']);
+    const rules = Array.isArray(result.rules) ? result.rules : [];
+    if (rules.some(r => r.pattern === pattern && r.type === type)) return; // already exists
+    const rule = createRule(pattern, type, { groupId: groupId || 'default' });
+    const next = [...rules, rule];
+    await persist({ rules: next });
+    updateRedirectRules();
+    chrome.notifications.create(`block-confirm-${Date.now()}`, {
+        type: 'basic',
+        iconUrl: 'icons/icon-48.png',
+        title: 'Easy Redirect',
+        message: `Blocked: ${pattern}`
+    });
+}
+
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+    const pageUrl = info.pageUrl || (tab && tab.url) || '';
+    if (!pageUrl || pageUrl.startsWith('chrome://') || pageUrl.startsWith('chrome-extension://')) return;
+
+    if (info.menuItemId === 'block-site') {
+        try {
+            const host = new URL(pageUrl).hostname.replace(/^www\./, '');
+            if (host) await addRuleFromBackground(host, 'domain');
+        } catch (e) { console.error('context menu block-site:', e); }
+    }
+    if (info.menuItemId === 'block-url') {
+        await addRuleFromBackground(pageUrl, 'wildcard');
+    }
+    if (info.menuItemId.startsWith('block-site-group-')) {
+        const groupId = info.menuItemId.replace('block-site-group-', '');
+        try {
+            const host = new URL(pageUrl).hostname.replace(/^www\./, '');
+            if (host) await addRuleFromBackground(host, 'domain', groupId);
+        } catch (e) {}
+    }
+});
