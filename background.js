@@ -771,6 +771,12 @@ async function addRuleFromBackground(pattern, type, groupId) {
     const next = [...rules, rule];
     await persist({ rules: next });
     updateRedirectRules();
+    chrome.notifications.create(`block-confirm-${Date.now()}`, {
+        type: 'basic',
+        iconUrl: 'icons/icon-48.png',
+        title: 'Easy Redirect',
+        message: `Blocked: ${pattern}`
+    });
 }
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
