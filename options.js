@@ -1233,6 +1233,7 @@ document.addEventListener('DOMContentLoaded', function() {
         showStatus('Exported successfully.', 'success');
     }
 
+    document.getElementById('bulkAddBtn').addEventListener('click', bulkAdd);
     document.getElementById('exportJsonBtn').addEventListener('click', exportSettings);
     document.getElementById('exportTxtBtn').addEventListener('click', exportPlainText);
     const importBtn = document.getElementById('importBtn');
