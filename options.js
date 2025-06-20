@@ -79,6 +79,26 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Sort direction toggle button — flips between ascending and descending.
+    const sortDirBtn = document.getElementById('sortDirBtn');
+    if (sortDirBtn) {
+        // Restore persisted direction preference on page load.
+        chrome.storage.local.get(['sortDir'], lr => {
+            if (lr.sortDir) {
+                sortDir = lr.sortDir;
+                sortDirBtn.textContent = sortDir === 'asc' ? '↑' : '↓';
+            }
+        });
+        sortDirBtn.addEventListener('click', () => {
+            sortDir = sortDir === 'desc' ? 'asc' : 'desc';
+            sortDirBtn.textContent = sortDir === 'asc' ? '↑' : '↓';
+            chrome.storage.local.set({ sortDir });
+            chrome.storage.sync.get(['rules'], result => {
+                displayRules(Array.isArray(result.rules) ? result.rules : []);
+            });
+        });
+    }
+
     // Press "/" anywhere on the page to jump focus to the rule search box,
     // unless the user is already typing in another input/textarea.
     document.addEventListener('keydown', function(e) {
