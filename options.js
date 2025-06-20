@@ -1153,6 +1153,7 @@ document.addEventListener('DOMContentLoaded', function() {
             textarea.value = '';
         }
 
+        // Status message always shows counts; 'success' tone only when at least one rule was added.
         let msg = `${added} added`;
         if (skipped) msg += `, ${skipped} duplicate${skipped > 1 ? 's' : ''} skipped`;
         if (errors.length) msg += `, ${errors.length} invalid`;
