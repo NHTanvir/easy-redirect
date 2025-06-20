@@ -141,6 +141,12 @@ If you add a new persisted key, add it to `DEFAULTS` in `background.js` so it pa
 
 When the options page mutates storage it triggers redirect-rule updates **twice**: once via the explicit `sendMessage({action:'updateRules'})` and once via the `chrome.storage.onChanged` listener in `background.js`. This is redundant but harmless because rule creation is idempotent (clear-then-recreate). If you change one path, change both, or remove one deliberately.
 
+### Per-rule enable/disable toggle
+
+Every rule row in the options page shows an **On / Off** button. Clicking it calls `toggleRule(ruleId)` in `options.js`, which flips `rule.enabled` in storage and immediately calls `updateRedirectRules()`. Disabled rules (`enabled === false`) are kept in `rules[]` but skipped at DNR emit time in `background.js` — the user can re-enable them at any time without re-entering the pattern.
+
+A **bulk-actions bar** appears above the rule list whenever at least one rule exists. It contains a **Select all** checkbox (wires all per-row checkboxes at once) and **Enable selected** / **Disable selected** buttons that call `bulkSetEnabled(visibleRules, enable)`. `bulkSetEnabled` reads the global `rules[]` from storage, flips `enabled` for every rule whose id is currently checked, and saves the updated array.
+
 ### Keyboard shortcuts
 
 Keyboard shortcuts are declared under `commands` in `manifest.json`. background.js `chrome.commands.onCommand` handles `open-settings` (opens options page) and `toggle-extension` (flips enabled state). Default bindings: Ctrl+Shift+B / Ctrl+Shift+Y.
