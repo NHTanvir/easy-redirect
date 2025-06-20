@@ -718,6 +718,33 @@ document.addEventListener('DOMContentLoaded', function() {
         );
     }
 
+    // Sort order applied to the rule list. Persisted to chrome.storage.local so it
+    // survives page reloads. Default is 'newest' (chronological descending).
+    let currentSortOrder = 'newest';
+
+    // Apply the current sort to a rules array. Uses createdAt as a stable
+    // secondary key so ties are always broken consistently.
+    function sortRules(rules) {
+        const arr = rules.slice();
+        switch (currentSortOrder) {
+            case 'oldest':
+                arr.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+                break;
+            case 'az':
+                arr.sort((a, b) => a.pattern.localeCompare(b.pattern) || (a.createdAt || 0) - (b.createdAt || 0));
+                break;
+            case 'za':
+                arr.sort((a, b) => b.pattern.localeCompare(a.pattern) || (a.createdAt || 0) - (b.createdAt || 0));
+                break;
+            case 'most-blocked':
+                arr.sort((a, b) => (b.hitCount || 0) - (a.hitCount || 0) || (b.createdAt || 0) - (a.createdAt || 0));
+                break;
+            default: // 'newest'
+                arr.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        }
+        return arr;
+    }
+
     function displayRules(allRules) {
         // Filter to only the rules belonging to the active group.
         let rules = (allRules || []).filter(r => {
@@ -735,6 +762,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     groupName.toLowerCase().includes(searchQuery);
             });
         }
+
+        // Apply sort before rendering.
+        rules = sortRules(rules);
 
         // Show or hide bulk actions bar based on whether there are rules to show.
         const bulkActionsEl = document.getElementById('bulkActions');
@@ -1064,6 +1094,17 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(() => {
             statusDiv.style.display = 'none';
         }, 3000);
+    }
+
+    async function exportSettings() {
+        const data = await chrome.storage.sync.get(['rules','redirectUrl','mode','groups','alwaysAllowed','extensionEnabled','theme']);
+        const exportData = { version: 1, exportedAt: new Date().toISOString(), ...data };
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = Object.assign(document.createElement('a'), { href: url, download: `easy-redirect-${Date.now()}.json` });
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showStatus('Exported successfully.', 'success');
     }
 
     // Expose removeRule for any external callers / debugging.
