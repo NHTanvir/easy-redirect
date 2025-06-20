@@ -65,6 +65,9 @@ document.addEventListener('DOMContentLoaded', function() {
         return `r-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
     }
 
+    // `enabled` has been in the Rule schema since PR #1 and background.js already
+    // skips disabled rules at DNR emit time. This PR adds the UI toggle per row
+    // so users can disable individual rules without deleting them.
     function createRule(pattern, type, opts = {}) {
         const rule = {
             id: opts.id || generateRuleId(),
