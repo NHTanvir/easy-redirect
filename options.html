@@ -520,6 +520,16 @@
     </div>
 
     <div class="section">
+        <h3>Bulk Add Rules</h3>
+        <textarea id="bulkInput" rows="6" placeholder="One entry per line:&#10;example.com&#10;reddit.com/r/funny&#10;kw:gambling&#10;*.site.com/*" style="width:100%;box-sizing:border-box;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);resize:vertical;"></textarea>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:8px;flex-wrap:wrap;">
+            <select id="bulkGroupSelect" style="padding:7px;border:1px solid var(--border);border-radius:4px;font-size:13px;background:var(--input-bg);color:var(--text);"></select>
+            <button id="bulkAddBtn">Add All</button>
+        </div>
+        <div class="help-text" style="margin-top:6px;">Enter one domain, path, keyword (kw:), or wildcard per line. Duplicates are skipped.</div>
+    </div>
+
+    <div class="section">
         <h3>Import / Export</h3>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
             <button id="exportJsonBtn">Export JSON</button>
