@@ -1170,6 +1170,24 @@ document.addEventListener('DOMContentLoaded', function() {
         showStatus('Exported successfully.', 'success');
     }
 
+    document.getElementById('exportJsonBtn').addEventListener('click', exportSettings);
+    document.getElementById('exportTxtBtn').addEventListener('click', exportPlainText);
+    const importBtn = document.getElementById('importBtn');
+    const importFile = document.getElementById('importFile');
+    importBtn.addEventListener('click', () => importFile.click());
+    importFile.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const text = await file.text();
+        const mode = document.querySelector('input[name="importMode"]:checked').value;
+        if (file.name.endsWith('.json')) {
+            await importFromJSON(text, mode);
+        } else {
+            await importFromPlainText(text, mode);
+        }
+        importFile.value = '';
+    });
+
     // Expose removeRule for any external callers / debugging.
     window.removeRule = removeRule;
     window.addException = addException;
