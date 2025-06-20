@@ -1,4 +1,5 @@
 // Static prebuilt category lists. These are never auto-updated — user opt-in only.
+//
 // To update these lists: edit this file and reload the extension. There is no remote fetch.
 const PREBUILT_CATEGORIES = [
     {
