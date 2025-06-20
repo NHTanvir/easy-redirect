@@ -300,6 +300,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             renderGroupTabs(currentGroups);
+            const bulkGroupSelect = document.getElementById('bulkGroupSelect');
+            if (bulkGroupSelect) {
+                bulkGroupSelect.innerHTML = currentGroups.map(g =>
+                    `<option value="${escapeHtml(g.id)}">${escapeHtml(g.name)}</option>`
+                ).join('');
+            }
             displayRules(rules);
 
             const isEnabled = result.extensionEnabled !== false; // Default to true
@@ -1118,6 +1124,42 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     }
 
+    // Bulk-adds newline-separated rules. Uses the same validateInput/detectRuleType/normalizePattern pipeline as the single-add path.
+    async function bulkAdd() {
+        const textarea = document.getElementById('bulkInput');
+        const groupSelect = document.getElementById('bulkGroupSelect');
+        const groupId = groupSelect ? groupSelect.value : 'default';
+        const lines = textarea.value.split('\n').map(l => l.trim()).filter(l => l);
+        if (!lines.length) { showStatus('Enter at least one rule.', 'error'); return; }
+
+        const existing = await chrome.storage.sync.get(['rules']);
+        const rules = Array.isArray(existing.rules) ? existing.rules : [];
+        let added = 0, skipped = 0, errors = [];
+
+        for (const raw of lines) {
+            const err = validateInput(raw);
+            if (err) { errors.push(`"${raw}": ${err}`); continue; }
+            const type = detectRuleType(raw);
+            const pattern = normalizePattern(raw, type);
+            if (rules.some(r => r.pattern === pattern && r.type === type)) { skipped++; continue; }
+            rules.push(createRule(pattern, type, { groupId }));
+            added++;
+        }
+
+        if (added > 0) {
+            await chrome.storage.sync.set({ rules });
+            await updateRedirectRules();
+            displayRules(rules);
+            textarea.value = '';
+        }
+
+        // Status message always shows counts; 'success' tone only when at least one rule was added.
+        let msg = `${added} added`;
+        if (skipped) msg += `, ${skipped} duplicate${skipped > 1 ? 's' : ''} skipped`;
+        if (errors.length) msg += `, ${errors.length} invalid`;
+        showStatus(msg, added > 0 ? 'success' : 'error');
+    }
+
     async function importFromPlainText(text, mode) {
         const lines = text.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
         const incoming = lines.map(line => {
@@ -1192,6 +1234,7 @@ document.addEventListener('DOMContentLoaded', function() {
         showStatus('Exported successfully.', 'success');
     }
 
+    document.getElementById('bulkAddBtn').addEventListener('click', bulkAdd);
     document.getElementById('exportJsonBtn').addEventListener('click', exportSettings);
     document.getElementById('exportTxtBtn').addEventListener('click', exportPlainText);
     const importBtn = document.getElementById('importBtn');
