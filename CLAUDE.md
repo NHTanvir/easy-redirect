@@ -145,6 +145,12 @@ If you add a new persisted key, add it to `DEFAULTS` in `background.js` so it pa
 
 When the options page mutates storage it triggers redirect-rule updates **twice**: once via the explicit `sendMessage({action:'updateRules'})` and once via the `chrome.storage.onChanged` listener in `background.js`. This is redundant but harmless because rule creation is idempotent (clear-then-recreate). If you change one path, change both, or remove one deliberately.
 
+### Rule list sort
+
+A `<select id="sortSelect">` in the search/filter toolbar lets the user sort the rule list by: **Newest first** (default), **Oldest first**, **A → Z**, **Z → A**, or **Most blocked**. An adjacent `<button id="sortDirBtn">` toggles ascending (↑) vs. descending (↓) within the selected criterion.
+
+`sortRules(rules)` in `options.js` applies the sort using `currentSortOrder` and `sortDir` state variables, using `rule.createdAt` as a stable secondary key so ties are always broken consistently. Both preferences are persisted to `chrome.storage.local` (not sync — sort preference is device-local) and restored on page load.
+
 ### Rule search / filter
 
 A search box (`#ruleSearch`) sits above the bulk-actions bar in the Block Rules section. Typing in it live-filters the visible rule list to rules whose `pattern` or group name contains the query (case-insensitive). The filter runs inside `displayRules()` after the active-group filter — it reads `ruleSearch.value` directly, so any caller that re-invokes `displayRules()` (e.g. the search `input` listener) will pick up the current query automatically.
