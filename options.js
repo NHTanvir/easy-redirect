@@ -1096,6 +1096,18 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     }
 
+    async function exportPlainText() {
+        const data = await chrome.storage.sync.get(['rules']);
+        const rules = Array.isArray(data.rules) ? data.rules : [];
+        const text = rules.map(r => r.pattern).join('\n');
+        const blob = new Blob([text], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = Object.assign(document.createElement('a'), { href: url, download: `easy-redirect-${Date.now()}.txt` });
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showStatus('Exported as plain text.', 'success');
+    }
+
     async function exportSettings() {
         const data = await chrome.storage.sync.get(['rules','redirectUrl','mode','groups','alwaysAllowed','extensionEnabled','theme']);
         const exportData = { version: 1, exportedAt: new Date().toISOString(), ...data };
