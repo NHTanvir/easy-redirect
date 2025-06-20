@@ -37,6 +37,21 @@ document.addEventListener('DOMContentLoaded', function() {
     modeAllowlistBtn.addEventListener('click', () => switchMode('allowlist'));
     document.getElementById('regexTestBtn').addEventListener('click', testRegexAgainstUrl);
 
+    // Wire the 3-way theme toggle — clicking saves to storage and applies immediately.
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const theme = btn.dataset.theme;
+            await chrome.storage.sync.set({ theme });
+            applyTheme(theme);
+            document.querySelectorAll('.theme-btn').forEach(b => {
+                b.style.background = 'var(--bg-section)';
+                b.style.color = 'var(--text)';
+            });
+            btn.style.background = 'var(--btn-blue)';
+            btn.style.color = '#fff';
+        });
+    });
+
     const shortcutsLink = document.getElementById('shortcutsLink');
     if (shortcutsLink) {
         shortcutsLink.addEventListener('click', (e) => {
