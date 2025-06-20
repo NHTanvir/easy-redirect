@@ -1096,6 +1096,31 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     }
 
+    async function importFromPlainText(text, mode) {
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+        const incoming = lines.map(line => {
+            const type = line.includes('*') ? 'wildcard' : (line.includes('/') || line.includes('?')) ? 'path' : 'domain';
+            const pattern = line.replace(/^https?:\/\//,'').replace(/^www\./,'').replace(/\/$/,'');
+            return createRule(pattern, type);
+        });
+        if (mode === 'replace') {
+            if (!confirm(`Replace ALL existing rules with ${incoming.length} imported rules?`)) return;
+            await chrome.storage.sync.set({ rules: incoming });
+        } else {
+            const existing = await chrome.storage.sync.get(['rules']);
+            const current = Array.isArray(existing.rules) ? existing.rules : [];
+            const deduped = [...current];
+            for (const r of incoming) {
+                if (!deduped.some(e => e.pattern === r.pattern && e.type === r.type)) deduped.push(r);
+            }
+            await chrome.storage.sync.set({ rules: deduped });
+        }
+        await updateRedirectRules();
+        const result = await chrome.storage.sync.get(['rules']);
+        displayRules(Array.isArray(result.rules) ? result.rules : []);
+        showStatus(`Imported ${incoming.length} rules.`, 'success');
+    }
+
     async function importFromJSON(text, mode) {
         let parsed;
         try { parsed = JSON.parse(text); } catch(e) { showStatus('Invalid JSON file.', 'error'); return; }
