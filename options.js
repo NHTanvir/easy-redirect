@@ -663,6 +663,23 @@ document.addEventListener('DOMContentLoaded', function() {
             .replace(/'/g, '&#39;');
     }
 
+    // Wrap the first occurrence of `query` in `text` with a <mark> highlight
+    // span. Both are compared case-insensitively. Returns the escaped HTML
+    // string. If query is empty the plain-escaped text is returned unchanged.
+    function highlightMatch(text, query) {
+        const escaped = escapeHtml(text);
+        if (!query) return escaped;
+        const idx = text.toLowerCase().indexOf(query.toLowerCase());
+        if (idx === -1) return escaped;
+        return (
+            escapeHtml(text.slice(0, idx)) +
+            '<mark style="background:#fff176;border-radius:2px;padding:0 1px;">' +
+            escapeHtml(text.slice(idx, idx + query.length)) +
+            '</mark>' +
+            escapeHtml(text.slice(idx + query.length))
+        );
+    }
+
     function displayRules(allRules) {
         // Filter to only the rules belonging to the active group.
         let rules = (allRules || []).filter(r => {
@@ -719,7 +736,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <span class="rule-meta">
                             <input type="checkbox" class="rule-select-checkbox" data-rule-id="${escapeHtml(rule.id)}" style="margin:0 4px 0 0;cursor:pointer;" title="Select this rule">
                             <span class="${badgeClass}">${badgeLabel}</span>
-                            <span class="rule-pattern">${escapeHtml(rule.pattern)}</span>
+                            <span class="rule-pattern">${highlightMatch(rule.pattern, searchQuery)}</span>
                         </span>
                         <span class="rule-actions">
                             <button class="${toggleClass}" data-rule-id="${escapeHtml(rule.id)}" title="${isEnabled ? 'Disable this rule' : 'Enable this rule'}">${isEnabled ? 'On' : 'Off'}</button>
