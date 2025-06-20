@@ -4,17 +4,33 @@
     <meta charset="utf-8">
     <title>Easy Redirect — Settings</title>
     <style>
+        :root {
+          --bg: #fafafa;
+          --bg-section: #fff;
+          --text: #222;
+          --text-muted: #666;
+          --border: #ddd;
+          --border-light: #eee;
+          --input-bg: #fff;
+          --btn-primary: #4CAF50;
+          --btn-primary-hover: #45a049;
+          --btn-blue: #2196F3;
+          --exception-bg: #e8f5e9;
+          --exception-border: #a5d6a7;
+          --exception-text: #2e7d32;
+        }
+
         body {
             max-width: 720px;
             margin: 0 auto;
             padding: 32px 24px 64px;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
-            color: #222;
-            background: #fafafa;
+            color: var(--text);
+            background: var(--bg);
         }
 
         h1 {
-            color: #333;
+            color: var(--text);
             font-size: 24px;
             margin: 0 0 24px;
             text-align: center;
@@ -23,28 +39,28 @@
         .section {
             margin-bottom: 20px;
             padding: 20px;
-            border: 1px solid #ddd;
+            border: 1px solid var(--border);
             border-radius: 6px;
-            background: #fff;
+            background: var(--bg-section);
         }
 
         .section h3 {
             margin-top: 0;
-            color: #555;
+            color: var(--text-muted);
             font-size: 15px;
         }
 
         input[type="text"] {
             width: 100%;
             padding: 10px;
-            border: 1px solid #ddd;
+            border: 1px solid var(--border);
             border-radius: 4px;
             font-size: 14px;
             box-sizing: border-box;
         }
 
         button {
-            background: #4CAF50;
+            background: var(--btn-primary);
             color: white;
             padding: 10px 16px;
             border: none;
@@ -55,7 +71,7 @@
         }
 
         button:hover {
-            background: #45a049;
+            background: var(--btn-primary-hover);
         }
 
         .remove-btn {
@@ -77,11 +93,11 @@
         }
 
         .website-item {
-            background: #fafafa;
+            background: var(--bg);
             padding: 10px 12px;
             margin: 6px 0;
             border-radius: 4px;
-            border: 1px solid #eee;
+            border: 1px solid var(--border-light);
             display: flex;
             flex-direction: column;
             font-size: 14px;
@@ -119,12 +135,12 @@
         }
 
         .exception-tag {
-            background: #e8f5e9;
-            border: 1px solid #a5d6a7;
+            background: var(--exception-bg);
+            border: 1px solid var(--exception-border);
             border-radius: 10px;
             padding: 2px 6px;
             font-size: 11px;
-            color: #2e7d32;
+            color: var(--exception-text);
             display: inline-flex;
             align-items: center;
             gap: 4px;
@@ -185,7 +201,7 @@
         }
 
         .help-text {
-            color: #666;
+            color: var(--text-muted);
             font-size: 12px;
             margin-top: 6px;
         }
@@ -244,19 +260,19 @@
 
         .mode-toggle {
             display: inline-flex;
-            border: 1px solid #ddd;
+            border: 1px solid var(--border);
             border-radius: 6px;
             overflow: hidden;
         }
 
         .mode-toggle button {
-            background: #fff;
-            color: #333;
+            background: var(--bg-section);
+            color: var(--text);
             margin-top: 0;
             border-radius: 0;
             padding: 8px 14px;
             font-size: 13px;
-            border-right: 1px solid #ddd;
+            border-right: 1px solid var(--border);
         }
 
         .mode-toggle button:last-child {
@@ -278,8 +294,8 @@
 
 
         .rule-toggle-btn {
-            background: #e8f5e9;
-            color: #2e7d32;
+            background: var(--exception-bg);
+            color: var(--exception-text);
             padding: 3px 8px;
             font-size: 11px;
             margin-top: 0;
@@ -318,9 +334,9 @@
             cursor: pointer;
             font-size: 13px;
             background: #f5f5f5;
-            color: #333;
+            color: var(--text);
             margin-top: 0;
-            border-left: 4px solid #2196F3;
+            border-left: 4px solid var(--btn-blue);
             transition: background 0.15s;
         }
 
@@ -331,13 +347,13 @@
         }
 
         .group-tab:hover:not(.active) {
-            background: #ececec;
+            background: var(--border-light);
         }
 
         .group-tab-add {
             background: transparent;
-            border: 1px dashed #aaa;
-            color: #666;
+            border: 1px dashed var(--text-muted);
+            color: var(--text-muted);
             border-radius: 20px;
             padding: 5px 12px;
             font-size: 13px;
@@ -346,17 +362,17 @@
         }
 
         .group-tab-add:hover {
-            background: #f0f0f0;
-            border-color: #888;
+            background: var(--border-light);
+            border-color: var(--text);
         }
 
         .rule-group-select {
             font-size: 11px;
             padding: 2px 4px;
-            border: 1px solid #ddd;
+            border: 1px solid var(--border);
             border-radius: 4px;
-            background: #fff;
-            color: #555;
+            background: var(--bg-section);
+            color: var(--text-muted);
             cursor: pointer;
         }
     </style>
@@ -410,7 +426,7 @@
         </div>
         <button id="addWebsite">Add Rule</button>
         <div id="regexTestRow" style="display:none; margin-top: 10px;">
-            <label style="font-size: 13px; color: #555; display: block; margin-bottom: 4px;">
+            <label style="font-size: 13px; color: var(--text-muted); display: block; margin-bottom: 4px;">
                 Test regex against a URL:
             </label>
             <div style="display: flex; gap: 8px; align-items: center;">
@@ -433,7 +449,7 @@
             <button id="bulkDisableBtn" style="margin-top:0;padding:4px 10px;font-size:12px;background:#9e9e9e;">Disable selected</button>
         </div>
         <div id="websiteList" class="website-list">
-            <div style="text-align: center; color: #666; font-size: 13px;">No rules configured</div>
+            <div style="text-align: center; color: var(--text-muted); font-size: 13px;">No rules configured</div>
         </div>
         <button id="clearAll" style="background: #ff9800; margin-top: 10px;">Clear All</button>
     </div>
