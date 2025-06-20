@@ -721,6 +721,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Sort order applied to the rule list. Persisted to chrome.storage.local so it
     // survives page reloads. Default is 'newest' (chronological descending).
     let currentSortOrder = 'newest';
+    let sortDir = 'desc'; // 'asc' or 'desc'; flips the sort order
 
     // Apply the current sort to a rules array. Uses createdAt as a stable
     // secondary key so ties are always broken consistently.
@@ -742,6 +743,7 @@ document.addEventListener('DOMContentLoaded', function() {
             default: // 'newest'
                 arr.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
         }
+        if (sortDir === 'asc') arr.reverse();
         return arr;
     }
 
