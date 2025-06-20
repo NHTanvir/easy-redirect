@@ -703,6 +703,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (selectAll) selectAll.checked = [...rowCheckboxes].every(ch => ch.checked);
             });
         });
+        // Wire bulk enable / disable buttons.
+        const bulkEnableBtn = document.getElementById('bulkEnableBtn');
+        const bulkDisableBtn = document.getElementById('bulkDisableBtn');
+        if (bulkEnableBtn) {
+            bulkEnableBtn.onclick = () => bulkSetEnabled(rules, true);
+        }
+        if (bulkDisableBtn) {
+            bulkDisableBtn.onclick = () => bulkSetEnabled(rules, false);
+        }
         websiteListDiv.querySelectorAll('.rule-toggle-btn').forEach(btn => {
             btn.addEventListener('click', () => toggleRule(btn.dataset.ruleId));
         });
@@ -719,6 +728,29 @@ document.addEventListener('DOMContentLoaded', function() {
         websiteListDiv.querySelectorAll('.rule-group-select').forEach(sel => {
             sel.addEventListener('change', () => moveRuleToGroup(sel.dataset.ruleId, sel.value));
         });
+    }
+
+    // Set enabled state for all rules that are currently checked in the bulk-
+    // select panel. Operates on the global rules array so groups not currently
+    // shown are NOT affected — only the rules visible in the current group view.
+    async function bulkSetEnabled(visibleRules, enable) {
+        const checkboxes = websiteListDiv.querySelectorAll('.rule-select-checkbox:checked');
+        const selectedIds = new Set([...checkboxes].map(cb => cb.dataset.ruleId));
+        if (selectedIds.size === 0) {
+            showStatus('Select at least one rule first.', 'error');
+            return;
+        }
+        try {
+            const result = await chrome.storage.sync.get(['rules']);
+            const all = Array.isArray(result.rules) ? result.rules : [];
+            const next = all.map(r => selectedIds.has(r.id) ? { ...r, enabled: enable } : r);
+            await chrome.storage.sync.set({ rules: next });
+            await updateRedirectRules();
+            displayRules(next);
+            showStatus(`${enable ? 'Enabled' : 'Disabled'} ${selectedIds.size} rule(s).`, 'success');
+        } catch (error) {
+            showStatus('Error updating rules: ' + error.message, 'error');
+        }
     }
 
     // Toggle a rule's enabled flag. Disabled rules are kept in storage but skipped
