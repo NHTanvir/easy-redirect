@@ -154,3 +154,9 @@ Keyboard shortcuts are declared under `commands` in `manifest.json`. background.
 ### Context menu
 
 background.js registers two context menu items ('Block this site' and 'Block this URL') recreated on every install/startup. `addRuleFromBackground(pattern, type, groupId)` handles the write. A desktop notification confirms each add. A submenu lists groups for direct targeting.
+
+### Dark mode / CSS variable token system
+
+options.html uses CSS custom properties for all colors. The `theme` storage key ('auto'|'light'|'dark') is read by options.js on load and sets a `data-theme` attribute on `<html>`. 'auto' defers to `prefers-color-scheme`. The CSS defines three sets of variables: the :root defaults (light), the dark media query, and explicit [data-theme] overrides.
+
+The three-layer precedence is: `[data-theme=dark/light]` (highest, forced by user) > `@media (prefers-color-scheme: dark)` (OS preference) > `:root` defaults (light fallback). A 3-way toggle (Auto/Light/Dark) in the toggle-section div lets users switch preference; clicking saves `theme` to `chrome.storage.sync` and calls `applyTheme()` immediately. Badge colors (domain, wildcard, path, keyword, regex) are intentionally kept as hard-coded hex values — they are semantic identifiers, not theme tokens.
