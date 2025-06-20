@@ -178,3 +178,7 @@ background.js registers two context menu items ('Block this site' and 'Block thi
 options.html uses CSS custom properties for all colors. The `theme` storage key ('auto'|'light'|'dark') is read by options.js on load and sets a `data-theme` attribute on `<html>`. 'auto' defers to `prefers-color-scheme`. The CSS defines three sets of variables: the :root defaults (light), the dark media query, and explicit [data-theme] overrides.
 
 The three-layer precedence is: `[data-theme=dark/light]` (highest, forced by user) > `@media (prefers-color-scheme: dark)` (OS preference) > `:root` defaults (light fallback). A 3-way toggle (Auto/Light/Dark) in the toggle-section div lets users switch preference; clicking saves `theme` to `chrome.storage.sync` and calls `applyTheme()` immediately. Badge colors (domain, wildcard, path, keyword, regex) are intentionally kept as hard-coded hex values — they are semantic identifiers, not theme tokens.
+
+### Prebuilt categories (categories.js)
+
+`categories.js` provides 6 prebuilt category lists (social, news, video, gaming, adult, gambling). Lists are static — no remote fetch or auto-update. `addCategory()` in `options.js` creates a new named group (using the category's color) and bulk-adds all entries as domain rules, skipping any that are already present. The Prebuilt Categories section in `options.html` renders one card per category with name, description, entry count, a 4-entry preview, and an "Add all" button.

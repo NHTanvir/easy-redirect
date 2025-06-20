@@ -328,9 +328,58 @@ document.addEventListener('DOMContentLoaded', function() {
                     b.style.color = 'var(--text)';
                 }
             });
+        renderCategories();
         } catch (error) {
             showStatus('Error loading data: ' + error.message, 'error');
         }
+    }
+
+    function renderCategories() {
+        const container = document.getElementById('categoryList');
+        if (!container || typeof PREBUILT_CATEGORIES === 'undefined') return;
+        container.innerHTML = PREBUILT_CATEGORIES.map(cat => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;margin:6px 0;border:1px solid var(--border);border-radius:6px;border-left:4px solid ${escapeHtml(cat.color)};">
+                <div>
+                    <strong style="font-size:14px;">${escapeHtml(cat.name)}</strong>
+                    <div class="help-text" style="margin-top:2px;">${escapeHtml(cat.description)} &middot; ${cat.entries.length} sites</div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">${cat.entries.slice(0,4).map(e=>escapeHtml(e)).join(', ')}${cat.entries.length > 4 ? ' …' : ''}</div>
+                </div>
+                <button class="add-category-btn" data-cat-id="${escapeHtml(cat.id)}" style="flex-shrink:0;margin-left:12px;font-size:13px;padding:6px 14px;">Add all</button>
+            </div>
+        `).join('');
+        container.querySelectorAll('.add-category-btn').forEach(btn => {
+            btn.addEventListener('click', () => addCategory(btn.dataset.catId));
+        });
+    }
+
+    async function addCategory(catId) {
+        const cat = (typeof PREBUILT_CATEGORIES !== 'undefined') && PREBUILT_CATEGORIES.find(c => c.id === catId);
+        if (!cat) return;
+
+        // Create a new group for this category
+        const group = createGroup(cat.name, { color: cat.color });
+        const existing = await chrome.storage.sync.get(['rules', 'groups']);
+        const rules = Array.isArray(existing.rules) ? existing.rules : [];
+        const groups = Array.isArray(existing.groups) ? existing.groups : [createGroup('Default', { id: 'default' })];
+
+        // Add the group
+        groups.push(group);
+
+        // Add rules (deduplicate)
+        let added = 0;
+        for (const entry of cat.entries) {
+            if (!rules.some(r => r.pattern === entry && r.type === 'domain')) {
+                rules.push(createRule(entry, 'domain', { groupId: group.id }));
+                added++;
+            }
+        }
+
+        await chrome.storage.sync.set({ rules, groups });
+        currentGroups = groups;
+        await updateRedirectRules();
+        displayRules(rules);
+        renderGroupTabs(groups);
+        showStatus(`Added "${cat.name}" group with ${added} rules.`, 'success');
     }
 
     function renderGroupTabs(groups) {
