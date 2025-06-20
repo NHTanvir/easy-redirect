@@ -352,6 +352,36 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    async function addCategory(catId) {
+        const cat = (typeof PREBUILT_CATEGORIES !== 'undefined') && PREBUILT_CATEGORIES.find(c => c.id === catId);
+        if (!cat) return;
+
+        // Create a new group for this category
+        const group = createGroup(cat.name, { color: cat.color });
+        const existing = await chrome.storage.sync.get(['rules', 'groups']);
+        const rules = Array.isArray(existing.rules) ? existing.rules : [];
+        const groups = Array.isArray(existing.groups) ? existing.groups : [createGroup('Default', { id: 'default' })];
+
+        // Add the group
+        groups.push(group);
+
+        // Add rules (deduplicate)
+        let added = 0;
+        for (const entry of cat.entries) {
+            if (!rules.some(r => r.pattern === entry && r.type === 'domain')) {
+                rules.push(createRule(entry, 'domain', { groupId: group.id }));
+                added++;
+            }
+        }
+
+        await chrome.storage.sync.set({ rules, groups });
+        currentGroups = groups;
+        await updateRedirectRules();
+        displayRules(rules);
+        renderGroupTabs(groups);
+        showStatus(`Added "${cat.name}" group with ${added} rules.`, 'success');
+    }
+
     function renderGroupTabs(groups) {
         const container = document.getElementById('groupTabs');
         if (!container) return;
