@@ -300,6 +300,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             renderGroupTabs(currentGroups);
+            const bulkGroupSelect = document.getElementById('bulkGroupSelect');
+            if (bulkGroupSelect) {
+                bulkGroupSelect.innerHTML = currentGroups.map(g =>
+                    `<option value="${escapeHtml(g.id)}">${escapeHtml(g.name)}</option>`
+                ).join('');
+            }
             displayRules(rules);
 
             const isEnabled = result.extensionEnabled !== false; // Default to true
