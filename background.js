@@ -40,7 +40,10 @@ const DEFAULTS = {
     // entry (the 'default' group) so rules with groupId='default' always have
     // a home. Participates in persist() and restoreFromLocalIfSyncEmpty() like
     // every other key in DEFAULTS.
-    groups: [{ id: 'default', name: 'Default', color: '#2196F3', enabled: true, redirectUrl: null }]
+    groups: [{ id: 'default', name: 'Default', color: '#2196F3', enabled: true, redirectUrl: null }],
+    // User theme preference: 'auto' defers to prefers-color-scheme, 'light' forces
+    // light regardless of OS setting, 'dark' forces dark regardless of OS setting.
+    theme: 'auto'
 };
 
 // Stable opaque identifier for a Rule. Prefer crypto.randomUUID() (available in
