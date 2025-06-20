@@ -54,6 +54,19 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Press "/" anywhere on the page to jump focus to the rule search box,
+    // unless the user is already typing in another input/textarea.
+    document.addEventListener('keydown', function(e) {
+        if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+        const tag = document.activeElement && document.activeElement.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        e.preventDefault();
+        if (ruleSearchInput) {
+            ruleSearchInput.focus();
+            ruleSearchInput.select();
+        }
+    });
+
     // Show the regex test row only when the input looks like a regex rule.
     newWebsiteInput.addEventListener('input', function() {
         const raw = newWebsiteInput.value.trim();
