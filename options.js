@@ -9,6 +9,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const MODES = ['blocklist', 'allowlist'];
 
+    function applyTheme(theme) {
+        if (theme === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        } else if (theme === 'light') {
+            document.documentElement.setAttribute('data-theme', 'light');
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+        }
+    }
+
     // Active group state — tracks which group tab is currently selected so
     // displayRules() can filter to only that group's rules. Starts as 'default'
     // and is updated whenever the user clicks a different tab.
@@ -208,7 +218,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function loadData() {
         try {
             const result = await chrome.storage.sync.get([
-                'redirectUrl', 'rules', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups'
+                'redirectUrl', 'rules', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups', 'theme'
             ]);
 
             redirectUrlInput.value = result.redirectUrl || 'https://www.google.com';
@@ -232,6 +242,19 @@ document.addEventListener('DOMContentLoaded', function() {
             updateModeButtons(mode);
             document.getElementById('rulesHeading').textContent =
                 mode === 'allowlist' ? 'Allowed Sites (Allowlist mode)' : 'Block Rules';
+
+            // Apply saved theme preference, highlighting the active toggle button.
+            const theme = result.theme || 'auto';
+            applyTheme(theme);
+            document.querySelectorAll('.theme-btn').forEach(b => {
+                if (b.dataset.theme === theme) {
+                    b.style.background = 'var(--btn-blue)';
+                    b.style.color = '#fff';
+                } else {
+                    b.style.background = 'var(--bg-section)';
+                    b.style.color = 'var(--text)';
+                }
+            });
         } catch (error) {
             showStatus('Error loading data: ' + error.message, 'error');
         }
