@@ -1127,6 +1127,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!parsed || !Array.isArray(parsed.rules)) { showStatus('Invalid format: missing rules array.', 'error'); return; }
         const incoming = parsed.rules.filter(r => r && r.pattern && r.type);
         if (mode === 'replace') {
+            const typed = prompt('Type REPLACE to confirm replacing all existing rules:');
+            if (typed !== 'REPLACE') { showStatus('Import cancelled.', 'error'); return; }
+        }
+        if (mode === 'replace') {
             await chrome.storage.sync.set({ rules: incoming });
         } else {
             const existing = await chrome.storage.sync.get(['rules']);
