@@ -1124,6 +1124,41 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     }
 
+    // Bulk-adds newline-separated rules. Uses the same validateInput/detectRuleType/normalizePattern pipeline as the single-add path.
+    async function bulkAdd() {
+        const textarea = document.getElementById('bulkInput');
+        const groupSelect = document.getElementById('bulkGroupSelect');
+        const groupId = groupSelect ? groupSelect.value : 'default';
+        const lines = textarea.value.split('\n').map(l => l.trim()).filter(l => l);
+        if (!lines.length) { showStatus('Enter at least one rule.', 'error'); return; }
+
+        const existing = await chrome.storage.sync.get(['rules']);
+        const rules = Array.isArray(existing.rules) ? existing.rules : [];
+        let added = 0, skipped = 0, errors = [];
+
+        for (const raw of lines) {
+            const err = validateInput(raw);
+            if (err) { errors.push(`"${raw}": ${err}`); continue; }
+            const type = detectRuleType(raw);
+            const pattern = normalizePattern(raw, type);
+            if (rules.some(r => r.pattern === pattern && r.type === type)) { skipped++; continue; }
+            rules.push(createRule(pattern, type, { groupId }));
+            added++;
+        }
+
+        if (added > 0) {
+            await chrome.storage.sync.set({ rules });
+            await updateRedirectRules();
+            displayRules(rules);
+            textarea.value = '';
+        }
+
+        let msg = `${added} added`;
+        if (skipped) msg += `, ${skipped} duplicate${skipped > 1 ? 's' : ''} skipped`;
+        if (errors.length) msg += `, ${errors.length} invalid`;
+        showStatus(msg, added > 0 ? 'success' : 'error');
+    }
+
     async function importFromPlainText(text, mode) {
         const lines = text.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
         const incoming = lines.map(line => {
