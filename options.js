@@ -671,6 +671,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="website-item${isEnabled ? '' : ' rule-disabled'}" data-rule-id="${escapeHtml(rule.id)}">
                     <div class="rule-main-row">
                         <span class="rule-meta">
+                            <input type="checkbox" class="rule-select-checkbox" data-rule-id="${escapeHtml(rule.id)}" style="margin:0 4px 0 0;cursor:pointer;" title="Select this rule">
                             <span class="${badgeClass}">${badgeLabel}</span>
                             <span class="rule-pattern">${escapeHtml(rule.pattern)}</span>
                         </span>
@@ -688,6 +689,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
         websiteListDiv.innerHTML = html;
 
+        // Wire select-all and per-row checkboxes for bulk operations.
+        const selectAll = document.getElementById('selectAllRules');
+        const rowCheckboxes = websiteListDiv.querySelectorAll('.rule-select-checkbox');
+        if (selectAll) {
+            selectAll.checked = false;
+            selectAll.addEventListener('change', () => {
+                rowCheckboxes.forEach(cb => { cb.checked = selectAll.checked; });
+            });
+        }
+        rowCheckboxes.forEach(cb => {
+            cb.addEventListener('change', () => {
+                if (selectAll) selectAll.checked = [...rowCheckboxes].every(ch => ch.checked);
+            });
+        });
         websiteListDiv.querySelectorAll('.rule-toggle-btn').forEach(btn => {
             btn.addEventListener('click', () => toggleRule(btn.dataset.ruleId));
         });
