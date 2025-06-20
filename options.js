@@ -736,6 +736,9 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
+        // Apply sort before rendering.
+        rules = sortRules(rules);
+
         // Show or hide bulk actions bar based on whether there are rules to show.
         const bulkActionsEl = document.getElementById('bulkActions');
         if (bulkActionsEl) bulkActionsEl.style.display = rules.length > 0 ? 'flex' : 'none';
