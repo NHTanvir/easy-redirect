@@ -762,3 +762,28 @@ function setActionIcon(enabled) {
         }
     });
 }
+
+async function addRuleFromBackground(pattern, type, groupId) {
+    const result = await chrome.storage.sync.get(['rules']);
+    const rules = Array.isArray(result.rules) ? result.rules : [];
+    if (rules.some(r => r.pattern === pattern && r.type === type)) return; // already exists
+    const rule = createRule(pattern, type, { groupId: groupId || 'default' });
+    const next = [...rules, rule];
+    await persist({ rules: next });
+    updateRedirectRules();
+}
+
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+    const pageUrl = info.pageUrl || (tab && tab.url) || '';
+    if (!pageUrl || pageUrl.startsWith('chrome://') || pageUrl.startsWith('chrome-extension://')) return;
+
+    if (info.menuItemId === 'block-site') {
+        try {
+            const host = new URL(pageUrl).hostname.replace(/^www\./, '');
+            if (host) await addRuleFromBackground(host, 'domain');
+        } catch (e) { console.error('context menu block-site:', e); }
+    }
+    if (info.menuItemId === 'block-url') {
+        await addRuleFromBackground(pageUrl, 'wildcard');
+    }
+});
