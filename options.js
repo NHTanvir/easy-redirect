@@ -633,17 +633,31 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function displayRules(allRules) {
         // Filter to only the rules belonging to the active group.
-        const rules = (allRules || []).filter(r => {
+        let rules = (allRules || []).filter(r => {
             const gid = r.groupId || 'default';
             return gid === activeGroupId;
         });
+
+        // Apply search filter: match against pattern and group name (case-insensitive).
+        const searchInput = document.getElementById('ruleSearch');
+        const searchQuery = searchInput ? searchInput.value.trim().toLowerCase() : '';
+        if (searchQuery) {
+            rules = rules.filter(r => {
+                const groupName = (currentGroups.find(g => g.id === (r.groupId || 'default')) || {}).name || '';
+                return r.pattern.toLowerCase().includes(searchQuery) ||
+                    groupName.toLowerCase().includes(searchQuery);
+            });
+        }
 
         // Show or hide bulk actions bar based on whether there are rules to show.
         const bulkActionsEl = document.getElementById('bulkActions');
         if (bulkActionsEl) bulkActionsEl.style.display = rules.length > 0 ? 'flex' : 'none';
 
         if (rules.length === 0) {
-            websiteListDiv.innerHTML = '<div style="text-align: center; color: #666; font-size: 13px;">No rules in this group</div>';
+            const emptyMsg = searchQuery
+                ? `No rules match "<strong>${escapeHtml(searchQuery)}</strong>"`
+                : 'No rules in this group';
+            websiteListDiv.innerHTML = `<div style="text-align: center; color: #666; font-size: 13px;">${emptyMsg}</div>`;
             return;
         }
 
