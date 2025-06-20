@@ -638,12 +638,17 @@ document.addEventListener('DOMContentLoaded', function() {
             return gid === activeGroupId;
         });
 
+        // Show or hide bulk actions bar based on whether there are rules to show.
+        const bulkActionsEl = document.getElementById('bulkActions');
+        if (bulkActionsEl) bulkActionsEl.style.display = rules.length > 0 ? 'flex' : 'none';
+
         if (rules.length === 0) {
             websiteListDiv.innerHTML = '<div style="text-align: center; color: #666; font-size: 13px;">No rules in this group</div>';
             return;
         }
 
         const html = rules.map(rule => {
+            const isEnabled = rule.enabled !== false;
             const badgeClass = rule.type === 'wildcard' ? 'badge badge-wildcard'
                 : rule.type === 'path' ? 'badge badge-path'
                 : rule.type === 'keyword' ? 'badge badge-keyword'
@@ -661,14 +666,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const groupOptions = currentGroups.map(g =>
                 `<option value="${escapeHtml(g.id)}" ${g.id === (rule.groupId || 'default') ? 'selected' : ''}>${escapeHtml(g.name)}</option>`
             ).join('');
+            const toggleClass = isEnabled ? 'rule-toggle-btn' : 'rule-toggle-btn rule-disabled-btn';
             return `
-                <div class="website-item" data-rule-id="${escapeHtml(rule.id)}">
+                <div class="website-item${isEnabled ? '' : ' rule-disabled'}" data-rule-id="${escapeHtml(rule.id)}">
                     <div class="rule-main-row">
                         <span class="rule-meta">
                             <span class="${badgeClass}">${badgeLabel}</span>
                             <span class="rule-pattern">${escapeHtml(rule.pattern)}</span>
                         </span>
                         <span class="rule-actions">
+                            <button class="${toggleClass}" data-rule-id="${escapeHtml(rule.id)}" title="${isEnabled ? 'Disable this rule' : 'Enable this rule'}">${isEnabled ? 'On' : 'Off'}</button>
                             <select class="rule-group-select" data-rule-id="${escapeHtml(rule.id)}" title="Move to group">${groupOptions}</select>
                             <button class="add-exception-btn" data-rule-id="${escapeHtml(rule.id)}" title="Add exception">+ except</button>
                             <button class="remove-btn" data-rule-id="${escapeHtml(rule.id)}">Remove</button>
@@ -681,6 +688,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         websiteListDiv.innerHTML = html;
 
+        websiteListDiv.querySelectorAll('.rule-toggle-btn').forEach(btn => {
+            btn.addEventListener('click', () => toggleRule(btn.dataset.ruleId));
+        });
         websiteListDiv.querySelectorAll('.remove-btn').forEach(btn => {
             btn.addEventListener('click', () => removeRule(btn.dataset.ruleId));
         });
@@ -694,6 +704,21 @@ document.addEventListener('DOMContentLoaded', function() {
         websiteListDiv.querySelectorAll('.rule-group-select').forEach(sel => {
             sel.addEventListener('change', () => moveRuleToGroup(sel.dataset.ruleId, sel.value));
         });
+    }
+
+    // Toggle a rule's enabled flag. Disabled rules are kept in storage but skipped
+    // at DNR emit time so users can pause individual rules without losing them.
+    async function toggleRule(ruleId) {
+        try {
+            const result = await chrome.storage.sync.get(['rules']);
+            const rules = Array.isArray(result.rules) ? result.rules : [];
+            const next = rules.map(r => r.id === ruleId ? { ...r, enabled: r.enabled === false } : r);
+            await chrome.storage.sync.set({ rules: next });
+            await updateRedirectRules();
+            displayRules(next);
+        } catch (error) {
+            showStatus('Error toggling rule: ' + error.message, 'error');
+        }
     }
 
     // Move a rule to a different group by updating its groupId in storage.
