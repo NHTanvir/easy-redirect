@@ -1096,6 +1096,28 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     }
 
+    async function importFromJSON(text, mode) {
+        let parsed;
+        try { parsed = JSON.parse(text); } catch(e) { showStatus('Invalid JSON file.', 'error'); return; }
+        if (!parsed || !Array.isArray(parsed.rules)) { showStatus('Invalid format: missing rules array.', 'error'); return; }
+        const incoming = parsed.rules.filter(r => r && r.pattern && r.type);
+        if (mode === 'replace') {
+            await chrome.storage.sync.set({ rules: incoming });
+        } else {
+            const existing = await chrome.storage.sync.get(['rules']);
+            const current = Array.isArray(existing.rules) ? existing.rules : [];
+            const deduped = [...current];
+            for (const r of incoming) {
+                if (!deduped.some(e => e.pattern === r.pattern && e.type === r.type)) deduped.push(r);
+            }
+            await chrome.storage.sync.set({ rules: deduped });
+        }
+        await updateRedirectRules();
+        const result = await chrome.storage.sync.get(['rules']);
+        displayRules(Array.isArray(result.rules) ? result.rules : []);
+        showStatus(`Import complete: ${incoming.length} rules processed.`, 'success');
+    }
+
     async function exportPlainText() {
         const data = await chrome.storage.sync.get(['rules']);
         const rules = Array.isArray(data.rules) ? data.rules : [];
