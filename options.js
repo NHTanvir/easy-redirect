@@ -65,6 +65,9 @@ document.addEventListener('DOMContentLoaded', function() {
         return `r-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
     }
 
+    // `enabled` has been in the Rule schema since PR #1 and background.js already
+    // skips disabled rules at DNR emit time. This PR adds the UI toggle per row
+    // so users can disable individual rules without deleting them.
     function createRule(pattern, type, opts = {}) {
         const rule = {
             id: opts.id || generateRuleId(),
@@ -635,12 +638,17 @@ document.addEventListener('DOMContentLoaded', function() {
             return gid === activeGroupId;
         });
 
+        // Show or hide bulk actions bar based on whether there are rules to show.
+        const bulkActionsEl = document.getElementById('bulkActions');
+        if (bulkActionsEl) bulkActionsEl.style.display = rules.length > 0 ? 'flex' : 'none';
+
         if (rules.length === 0) {
             websiteListDiv.innerHTML = '<div style="text-align: center; color: #666; font-size: 13px;">No rules in this group</div>';
             return;
         }
 
         const html = rules.map(rule => {
+            const isEnabled = rule.enabled !== false;
             const badgeClass = rule.type === 'wildcard' ? 'badge badge-wildcard'
                 : rule.type === 'path' ? 'badge badge-path'
                 : rule.type === 'keyword' ? 'badge badge-keyword'
@@ -658,14 +666,17 @@ document.addEventListener('DOMContentLoaded', function() {
             const groupOptions = currentGroups.map(g =>
                 `<option value="${escapeHtml(g.id)}" ${g.id === (rule.groupId || 'default') ? 'selected' : ''}>${escapeHtml(g.name)}</option>`
             ).join('');
+            const toggleClass = isEnabled ? 'rule-toggle-btn' : 'rule-toggle-btn rule-disabled-btn';
             return `
-                <div class="website-item" data-rule-id="${escapeHtml(rule.id)}">
+                <div class="website-item${isEnabled ? '' : ' rule-disabled'}" data-rule-id="${escapeHtml(rule.id)}">
                     <div class="rule-main-row">
                         <span class="rule-meta">
+                            <input type="checkbox" class="rule-select-checkbox" data-rule-id="${escapeHtml(rule.id)}" style="margin:0 4px 0 0;cursor:pointer;" title="Select this rule">
                             <span class="${badgeClass}">${badgeLabel}</span>
                             <span class="rule-pattern">${escapeHtml(rule.pattern)}</span>
                         </span>
                         <span class="rule-actions">
+                            <button class="${toggleClass}" data-rule-id="${escapeHtml(rule.id)}" title="${isEnabled ? 'Disable this rule' : 'Enable this rule'}">${isEnabled ? 'On' : 'Off'}</button>
                             <select class="rule-group-select" data-rule-id="${escapeHtml(rule.id)}" title="Move to group">${groupOptions}</select>
                             <button class="add-exception-btn" data-rule-id="${escapeHtml(rule.id)}" title="Add exception">+ except</button>
                             <button class="remove-btn" data-rule-id="${escapeHtml(rule.id)}">Remove</button>
@@ -678,6 +689,32 @@ document.addEventListener('DOMContentLoaded', function() {
 
         websiteListDiv.innerHTML = html;
 
+        // Wire select-all and per-row checkboxes for bulk operations.
+        const selectAll = document.getElementById('selectAllRules');
+        const rowCheckboxes = websiteListDiv.querySelectorAll('.rule-select-checkbox');
+        if (selectAll) {
+            selectAll.checked = false;
+            selectAll.addEventListener('change', () => {
+                rowCheckboxes.forEach(cb => { cb.checked = selectAll.checked; });
+            });
+        }
+        rowCheckboxes.forEach(cb => {
+            cb.addEventListener('change', () => {
+                if (selectAll) selectAll.checked = [...rowCheckboxes].every(ch => ch.checked);
+            });
+        });
+        // Wire bulk enable / disable buttons.
+        const bulkEnableBtn = document.getElementById('bulkEnableBtn');
+        const bulkDisableBtn = document.getElementById('bulkDisableBtn');
+        if (bulkEnableBtn) {
+            bulkEnableBtn.onclick = () => bulkSetEnabled(rules, true);
+        }
+        if (bulkDisableBtn) {
+            bulkDisableBtn.onclick = () => bulkSetEnabled(rules, false);
+        }
+        websiteListDiv.querySelectorAll('.rule-toggle-btn').forEach(btn => {
+            btn.addEventListener('click', () => toggleRule(btn.dataset.ruleId));
+        });
         websiteListDiv.querySelectorAll('.remove-btn').forEach(btn => {
             btn.addEventListener('click', () => removeRule(btn.dataset.ruleId));
         });
@@ -691,6 +728,44 @@ document.addEventListener('DOMContentLoaded', function() {
         websiteListDiv.querySelectorAll('.rule-group-select').forEach(sel => {
             sel.addEventListener('change', () => moveRuleToGroup(sel.dataset.ruleId, sel.value));
         });
+    }
+
+    // Set enabled state for all rules that are currently checked in the bulk-
+    // select panel. Operates on the global rules array so groups not currently
+    // shown are NOT affected — only the rules visible in the current group view.
+    async function bulkSetEnabled(visibleRules, enable) {
+        const checkboxes = websiteListDiv.querySelectorAll('.rule-select-checkbox:checked');
+        const selectedIds = new Set([...checkboxes].map(cb => cb.dataset.ruleId));
+        if (selectedIds.size === 0) {
+            showStatus('Select at least one rule first.', 'error');
+            return;
+        }
+        try {
+            const result = await chrome.storage.sync.get(['rules']);
+            const all = Array.isArray(result.rules) ? result.rules : [];
+            const next = all.map(r => selectedIds.has(r.id) ? { ...r, enabled: enable } : r);
+            await chrome.storage.sync.set({ rules: next });
+            await updateRedirectRules();
+            displayRules(next);
+            showStatus(`${enable ? 'Enabled' : 'Disabled'} ${selectedIds.size} rule(s).`, 'success');
+        } catch (error) {
+            showStatus('Error updating rules: ' + error.message, 'error');
+        }
+    }
+
+    // Toggle a rule's enabled flag. Disabled rules are kept in storage but skipped
+    // at DNR emit time so users can pause individual rules without losing them.
+    async function toggleRule(ruleId) {
+        try {
+            const result = await chrome.storage.sync.get(['rules']);
+            const rules = Array.isArray(result.rules) ? result.rules : [];
+            const next = rules.map(r => r.id === ruleId ? { ...r, enabled: r.enabled === false } : r);
+            await chrome.storage.sync.set({ rules: next });
+            await updateRedirectRules();
+            displayRules(next);
+        } catch (error) {
+            showStatus('Error toggling rule: ' + error.message, 'error');
+        }
     }
 
     // Move a rule to a different group by updating its groupId in storage.
