@@ -35,6 +35,25 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Search input — re-render the list on every keystroke so the filter is live.
+    const ruleSearchInput = document.getElementById('ruleSearch');
+    if (ruleSearchInput) {
+        ruleSearchInput.addEventListener('input', () => {
+            chrome.storage.sync.get(['rules'], result => {
+                displayRules(Array.isArray(result.rules) ? result.rules : []);
+            });
+        });
+        // Clear search on Escape.
+        ruleSearchInput.addEventListener('keydown', e => {
+            if (e.key === 'Escape') {
+                ruleSearchInput.value = '';
+                chrome.storage.sync.get(['rules'], result => {
+                    displayRules(Array.isArray(result.rules) ? result.rules : []);
+                });
+            }
+        });
+    }
+
     // Show the regex test row only when the input looks like a regex rule.
     newWebsiteInput.addEventListener('input', function() {
         const raw = newWebsiteInput.value.trim();
