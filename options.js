@@ -328,9 +328,28 @@ document.addEventListener('DOMContentLoaded', function() {
                     b.style.color = 'var(--text)';
                 }
             });
+        renderCategories();
         } catch (error) {
             showStatus('Error loading data: ' + error.message, 'error');
         }
+    }
+
+    function renderCategories() {
+        const container = document.getElementById('categoryList');
+        if (!container || typeof PREBUILT_CATEGORIES === 'undefined') return;
+        container.innerHTML = PREBUILT_CATEGORIES.map(cat => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;margin:6px 0;border:1px solid var(--border);border-radius:6px;border-left:4px solid ${escapeHtml(cat.color)};">
+                <div>
+                    <strong style="font-size:14px;">${escapeHtml(cat.name)}</strong>
+                    <div class="help-text" style="margin-top:2px;">${escapeHtml(cat.description)} &middot; ${cat.entries.length} sites</div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">${cat.entries.slice(0,4).map(e=>escapeHtml(e)).join(', ')}${cat.entries.length > 4 ? ' …' : ''}</div>
+                </div>
+                <button class="add-category-btn" data-cat-id="${escapeHtml(cat.id)}" style="flex-shrink:0;margin-left:12px;font-size:13px;padding:6px 14px;">Add all</button>
+            </div>
+        `).join('');
+        container.querySelectorAll('.add-category-btn').forEach(btn => {
+            btn.addEventListener('click', () => addCategory(btn.dataset.catId));
+        });
     }
 
     function renderGroupTabs(groups) {
