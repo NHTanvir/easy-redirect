@@ -1118,6 +1118,98 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     }
 
+    async function importFromPlainText(text, mode) {
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+        const incoming = lines.map(line => {
+            const type = line.includes('*') ? 'wildcard' : (line.includes('/') || line.includes('?')) ? 'path' : 'domain';
+            const pattern = line.replace(/^https?:\/\//,'').replace(/^www\./,'').replace(/\/$/,'');
+            return createRule(pattern, type);
+        });
+        if (mode === 'replace') {
+            if (!confirm(`Replace ALL existing rules with ${incoming.length} imported rules?`)) return;
+            await chrome.storage.sync.set({ rules: incoming });
+        } else {
+            const existing = await chrome.storage.sync.get(['rules']);
+            const current = Array.isArray(existing.rules) ? existing.rules : [];
+            const deduped = [...current];
+            for (const r of incoming) {
+                if (!deduped.some(e => e.pattern === r.pattern && e.type === r.type)) deduped.push(r);
+            }
+            await chrome.storage.sync.set({ rules: deduped });
+        }
+        await updateRedirectRules();
+        const result = await chrome.storage.sync.get(['rules']);
+        displayRules(Array.isArray(result.rules) ? result.rules : []);
+        showStatus(`Imported ${incoming.length} rules.`, 'success');
+    }
+
+    async function importFromJSON(text, mode) {
+        let parsed;
+        try { parsed = JSON.parse(text); } catch(e) { showStatus('Invalid JSON file.', 'error'); return; }
+        if (!parsed || !Array.isArray(parsed.rules)) { showStatus('Invalid format: missing rules array.', 'error'); return; }
+        const incoming = parsed.rules.filter(r => r && r.pattern && r.type);
+        if (mode === 'replace') {
+            const typed = prompt('Type REPLACE to confirm replacing all existing rules:');
+            if (typed !== 'REPLACE') { showStatus('Import cancelled.', 'error'); return; }
+        }
+        if (mode === 'replace') {
+            await chrome.storage.sync.set({ rules: incoming });
+        } else {
+            const existing = await chrome.storage.sync.get(['rules']);
+            const current = Array.isArray(existing.rules) ? existing.rules : [];
+            const deduped = [...current];
+            for (const r of incoming) {
+                if (!deduped.some(e => e.pattern === r.pattern && e.type === r.type)) deduped.push(r);
+            }
+            await chrome.storage.sync.set({ rules: deduped });
+        }
+        await updateRedirectRules();
+        const result = await chrome.storage.sync.get(['rules']);
+        displayRules(Array.isArray(result.rules) ? result.rules : []);
+        showStatus(`Import complete: ${incoming.length} rules processed.`, 'success');
+    }
+
+    async function exportPlainText() {
+        const data = await chrome.storage.sync.get(['rules']);
+        const rules = Array.isArray(data.rules) ? data.rules : [];
+        const text = rules.map(r => r.pattern).join('\n');
+        const blob = new Blob([text], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = Object.assign(document.createElement('a'), { href: url, download: `easy-redirect-${Date.now()}.txt` });
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showStatus('Exported as plain text.', 'success');
+    }
+
+    async function exportSettings() {
+        const data = await chrome.storage.sync.get(['rules','redirectUrl','mode','groups','alwaysAllowed','extensionEnabled','theme']);
+        const exportData = { version: 1, exportedAt: new Date().toISOString(), ...data };
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = Object.assign(document.createElement('a'), { href: url, download: `easy-redirect-${Date.now()}.json` });
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showStatus('Exported successfully.', 'success');
+    }
+
+    document.getElementById('exportJsonBtn').addEventListener('click', exportSettings);
+    document.getElementById('exportTxtBtn').addEventListener('click', exportPlainText);
+    const importBtn = document.getElementById('importBtn');
+    const importFile = document.getElementById('importFile');
+    importBtn.addEventListener('click', () => importFile.click());
+    importFile.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const text = await file.text();
+        const mode = document.querySelector('input[name="importMode"]:checked').value;
+        if (file.name.endsWith('.json')) {
+            await importFromJSON(text, mode);
+        } else {
+            await importFromPlainText(text, mode);
+        }
+        importFile.value = '';
+    });
+
     // Expose removeRule for any external callers / debugging.
     window.removeRule = removeRule;
     window.addException = addException;

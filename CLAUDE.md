@@ -110,6 +110,10 @@ A `Rule` is:
 
 Every rule carries an `exceptions[]` array of URL patterns that are exempt from redirect even when the parent rule matches. In `background.js`, these are emitted as `priority: PRIORITY_EXCEPTION (= 4)` DNR allow rules at ID offsets `90..99` within the rule's 100-ID block — they shadow the parent's redirect (priority 2) and the allowlist catch-all (priority 1). The UI shows exceptions as green tags under each rule row with a `+ except` button.
 
+### Import / export
+
+The Import / Export section in options.html (wired in options.js) lets users back up and restore their rule list. JSON export (version 1 format) includes all settings — rules, groups, redirectUrl, mode, alwaysAllowed, extensionEnabled, and theme. Plain-text export writes one pattern per line for compatibility with other blocklist tools. JSON import validates the rules array and filters entries missing pattern or type. Replace mode requires the user to type the exact string REPLACE to prevent accidental overwrites; merge mode deduplicates by pattern+type so re-importing the same file is idempotent.
+
 ### Schema migration
 
 On install and startup, `background.js` runs `migrateLegacyBlockedWebsites()` after `restoreFromLocalIfSyncEmpty()` but before `initializeMissingDefaults()`. The migration:
