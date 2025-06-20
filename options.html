@@ -511,6 +511,21 @@
         <button id="clearAll" style="background: #ff9800; margin-top: 10px;">Clear All</button>
     </div>
 
+    <div class="section">
+        <h3>Import / Export</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+            <button id="exportJsonBtn">Export JSON</button>
+            <button id="exportTxtBtn" style="background:#607d8b;">Export plain text</button>
+        </div>
+        <div style="margin-top:8px;">
+            <label style="font-size:13px;color:var(--text-muted);">Import mode:</label>
+            <label style="margin-left:12px;font-size:13px;"><input type="radio" name="importMode" value="merge" checked> Merge with existing</label>
+            <label style="margin-left:12px;font-size:13px;"><input type="radio" name="importMode" value="replace"> Replace all</label>
+        </div>
+        <input type="file" id="importFile" accept=".json,.txt" style="display:none;">
+        <button id="importBtn" style="background:#ff9800;margin-top:8px;">Import file…</button>
+    </div>
+
     <div id="status" class="status" style="display: none;"></div>
 
     <script src="options.js"></script>
