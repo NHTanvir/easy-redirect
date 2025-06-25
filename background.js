@@ -48,7 +48,13 @@ const DEFAULTS = {
     // 'pin' (numeric PIN), or 'password' (arbitrary passphrase). hash and salt
     // are Base64-encoded PBKDF2-SHA256 output and random salt respectively.
     // Stored in chrome.storage.sync so the lock follows the user across devices.
-    protection: { mode: 'none', hash: null, salt: null }
+    protection: { mode: 'none', hash: null, salt: null },
+    // Random-access-code friction gate (feature #18). When enabled, a randomly
+    // generated alphanumeric code of `length` characters must be typed (not
+    // pasted) into the Add Rule input before any rule can be saved. Length is
+    // configurable between 32 and 256 characters (default 64). Stored in
+    // chrome.storage.sync so the setting follows the user across devices.
+    accessCode: { enabled: false, length: 64 }
 };
 
 // Stable opaque identifier for a Rule. Prefer crypto.randomUUID() (available in
