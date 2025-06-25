@@ -57,6 +57,34 @@ const DEFAULTS = {
     accessCode: { enabled: false, length: 64 }
 };
 
+// Daily quota counts. Stored in chrome.storage.local (not sync) because they
+// are per-device runtime state that resets every midnight UTC. The shape is:
+//   { date: "YYYY-MM-DD", counts: { [ruleId]: number } }
+// A mismatched date means the counts are stale and should be zeroed out.
+const DAILY_COUNTS_DEFAULT = { date: null, counts: {} };
+
+// Return today's date in YYYY-MM-DD format (UTC).
+function todayUTC() {
+    return new Date().toISOString().slice(0, 10);
+}
+
+// Read the current dailyCounts from chrome.storage.local. If the stored date
+// does not match today (UTC), the counts are stale: return a fresh zero object.
+async function getDailyCounts() {
+    const result = await chrome.storage.local.get(['dailyCounts']);
+    const stored = result.dailyCounts || DAILY_COUNTS_DEFAULT;
+    const today = todayUTC();
+    if (stored.date !== today) {
+        return { date: today, counts: {} };
+    }
+    return stored;
+}
+
+// Persist dailyCounts to chrome.storage.local.
+async function saveDailyCounts(dc) {
+    await chrome.storage.local.set({ dailyCounts: dc });
+}
+
 // Stable opaque identifier for a Rule. Prefer crypto.randomUUID() (available in
 // MV3 service workers) but fall back to a timestamp+random combo for unusual
 // environments so rule creation never silently fails to assign an id.
