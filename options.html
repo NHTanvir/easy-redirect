@@ -690,6 +690,30 @@
         <div id="secStatus" style="min-height:18px;font-size:13px;margin-top:10px;"></div>
     </div>
 
+    <!-- Random access code section (feature #18) -->
+    <div class="section" id="accessCodeSection">
+        <h3>Add-rule friction code</h3>
+        <div class="help-text" style="margin-bottom:12px;">
+            When enabled, a randomly generated code is shown each time you try
+            to add a rule. You must type the full code (paste is disabled) before
+            the rule is saved. This discourages impulsive additions.
+        </div>
+        <label style="font-size:13px;display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:12px;">
+            <input type="checkbox" id="accessCodeEnabled"> Enable friction code
+        </label>
+        <div id="accessCodeLengthRow" style="display:none;">
+            <label style="font-size:13px;display:block;margin-bottom:6px;">
+                Code length:
+                <strong id="accessCodeLengthDisplay">64</strong> characters
+            </label>
+            <input type="range" id="accessCodeLength" min="32" max="256" step="8" value="64"
+                   style="width:100%;margin-bottom:8px;">
+            <div class="help-text">Range: 32 – 256 characters. Default: 64.</div>
+        </div>
+        <button id="saveAccessCodeBtn" style="margin-top:8px;">Save</button>
+        <div id="accessCodeStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
+    </div>
+
     <div id="status" class="status" style="display: none;"></div>
 
     <script src="categories.js"></script>
