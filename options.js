@@ -490,6 +490,48 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Change password button — verify current, hash new, persist (feature #17, commit 8).
+    const secChangeBtn = document.getElementById('secChangeBtn');
+    if (secChangeBtn) {
+        secChangeBtn.addEventListener('click', async () => {
+            const secStatusEl = document.getElementById('secStatus');
+            const current = (document.getElementById('secCurrentPin') || {}).value || '';
+            const newPin = (document.getElementById('secNewPin2') || {}).value || '';
+            const confirm = (document.getElementById('secConfirmPin2') || {}).value || '';
+            if (!current) { secStatusEl.textContent = 'Enter your current password.'; secStatusEl.style.color = '#c62828'; return; }
+            if (!newPin) { secStatusEl.textContent = 'Enter a new password.'; secStatusEl.style.color = '#c62828'; return; }
+            if (newPin !== confirm) { secStatusEl.textContent = 'New passwords do not match.'; secStatusEl.style.color = '#c62828'; return; }
+            try {
+                secChangeBtn.disabled = true;
+                secStatusEl.textContent = 'Verifying…';
+                secStatusEl.style.color = 'var(--text-muted)';
+                const pResult = await chrome.storage.sync.get(['protection']);
+                const prot = pResult.protection || {};
+                const ok = await _verifyPin(current, prot.hash, prot.salt);
+                if (!ok) {
+                    secStatusEl.textContent = 'Current password is incorrect.';
+                    secStatusEl.style.color = '#c62828';
+                    return;
+                }
+                secStatusEl.textContent = 'Hashing new password…';
+                const { hash, salt } = await _hashPin(newPin);
+                await chrome.storage.sync.set({ protection: { mode: 'pin', hash, salt } });
+                secStatusEl.textContent = 'Password changed successfully.';
+                secStatusEl.style.color = '#2e7d32';
+                document.getElementById('secCurrentPin').value = '';
+                document.getElementById('secNewPin2').value = '';
+                document.getElementById('secConfirmPin2').value = '';
+                const details = document.getElementById('changePasswordDetails');
+                if (details) details.removeAttribute('open');
+            } catch (err) {
+                secStatusEl.textContent = 'Error: ' + err.message;
+                secStatusEl.style.color = '#c62828';
+            } finally {
+                secChangeBtn.disabled = false;
+            }
+        });
+    }
+
     function renderCategories() {
         const container = document.getElementById('categoryList');
         if (!container || typeof PREBUILT_CATEGORIES === 'undefined') return;

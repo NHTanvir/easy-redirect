@@ -666,6 +666,25 @@
                 <strong>Lock is active.</strong>
                 The settings page will require a PIN or password each time it is opened.
             </p>
+            <!-- Change-password form (feature #17, commit 8) -->
+            <details id="changePasswordDetails" style="margin-bottom:12px;">
+                <summary style="cursor:pointer;font-size:13px;color:var(--btn-blue);user-select:none;">Change password…</summary>
+                <div style="margin-top:10px;">
+                    <label style="font-size:13px;display:block;margin-bottom:4px;">Current password</label>
+                    <input type="password" id="secCurrentPin" placeholder="Current PIN or password"
+                           autocomplete="current-password"
+                           style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+                    <label style="font-size:13px;display:block;margin-bottom:4px;">New password</label>
+                    <input type="password" id="secNewPin2" placeholder="New PIN or password"
+                           autocomplete="new-password"
+                           style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+                    <label style="font-size:13px;display:block;margin-bottom:4px;">Confirm new password</label>
+                    <input type="password" id="secConfirmPin2" placeholder="Re-enter new PIN or password"
+                           autocomplete="new-password"
+                           style="width:100%;box-sizing:border-box;margin-bottom:10px;">
+                    <button id="secChangeBtn">Change password</button>
+                </div>
+            </details>
             <button id="secRemoveBtn" style="background:#f44336;">Remove lock</button>
         </div>
         <div id="secStatus" style="min-height:18px;font-size:13px;margin-top:10px;"></div>
