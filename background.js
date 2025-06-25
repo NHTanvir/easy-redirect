@@ -732,6 +732,12 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
         const groups = Array.isArray(opts.groups) ? opts.groups : [];
         const groupMap = new Map(groups.map(g => [g.id, g]));
 
+        // Read today's per-rule hit counts so quota-exceeded rules can be skipped
+        // during DNR emission. This keeps suspended rules out of DNR without
+        // touching chrome.storage.sync — they will be re-emitted once the midnight
+        // alarm fires and getDailyCounts() returns a fresh zero object.
+        const dailyCounts = await getDailyCounts();
+
         // Build DNR rules. Disabled source rules are skipped here, not deleted —
         // toggling enabled back to true must restore behaviour without touching
         // storage. Unknown types log a warning so future contributors see they
@@ -753,6 +759,15 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
             // Disabled rules are intentionally skipped here, not deleted — re-enabling restores them without a storage write.
             if (!rule || rule.enabled === false) {
                 return;
+            }
+
+            // Skip rules whose daily quota has been reached. The rule stays in
+            // storage; it will be re-emitted after midnight resets dailyCounts.
+            if (rule.quota !== null && rule.quota !== undefined && rule.quota > 0) {
+                const todayCount = (dailyCounts.counts && dailyCounts.counts[rule.id]) || 0;
+                if (todayCount >= rule.quota) {
+                    return;
+                }
             }
 
             // Skip rules whose group is explicitly disabled. Rules with an
