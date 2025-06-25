@@ -205,3 +205,16 @@ The `protection` key in `DEFAULTS` / `chrome.storage.sync` holds `{ mode, hash, 
 - **Set lock** — `#secSetBtn` validates that both PIN inputs match, calls `_hashPin()`, and writes to storage.
 - **Change password** — `#secChangeBtn` (inside a `<details>` in `#securityActive`) first verifies the current password via `_verifyPin()`, then hashes and writes the new one.
 - **Remove lock** — `#secRemoveBtn` uses `window.prompt()` to collect the current password, verifies it via `_verifyPin()`, then writes `{ mode: 'none', hash: null, salt: null }` to storage.
+
+### Add-rule friction code (feature #18)
+
+The `accessCode` key in `DEFAULTS` / `chrome.storage.sync` holds `{ enabled: boolean, length: number }`:
+
+- `enabled` — when `true`, a randomly generated code must be typed before any rule can be added.
+- `length` — code length in characters; clamped to 32–256 (default 64). Configurable via the "Add-rule friction code" section in options.
+
+**Code generation** — `generateAccessCode(length)` in `background.js` uses `crypto.getRandomValues` with a 56-character alphabet that omits visually ambiguous pairs (0/O, 1/l/I). A page-context mirror `_generateCode(length)` in `options.js` generates the actual challenge code without a round-trip.
+
+**Challenge flow** — when `addRule()` detects `accessCode.enabled`, it calls `_generateCode()` and `_showAccessChallenge(code)`. The challenge div (`#accessCodeChallenge`) reveals the generated code in a monospace display and provides a text input where the user must type it manually. Paste is blocked via a `paste` event listener that shows a "typing only" error message. The user must type the entire code exactly before clicking Confirm (or pressing Enter); Cancel aborts the rule addition. The challenge div hides after success or cancel.
+
+**Settings UI** — the "Add-rule friction code" section in options.html contains a checkbox (`#accessCodeEnabled`), a range slider (`#accessCodeLength`, 32–256 step 8), and a Save button. The length row is hidden when disabled. Saving calls `chrome.storage.sync.set({ accessCode: { enabled, length } })`.
