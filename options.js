@@ -615,6 +615,82 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // ---------------------------------------------------------------------------
+    // Access code challenge helpers (feature #18, commit 5)
+    // ---------------------------------------------------------------------------
+
+    // Mirrors background.js ACCESS_CODE_CHARS / generateAccessCode in the page
+    // context so the challenge can run without a round-trip to the worker.
+    const _AC_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    function _generateCode(length) {
+        const len = Math.max(32, Math.min(256, length || 64));
+        let result = '';
+        if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+            const buf = new Uint8Array(len * 2);
+            crypto.getRandomValues(buf);
+            for (let i = 0, j = 0; j < len; i++) {
+                const val = buf[i % buf.length];
+                if (val < Math.floor(256 / _AC_CHARS.length) * _AC_CHARS.length) {
+                    result += _AC_CHARS[val % _AC_CHARS.length]; j++;
+                }
+            }
+        } else {
+            for (let i = 0; i < len; i++) result += _AC_CHARS[Math.floor(Math.random() * _AC_CHARS.length)];
+        }
+        return result;
+    }
+
+    // Show the access-code challenge and return a Promise that resolves to true
+    // when the user correctly types the code, or false if they cancel.
+    function _showAccessChallenge(code) {
+        return new Promise(resolve => {
+            const challengeDiv = document.getElementById('accessCodeChallenge');
+            const displayDiv = document.getElementById('accessCodeDisplay');
+            const inputEl = document.getElementById('accessCodeInput');
+            const confirmBtn = document.getElementById('accessCodeConfirmBtn');
+            const cancelBtn = document.getElementById('accessCodeCancelBtn');
+            const errorDiv = document.getElementById('accessCodeError');
+            if (!challengeDiv || !displayDiv || !inputEl) { resolve(true); return; }
+
+            displayDiv.textContent = code;
+            inputEl.value = '';
+            if (errorDiv) errorDiv.textContent = '';
+            challengeDiv.style.display = 'block';
+            inputEl.focus();
+
+            // Disable paste on the input.
+            function noPaste(e) { e.preventDefault(); if (errorDiv) errorDiv.textContent = 'Typing only — paste is disabled.'; }
+            inputEl.addEventListener('paste', noPaste);
+
+            function cleanup() {
+                challengeDiv.style.display = 'none';
+                inputEl.removeEventListener('paste', noPaste);
+                if (confirmBtn) confirmBtn.removeEventListener('click', onConfirm);
+                if (cancelBtn) cancelBtn.removeEventListener('click', onCancel);
+            }
+
+            function onConfirm() {
+                if (inputEl.value === code) {
+                    cleanup(); resolve(true);
+                } else {
+                    if (errorDiv) errorDiv.textContent = 'Code does not match. Keep typing.';
+                    inputEl.value = '';
+                    inputEl.focus();
+                }
+            }
+
+            function onCancel() { cleanup(); resolve(false); }
+
+            if (confirmBtn) confirmBtn.addEventListener('click', onConfirm);
+            if (cancelBtn) cancelBtn.addEventListener('click', onCancel);
+            // Also allow Enter key as confirm.
+            inputEl.addEventListener('keydown', function onKey(e) {
+                if (e.key === 'Enter') { inputEl.removeEventListener('keydown', onKey); onConfirm(); }
+                if (e.key === 'Escape') { inputEl.removeEventListener('keydown', onKey); onCancel(); }
+            });
+        });
+    }
+
     function renderCategories() {
         const container = document.getElementById('categoryList');
         if (!container || typeof PREBUILT_CATEGORIES === 'undefined') return;
@@ -899,6 +975,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 showStatus(regexError, 'error');
                 return;
             }
+        }
+
+        // Access code friction gate (feature #18): if enabled, show the challenge
+        // and abort if the user cancels or fails to type the code correctly.
+        const acResult = await chrome.storage.sync.get(['accessCode']);
+        const ac = acResult.accessCode || { enabled: false, length: 64 };
+        if (ac.enabled) {
+            const code = _generateCode(ac.length || 64);
+            const passed = await _showAccessChallenge(code);
+            if (!passed) return; // user cancelled
         }
 
         try {
