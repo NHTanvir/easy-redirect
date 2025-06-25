@@ -980,6 +980,31 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('bulkActionBar').style.display = selectedIds.size > 0 ? 'flex' : 'none';
             });
         }
+        // Wire the Enable / Disable buttons in #bulkActionBar to operate on selectedIds.
+        const barEnableBtn = document.getElementById('bulkEnableBtn2');
+        if (barEnableBtn) {
+            barEnableBtn.onclick = async () => {
+                const result = await chrome.storage.sync.get(['rules']);
+                const allRules = Array.isArray(result.rules) ? result.rules : [];
+                const next = allRules.map(r => selectedIds.has(r.id) ? { ...r, enabled: true } : r);
+                await chrome.storage.sync.set({ rules: next });
+                await updateRedirectRules();
+                displayRules(next);
+                showStatus(`Enabled ${selectedIds.size} rules.`, 'success');
+            };
+        }
+        const barDisableBtn = document.getElementById('bulkDisableBtn2');
+        if (barDisableBtn) {
+            barDisableBtn.onclick = async () => {
+                const result = await chrome.storage.sync.get(['rules']);
+                const allRules = Array.isArray(result.rules) ? result.rules : [];
+                const next = allRules.map(r => selectedIds.has(r.id) ? { ...r, enabled: false } : r);
+                await chrome.storage.sync.set({ rules: next });
+                await updateRedirectRules();
+                displayRules(next);
+                showStatus(`Disabled ${selectedIds.size} rules.`, 'success');
+            };
+        }
     }
 
     // Set enabled state for all rules that are currently checked in the bulk-
