@@ -5,6 +5,14 @@
 // settings.schemaVersion to decide whether to migrate before reading.
 const SCHEMA_VERSION = 2;
 
+// URL opened in the browser when the extension is uninstalled. Chrome's DNR
+// does not expose a built-in survey flow so we set this via
+// chrome.runtime.setUninstallURL on install and startup (the URL is reset on
+// every Chrome restart so we must re-register it on startup too).
+// Override DEFAULT_UNINSTALL_URL by saving a custom URL to
+// chrome.storage.sync under the key 'uninstallUrl'.
+const DEFAULT_UNINSTALL_URL = 'https://forms.gle/easyredirect-uninstall';
+
 // Rule.type values understood by createRedirectRules. Extended as later PRs land
 // (regex). 'keyword' rules match either a URL substring (DNR-driven) or
 // the page <title>/body (content-script-driven — DNR alone can't see titles).
@@ -277,8 +285,25 @@ async function registerContextMenus() {
     });
 }
 
+// Read the stored uninstall URL (may be customised by the user) and call
+// chrome.runtime.setUninstallURL. Must be called on both onInstalled and
+// onStartup because Chrome resets the URL on browser restart.
+async function registerUninstallUrl() {
+    try {
+        const result = await chrome.storage.sync.get(['uninstallUrl']);
+        const url = (typeof result.uninstallUrl === 'string' && result.uninstallUrl.trim())
+            ? result.uninstallUrl.trim()
+            : DEFAULT_UNINSTALL_URL;
+        await chrome.runtime.setUninstallURL(url);
+    } catch (err) {
+        console.warn('[easy-redirect] setUninstallURL failed:', err);
+    }
+}
+
 chrome.runtime.onInstalled.addListener(async (details) => {
     console.log('Website Redirector onInstalled:', details.reason);
+
+    registerUninstallUrl();
 
     // Order matters: restore from the local backup BEFORE filling in defaults,
     // otherwise a sync that came back empty would get DEFAULTS written over the
@@ -414,6 +439,7 @@ async function restoreFromLocalIfSyncEmpty() {
 }
 
 chrome.runtime.onStartup.addListener(async () => {
+    registerUninstallUrl(); // Chrome resets the URL on restart; re-register here.
     await restoreFromLocalIfSyncEmpty();
     await runSchemaMigration();
     await ensureKeywordContentScriptRegistered();
