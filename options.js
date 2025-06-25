@@ -1405,6 +1405,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 showStatus(`Disabled ${selectedIds.size} rules.`, 'success');
             };
         }
+
+        // Populate today's hit count for each rule from dailyCounts in local storage.
+        chrome.storage.local.get(['dailyCounts'], lr => {
+            const dc = lr.dailyCounts || {};
+            const today = new Date().toISOString().slice(0, 10);
+            const counts = (dc.date === today && dc.counts) ? dc.counts : {};
+            websiteListDiv.querySelectorAll('.rule-today-count').forEach(span => {
+                const ruleId = span.dataset.ruleId;
+                const count = counts[ruleId] || 0;
+                span.textContent = count > 0 ? `${count} today` : '';
+            });
+        });
     }
 
     // Set enabled state for all rules that are currently checked in the bulk-
