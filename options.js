@@ -25,6 +25,10 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentGroups = [];
     let activeGroupId = 'default';
 
+    // Daily quota counts loaded from chrome.storage.local. Populated in loadData()
+    // so displayRules() can show today's hit count without an extra async read.
+    let currentDailyCounts = { date: null, counts: {} };
+
     // ---------------------------------------------------------------------------
     // Lock screen helpers (feature #17)
     // ---------------------------------------------------------------------------
@@ -410,6 +414,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 ).join('');
             }
             displayRules(rules);
+
+            // Load today's daily quota counts from local storage and refresh the
+            // hit-count badges in the rule list without a full re-render.
+            chrome.storage.local.get(['dailyCounts'], lr => {
+                const today = new Date().toISOString().slice(0, 10);
+                const dc = lr.dailyCounts || {};
+                currentDailyCounts = (dc.date === today) ? dc : { date: today, counts: {} };
+                const websiteListDiv = document.getElementById('websiteList');
+                if (websiteListDiv) {
+                    websiteListDiv.querySelectorAll('.rule-today-count').forEach(span => {
+                        const ruleId = span.dataset.ruleId;
+                        const count = (currentDailyCounts.counts && currentDailyCounts.counts[ruleId]) || 0;
+                        span.textContent = count > 0 ? `${count} today` : '';
+                    });
+                }
+            });
 
             const isEnabled = result.extensionEnabled !== false; // Default to true
             updateToggleButton(isEnabled);
