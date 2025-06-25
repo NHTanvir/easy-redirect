@@ -165,6 +165,8 @@ Every rule row in the options page shows an **On / Off** button. Clicking it cal
 
 A **bulk-actions bar** appears above the rule list whenever at least one rule exists. It contains a **Select all** checkbox (wires all per-row checkboxes at once) and **Enable selected** / **Disable selected** buttons that call `bulkSetEnabled(visibleRules, enable)`. `bulkSetEnabled` reads the global `rules[]` from storage, flips `enabled` for every rule whose id is currently checked, and saves the updated array.
 
+The `enabled` field on each Rule (present since PR #1) is surfaced as a per-row checkbox toggle. Disabled rules are skipped by `createRedirectRules()` at emit time but remain in storage — re-enabling them via the checkbox restores blocking without any storage loss. Bulk enable/disable is available via the action bar.
+
 ### Keyboard shortcuts
 
 Keyboard shortcuts are declared under `commands` in `manifest.json`. background.js `chrome.commands.onCommand` handles `open-settings` (opens options page) and `toggle-extension` (flips enabled state). Default bindings: Ctrl+Shift+B / Ctrl+Shift+Y.

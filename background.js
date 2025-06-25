@@ -511,6 +511,7 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
         }
 
         rules.forEach((rule, index) => {
+            // Disabled rules are intentionally skipped here, not deleted — re-enabling restores them without a storage write.
             if (!rule || rule.enabled === false) {
                 return;
             }

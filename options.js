@@ -878,6 +878,10 @@ document.addEventListener('DOMContentLoaded', function() {
             return `
                 <div class="website-item${isEnabled ? '' : ' rule-disabled'}" data-rule-id="${escapeHtml(rule.id)}">
                     <div class="rule-main-row">
+                        <input type="checkbox" class="rule-enabled-cb" data-rule-id="${escapeHtml(rule.id)}"
+                          ${rule.enabled !== false ? 'checked' : ''}
+                          title="${rule.enabled !== false ? 'Disable this rule' : 'Enable this rule'}"
+                          style="width:16px;height:16px;cursor:pointer;flex-shrink:0;">
                         <span class="rule-meta">
                             <input type="checkbox" class="rule-select-checkbox" data-rule-id="${escapeHtml(rule.id)}" style="margin:0 4px 0 0;cursor:pointer;" title="Select this rule">
                             <span class="${badgeClass}">${badgeLabel}</span>
@@ -936,6 +940,71 @@ document.addEventListener('DOMContentLoaded', function() {
         websiteListDiv.querySelectorAll('.rule-group-select').forEach(sel => {
             sel.addEventListener('change', () => moveRuleToGroup(sel.dataset.ruleId, sel.value));
         });
+        // Per-row enabled toggle checkbox — flip enabled without a full re-render
+        // to preserve focus and avoid scroll position jumps.
+        websiteListDiv.querySelectorAll('.rule-enabled-cb').forEach(cb => {
+            cb.addEventListener('change', async () => {
+                const ruleId = cb.dataset.ruleId;
+                const checked = cb.checked;
+                const result = await chrome.storage.sync.get(['rules']);
+                const rules = Array.isArray(result.rules) ? result.rules : [];
+                const next = rules.map(r => r.id === ruleId ? { ...r, enabled: checked } : r);
+                await chrome.storage.sync.set({ rules: next });
+                await updateRedirectRules();
+                // Update just this item's opacity instead of full re-render to preserve focus
+                const item = websiteListDiv.querySelector(`.website-item[data-rule-id="${CSS.escape(ruleId)}"]`);
+                if (item) item.classList.toggle('rule-disabled', !checked);
+            });
+        });
+        // Bulk-select-cb: show the bulkActionBar and update selected count.
+        const selectedIds = new Set();
+        websiteListDiv.querySelectorAll('.bulk-select-cb').forEach(cb => {
+            cb.addEventListener('change', () => {
+                if (cb.checked) selectedIds.add(cb.dataset.ruleId);
+                else selectedIds.delete(cb.dataset.ruleId);
+                document.getElementById('selectedCount').textContent = `${selectedIds.size} selected`;
+                document.getElementById('bulkActionBar').style.display = selectedIds.size > 0 ? 'flex' : 'none';
+            });
+        });
+        // Wire the select-all checkbox in #bulkActionBar.
+        const selectAllCb = document.getElementById('selectAllCb');
+        if (selectAllCb) {
+            selectAllCb.checked = false;
+            selectAllCb.addEventListener('change', () => {
+                websiteListDiv.querySelectorAll('.bulk-select-cb').forEach(cb => {
+                    cb.checked = selectAllCb.checked;
+                    if (cb.checked) selectedIds.add(cb.dataset.ruleId);
+                    else selectedIds.delete(cb.dataset.ruleId);
+                });
+                document.getElementById('selectedCount').textContent = `${selectedIds.size} selected`;
+                document.getElementById('bulkActionBar').style.display = selectedIds.size > 0 ? 'flex' : 'none';
+            });
+        }
+        // Wire the Enable / Disable buttons in #bulkActionBar to operate on selectedIds.
+        const barEnableBtn = document.getElementById('bulkEnableBtn2');
+        if (barEnableBtn) {
+            barEnableBtn.onclick = async () => {
+                const result = await chrome.storage.sync.get(['rules']);
+                const allRules = Array.isArray(result.rules) ? result.rules : [];
+                const next = allRules.map(r => selectedIds.has(r.id) ? { ...r, enabled: true } : r);
+                await chrome.storage.sync.set({ rules: next });
+                await updateRedirectRules();
+                displayRules(next);
+                showStatus(`Enabled ${selectedIds.size} rules.`, 'success');
+            };
+        }
+        const barDisableBtn = document.getElementById('bulkDisableBtn2');
+        if (barDisableBtn) {
+            barDisableBtn.onclick = async () => {
+                const result = await chrome.storage.sync.get(['rules']);
+                const allRules = Array.isArray(result.rules) ? result.rules : [];
+                const next = allRules.map(r => selectedIds.has(r.id) ? { ...r, enabled: false } : r);
+                await chrome.storage.sync.set({ rules: next });
+                await updateRedirectRules();
+                displayRules(next);
+                showStatus(`Disabled ${selectedIds.size} rules.`, 'success');
+            };
+        }
     }
 
     // Set enabled state for all rules that are currently checked in the bulk-
