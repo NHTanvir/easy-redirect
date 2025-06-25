@@ -173,6 +173,41 @@ async function verifyPin(passphrase, storedHash, storedSalt) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Random access code generation (feature #18)
+// ---------------------------------------------------------------------------
+
+// Characters used when building a random access code. The set intentionally
+// omits visually ambiguous pairs (0/O, 1/l/I) so the user can read and type
+// the code accurately from a screen. 56 unique chars give enough entropy even
+// at minimum length 32 (log2(56^32) ≈ 186 bits).
+const ACCESS_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+
+// Generate a cryptographically random access code of exactly `length`
+// characters drawn from ACCESS_CODE_CHARS. Falls back to Math.random if
+// crypto.getRandomValues is unavailable (should never happen in MV3).
+function generateAccessCode(length) {
+    const len = Math.max(32, Math.min(256, length || 64));
+    const chars = ACCESS_CODE_CHARS;
+    let result = '';
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+        const buf = new Uint8Array(len * 2); // oversample to avoid modulo bias
+        crypto.getRandomValues(buf);
+        for (let i = 0, j = 0; j < len; i++) {
+            const val = buf[i % buf.length];
+            if (val < Math.floor(256 / chars.length) * chars.length) {
+                result += chars[val % chars.length];
+                j++;
+            }
+        }
+    } else {
+        for (let i = 0; i < len; i++) {
+            result += chars[Math.floor(Math.random() * chars.length)];
+        }
+    }
+    return result;
+}
+
 // Split a stored path-rule pattern into its host and tail halves. Patterns are
 // stored canonically as either `host/path` or `host?query` (no scheme, no
 // leading www, no trailing slash on the path). The returned `tail` includes
