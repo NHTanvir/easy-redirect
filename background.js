@@ -43,7 +43,12 @@ const DEFAULTS = {
     groups: [{ id: 'default', name: 'Default', color: '#2196F3', enabled: true, redirectUrl: null }],
     // User theme preference: 'auto' defers to prefers-color-scheme, 'light' forces
     // light regardless of OS setting, 'dark' forces dark regardless of OS setting.
-    theme: 'auto'
+    theme: 'auto',
+    // PIN / password protection settings. mode is 'none' (no lock),
+    // 'pin' (numeric PIN), or 'password' (arbitrary passphrase). hash and salt
+    // are Base64-encoded PBKDF2-SHA256 output and random salt respectively.
+    // Stored in chrome.storage.sync so the lock follows the user across devices.
+    protection: { mode: 'none', hash: null, salt: null }
 };
 
 // Stable opaque identifier for a Rule. Prefer crypto.randomUUID() (available in
