@@ -184,3 +184,24 @@ The three-layer precedence is: `[data-theme=dark/light]` (highest, forced by use
 ### Prebuilt categories (categories.js)
 
 `categories.js` provides 6 prebuilt category lists (social, news, video, gaming, adult, gambling). Lists are static — no remote fetch or auto-update. `addCategory()` in `options.js` creates a new named group (using the category's color) and bulk-adds all entries as domain rules, skipping any that are already present. The Prebuilt Categories section in `options.html` renders one card per category with name, description, entry count, a 4-entry preview, and an "Add all" button.
+
+### Settings-page PIN protection (feature #17)
+
+The `protection` key in `DEFAULTS` / `chrome.storage.sync` holds `{ mode, hash, salt }`:
+
+- `mode` — `'none'` (no lock) or `'pin'` (active lock; `'password'` is a valid alias for future UI copy).
+- `hash` and `salt` — both Base64-encoded. `salt` is 16 random bytes generated fresh on every `hashPin()` call. `hash` is the 256-bit PBKDF2-SHA256 output (200 000 iterations). Storing a salted hash means the raw passphrase never touches storage.
+
+**background.js helpers** — `hashPin(passphrase)` and `verifyPin(passphrase, storedHash, storedSalt)` — use `SubtleCrypto` (available in MV3 service workers). Page-context mirrors (`_hashPin`, `_verifyPin`) live in `options.js` so the lock screen can verify locally without a round-trip.
+
+**Lock screen** — `checkLock()` in `options.js` runs before `loadData()`. If `protection.mode !== 'none'`, a full-viewport overlay (`#lockOverlay`) is shown and the page remains blocked until the correct passphrase is entered. Successful unlock resets the `lockAttempts` counter in `chrome.storage.local`.
+
+**Rate limiting** — failed attempts are tracked in `chrome.storage.local` under `lockAttempts: { count, lockedUntil }`. After `LOCK_MAX_ATTEMPTS` (10) failures the screen is locked for `LOCK_BACKOFF_MS` (60 seconds). The counter resets on a correct entry.
+
+**Background gate** — the `updateRules` message handler in `background.js` checks `request.protectionOk`. The options page always sets this to `true` after `checkLock()` resolves. Other callers (injected scripts, external extensions) that omit the flag are rejected when a lock is active.
+
+**Security section UI** (options.html / options.js):
+- `loadSecuritySection()` — reads protection from storage and shows either `#securityNone` (set a new lock) or `#securityActive` (change / remove the current lock).
+- **Set lock** — `#secSetBtn` validates that both PIN inputs match, calls `_hashPin()`, and writes to storage.
+- **Change password** — `#secChangeBtn` (inside a `<details>` in `#securityActive`) first verifies the current password via `_verifyPin()`, then hashes and writes the new one.
+- **Remove lock** — `#secRemoveBtn` uses `window.prompt()` to collect the current password, verifies it via `_verifyPin()`, then writes `{ mode: 'none', hash: null, salt: null }` to storage.

@@ -25,8 +25,106 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentGroups = [];
     let activeGroupId = 'default';
 
-    // Load saved data
-    loadData();
+    // ---------------------------------------------------------------------------
+    // Lock screen helpers (feature #17)
+    // ---------------------------------------------------------------------------
+
+    // Rate-limiting constants for the lock screen:
+    //   LOCK_MAX_ATTEMPTS — wrong guesses allowed before a lockout kicks in.
+    //   LOCK_BACKOFF_MS   — how long (ms) the user must wait after hitting the cap.
+    // Both are stored / read from chrome.storage.local under the 'lockAttempts' key
+    // so they survive page refreshes and extension restarts without using sync quota.
+    const LOCK_MAX_ATTEMPTS = 10;
+    const LOCK_BACKOFF_MS = 60 * 1000; // 60 seconds
+
+    // Encode / decode Base64 (mirrors background.js helpers but runs in the page
+    // context so the UI can verify a PIN without round-tripping to the worker).
+    function _strToBytes(str) { return new TextEncoder().encode(str); }
+    function _bytesToBase64(bytes) {
+        let b = ''; bytes.forEach(x => { b += String.fromCharCode(x); }); return btoa(b);
+    }
+    function _base64ToBytes(b64) {
+        const s = atob(b64); const a = new Uint8Array(s.length);
+        for (let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return a;
+    }
+    async function _deriveKey(passphrase, saltBytes) {
+        const km = await crypto.subtle.importKey('raw', _strToBytes(passphrase), { name: 'PBKDF2' }, false, ['deriveBits']);
+        const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: saltBytes, iterations: 200000 }, km, 256);
+        return new Uint8Array(bits);
+    }
+    async function _verifyPin(passphrase, storedHash, storedSalt) {
+        try {
+            const derived = await _deriveKey(passphrase, _base64ToBytes(storedSalt));
+            return _bytesToBase64(derived) === storedHash;
+        } catch (_) { return false; }
+    }
+
+    // Show the lock overlay, focus the input, and wire the submit button / Enter key.
+    // Resolves only when the correct passphrase has been entered.
+    async function checkLock() {
+        const result = await chrome.storage.sync.get(['protection']);
+        const prot = result.protection || { mode: 'none', hash: null, salt: null };
+        if (prot.mode === 'none' || !prot.hash || !prot.salt) return; // no lock set
+
+        const overlay = document.getElementById('lockOverlay');
+        const input = document.getElementById('lockPinInput');
+        const errorEl = document.getElementById('lockError');
+        const attemptsEl = document.getElementById('lockAttemptsLeft');
+        if (!overlay || !input) return;
+
+        overlay.classList.add('visible');
+        input.focus();
+
+        // Update attempt display from stored counter.
+        function refreshAttemptDisplay() {
+            chrome.storage.local.get(['lockAttempts'], lr => {
+                const attempts = (lr.lockAttempts || {});
+                const remaining = Math.max(0, LOCK_MAX_ATTEMPTS - (attempts.count || 0));
+                attemptsEl.textContent = remaining < LOCK_MAX_ATTEMPTS
+                    ? `${remaining} attempt${remaining !== 1 ? 's' : ''} remaining`
+                    : '';
+            });
+        }
+        refreshAttemptDisplay();
+
+        await new Promise(resolve => {
+            async function tryUnlock() {
+                errorEl.textContent = '';
+                const lr = await new Promise(r => chrome.storage.local.get(['lockAttempts'], r));
+                const attempts = lr.lockAttempts || { count: 0, lockedUntil: null };
+                // Rate-limit: if locked until a future time, block.
+                if (attempts.lockedUntil && Date.now() < attempts.lockedUntil) {
+                    const secs = Math.ceil((attempts.lockedUntil - Date.now()) / 1000);
+                    errorEl.textContent = `Too many failed attempts. Try again in ${secs}s.`;
+                    return;
+                }
+                const ok = await _verifyPin(input.value, prot.hash, prot.salt);
+                if (ok) {
+                    // Reset attempt counter on success.
+                    await chrome.storage.local.set({ lockAttempts: { count: 0, lockedUntil: null } });
+                    overlay.classList.remove('visible');
+                    resolve();
+                } else {
+                    const newCount = (attempts.count || 0) + 1;
+                    const lockedUntil = newCount >= LOCK_MAX_ATTEMPTS ? Date.now() + LOCK_BACKOFF_MS : null;
+                    await chrome.storage.local.set({ lockAttempts: { count: newCount, lockedUntil } });
+                    errorEl.textContent = 'Incorrect PIN or password.';
+                    input.value = '';
+                    input.focus();
+                    refreshAttemptDisplay();
+                }
+            }
+            document.getElementById('lockSubmitBtn').addEventListener('click', tryUnlock);
+            input.addEventListener('keydown', e => { if (e.key === 'Enter') tryUnlock(); });
+        });
+    }
+
+    // Load saved data (called after lock check resolves)
+    async function init() {
+        await checkLock();
+        loadData();
+    }
+    init();
 
     // Event listeners
     document.getElementById('saveRedirectUrl').addEventListener('click', saveRedirectUrl);
@@ -329,9 +427,142 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         renderCategories();
+        loadSecuritySection();
         } catch (error) {
             showStatus('Error loading data: ' + error.message, 'error');
         }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Security section — set a new PIN/password (feature #17, commit 7)
+    // ---------------------------------------------------------------------------
+
+    // Hash a passphrase using PBKDF2-SHA256 (page-context mirror of background.js hashPin).
+    async function _hashPin(passphrase) {
+        const enc = new TextEncoder();
+        function toB64(bytes) {
+            let b = ''; bytes.forEach(x => { b += String.fromCharCode(x); }); return btoa(b);
+        }
+        const saltBytes = crypto.getRandomValues(new Uint8Array(16));
+        const km = await crypto.subtle.importKey('raw', enc.encode(passphrase), { name: 'PBKDF2' }, false, ['deriveBits']);
+        const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: saltBytes, iterations: 200000 }, km, 256);
+        return { hash: toB64(new Uint8Array(bits)), salt: toB64(saltBytes) };
+    }
+
+    // Load the current protection state and show the appropriate sub-panel.
+    async function loadSecuritySection() {
+        const result = await chrome.storage.sync.get(['protection']);
+        const prot = result.protection || { mode: 'none', hash: null, salt: null };
+        const isLocked = prot.mode !== 'none' && prot.hash && prot.salt;
+        const noneEl = document.getElementById('securityNone');
+        const activeEl = document.getElementById('securityActive');
+        if (!noneEl || !activeEl) return;
+        noneEl.style.display = isLocked ? 'none' : 'block';
+        activeEl.style.display = isLocked ? 'block' : 'none';
+    }
+
+    // Set lock button — validate, hash, and persist.
+    const secSetBtn = document.getElementById('secSetBtn');
+    if (secSetBtn) {
+        secSetBtn.addEventListener('click', async () => {
+            const secStatusEl = document.getElementById('secStatus');
+            const pin = (document.getElementById('secNewPin') || {}).value || '';
+            const confirm = (document.getElementById('secConfirmPin') || {}).value || '';
+            if (!pin) { secStatusEl.textContent = 'Please enter a PIN or password.'; secStatusEl.style.color = '#c62828'; return; }
+            if (pin !== confirm) { secStatusEl.textContent = 'Entries do not match.'; secStatusEl.style.color = '#c62828'; return; }
+            try {
+                secSetBtn.disabled = true;
+                secStatusEl.textContent = 'Hashing…';
+                secStatusEl.style.color = 'var(--text-muted)';
+                const { hash, salt } = await _hashPin(pin);
+                await chrome.storage.sync.set({ protection: { mode: 'pin', hash, salt } });
+                secStatusEl.textContent = 'Lock set successfully.';
+                secStatusEl.style.color = '#2e7d32';
+                document.getElementById('secNewPin').value = '';
+                document.getElementById('secConfirmPin').value = '';
+                await loadSecuritySection();
+            } catch (err) {
+                secStatusEl.textContent = 'Error: ' + err.message;
+                secStatusEl.style.color = '#c62828';
+            } finally {
+                secSetBtn.disabled = false;
+            }
+        });
+    }
+
+    // Change password button — verify current, hash new, persist (feature #17, commit 8).
+    const secChangeBtn = document.getElementById('secChangeBtn');
+    if (secChangeBtn) {
+        secChangeBtn.addEventListener('click', async () => {
+            const secStatusEl = document.getElementById('secStatus');
+            const current = (document.getElementById('secCurrentPin') || {}).value || '';
+            const newPin = (document.getElementById('secNewPin2') || {}).value || '';
+            const confirm = (document.getElementById('secConfirmPin2') || {}).value || '';
+            if (!current) { secStatusEl.textContent = 'Enter your current password.'; secStatusEl.style.color = '#c62828'; return; }
+            if (!newPin) { secStatusEl.textContent = 'Enter a new password.'; secStatusEl.style.color = '#c62828'; return; }
+            if (newPin !== confirm) { secStatusEl.textContent = 'New passwords do not match.'; secStatusEl.style.color = '#c62828'; return; }
+            try {
+                secChangeBtn.disabled = true;
+                secStatusEl.textContent = 'Verifying…';
+                secStatusEl.style.color = 'var(--text-muted)';
+                const pResult = await chrome.storage.sync.get(['protection']);
+                const prot = pResult.protection || {};
+                const ok = await _verifyPin(current, prot.hash, prot.salt);
+                if (!ok) {
+                    secStatusEl.textContent = 'Current password is incorrect.';
+                    secStatusEl.style.color = '#c62828';
+                    return;
+                }
+                secStatusEl.textContent = 'Hashing new password…';
+                const { hash, salt } = await _hashPin(newPin);
+                await chrome.storage.sync.set({ protection: { mode: 'pin', hash, salt } });
+                secStatusEl.textContent = 'Password changed successfully.';
+                secStatusEl.style.color = '#2e7d32';
+                document.getElementById('secCurrentPin').value = '';
+                document.getElementById('secNewPin2').value = '';
+                document.getElementById('secConfirmPin2').value = '';
+                const details = document.getElementById('changePasswordDetails');
+                if (details) details.removeAttribute('open');
+            } catch (err) {
+                secStatusEl.textContent = 'Error: ' + err.message;
+                secStatusEl.style.color = '#c62828';
+            } finally {
+                secChangeBtn.disabled = false;
+            }
+        });
+    }
+
+    // Remove lock button — verify current password then clear protection (feature #17, commit 9).
+    const secRemoveBtn = document.getElementById('secRemoveBtn');
+    if (secRemoveBtn) {
+        secRemoveBtn.addEventListener('click', async () => {
+            const secStatusEl = document.getElementById('secStatus');
+            // Inline prompt: ask for current password before removing.
+            const current = window.prompt('Enter your current PIN or password to remove the lock:');
+            if (current === null) return; // user cancelled
+            try {
+                secRemoveBtn.disabled = true;
+                secStatusEl.textContent = 'Verifying…';
+                secStatusEl.style.color = 'var(--text-muted)';
+                const pResult = await chrome.storage.sync.get(['protection']);
+                const prot = pResult.protection || {};
+                const ok = await _verifyPin(current, prot.hash, prot.salt);
+                if (!ok) {
+                    secStatusEl.textContent = 'Incorrect password. Lock not removed.';
+                    secStatusEl.style.color = '#c62828';
+                    return;
+                }
+                await chrome.storage.sync.set({ protection: { mode: 'none', hash: null, salt: null } });
+                secStatusEl.textContent = 'Lock removed.';
+                secStatusEl.style.color = '#2e7d32';
+                await loadSecuritySection();
+            } catch (err) {
+                secStatusEl.textContent = 'Error: ' + err.message;
+                secStatusEl.style.color = '#c62828';
+            } finally {
+                secRemoveBtn.disabled = false;
+            }
+        });
     }
 
     function renderCategories() {
@@ -883,6 +1114,7 @@ document.addEventListener('DOMContentLoaded', function() {
                           title="${rule.enabled !== false ? 'Disable this rule' : 'Enable this rule'}"
                           style="width:16px;height:16px;cursor:pointer;flex-shrink:0;">
                         <span class="rule-meta">
+                            <input type="checkbox" class="bulk-select-cb" data-rule-id="${escapeHtml(rule.id)}" style="width:14px;height:14px;margin-right:4px;">
                             <input type="checkbox" class="rule-select-checkbox" data-rule-id="${escapeHtml(rule.id)}" style="margin:0 4px 0 0;cursor:pointer;" title="Select this rule">
                             <span class="${badgeClass}">${badgeLabel}</span>
                             <span class="rule-pattern">${highlightMatch(rule.pattern, searchQuery)}</span>
@@ -1218,14 +1450,18 @@ document.addEventListener('DOMContentLoaded', function() {
             const mode = MODES.includes(result.mode) ? result.mode : 'blocklist';
             const alwaysAllowed = Array.isArray(result.alwaysAllowed) ? result.alwaysAllowed : [];
 
-            // Send message to background script to update rules
+            // Send message to background script to update rules.
+            // protectionOk: true signals that the user has already passed the
+            // lock screen (checkLock() resolved before init() called loadData()).
+            // Background.js uses this to gate mutations when protection is active.
             chrome.runtime.sendMessage({
                 action: 'updateRules',
                 rules: isEnabled ? rules : [],
                 redirectUrl: redirectUrl,
                 mode: mode,
                 alwaysAllowed: alwaysAllowed,
-                groups: currentGroups
+                groups: currentGroups,
+                protectionOk: true
             });
         } catch (error) {
             console.error('Error updating redirect rules:', error);

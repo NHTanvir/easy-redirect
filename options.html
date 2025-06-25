@@ -432,9 +432,89 @@
             color: var(--text-muted);
             cursor: pointer;
         }
+
+        /* Lock screen overlay (feature #17) */
+        #lockOverlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: var(--bg);
+            z-index: 9999;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        #lockOverlay.visible {
+            display: flex;
+        }
+        #lockBox {
+            background: var(--bg-section);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 36px 40px;
+            max-width: 360px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+        }
+        #lockBox h2 {
+            margin: 0 0 8px;
+            color: var(--text);
+            font-size: 20px;
+        }
+        #lockBox .lock-icon {
+            font-size: 40px;
+            margin-bottom: 12px;
+        }
+        #lockBox .help-text {
+            margin-bottom: 16px;
+        }
+        #lockPinInput {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 18px;
+            box-sizing: border-box;
+            text-align: center;
+            letter-spacing: 4px;
+            background: var(--input-bg);
+            color: var(--text);
+        }
+        #lockSubmitBtn {
+            width: 100%;
+            margin-top: 12px;
+            padding: 12px;
+            font-size: 15px;
+        }
+        #lockError {
+            margin-top: 10px;
+            color: #c62828;
+            font-size: 13px;
+            min-height: 18px;
+        }
+        #lockAttemptsLeft {
+            margin-top: 6px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
     </style>
 </head>
 <body>
+    <!-- Lock screen overlay — shown when a PIN/password is set (feature #17) -->
+    <div id="lockOverlay" role="dialog" aria-modal="true" aria-labelledby="lockTitle">
+        <div id="lockBox">
+            <div class="lock-icon" aria-hidden="true">&#128274;</div>
+            <h2 id="lockTitle">Easy Redirect is locked</h2>
+            <p class="help-text">Enter your PIN or password to access settings.</p>
+            <input type="password" id="lockPinInput" placeholder="Enter PIN / password"
+                   autocomplete="current-password" autocorrect="off" spellcheck="false">
+            <button id="lockSubmitBtn">Unlock</button>
+            <div id="lockError" role="alert"></div>
+            <div id="lockAttemptsLeft"></div>
+        </div>
+    </div>
+
     <h1>Easy Redirect — Settings</h1>
 
     <p style="text-align:center;color:#666;font-size:12px;margin:0 0 16px;">
@@ -562,6 +642,52 @@
         </div>
         <input type="file" id="importFile" accept=".json,.txt" style="display:none;">
         <button id="importBtn" style="background:#ff9800;margin-top:8px;">Import file…</button>
+    </div>
+
+    <!-- Security / lock section (feature #17) -->
+    <div class="section" id="securitySection">
+        <h3>Security</h3>
+        <div class="help-text" style="margin-bottom:14px;">
+            Set a PIN or password to lock the settings page. Anyone who opens
+            Easy Redirect will need to enter it before viewing or changing rules.
+        </div>
+        <div id="securityNone" style="display:none;">
+            <p style="margin:0 0 12px;color:var(--text-muted);font-size:13px;">No lock is currently set.</p>
+            <label style="font-size:13px;display:block;margin-bottom:6px;">New PIN or password</label>
+            <input type="password" id="secNewPin" placeholder="Enter PIN or password" autocomplete="new-password"
+                   style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+            <label style="font-size:13px;display:block;margin-bottom:6px;">Confirm</label>
+            <input type="password" id="secConfirmPin" placeholder="Re-enter PIN or password" autocomplete="new-password"
+                   style="width:100%;box-sizing:border-box;margin-bottom:10px;">
+            <button id="secSetBtn">Set lock</button>
+        </div>
+        <div id="securityActive" style="display:none;">
+            <p style="margin:0 0 10px;font-size:13px;">
+                <strong>Lock is active.</strong>
+                The settings page will require a PIN or password each time it is opened.
+            </p>
+            <!-- Change-password form (feature #17, commit 8) -->
+            <details id="changePasswordDetails" style="margin-bottom:12px;">
+                <summary style="cursor:pointer;font-size:13px;color:var(--btn-blue);user-select:none;">Change password…</summary>
+                <div style="margin-top:10px;">
+                    <label style="font-size:13px;display:block;margin-bottom:4px;">Current password</label>
+                    <input type="password" id="secCurrentPin" placeholder="Current PIN or password"
+                           autocomplete="current-password"
+                           style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+                    <label style="font-size:13px;display:block;margin-bottom:4px;">New password</label>
+                    <input type="password" id="secNewPin2" placeholder="New PIN or password"
+                           autocomplete="new-password"
+                           style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+                    <label style="font-size:13px;display:block;margin-bottom:4px;">Confirm new password</label>
+                    <input type="password" id="secConfirmPin2" placeholder="Re-enter new PIN or password"
+                           autocomplete="new-password"
+                           style="width:100%;box-sizing:border-box;margin-bottom:10px;">
+                    <button id="secChangeBtn">Change password</button>
+                </div>
+            </details>
+            <button id="secRemoveBtn" style="background:#f44336;">Remove lock</button>
+        </div>
+        <div id="secStatus" style="min-height:18px;font-size:13px;margin-top:10px;"></div>
     </div>
 
     <div id="status" class="status" style="display: none;"></div>

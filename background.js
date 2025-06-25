@@ -43,7 +43,12 @@ const DEFAULTS = {
     groups: [{ id: 'default', name: 'Default', color: '#2196F3', enabled: true, redirectUrl: null }],
     // User theme preference: 'auto' defers to prefers-color-scheme, 'light' forces
     // light regardless of OS setting, 'dark' forces dark regardless of OS setting.
-    theme: 'auto'
+    theme: 'auto',
+    // PIN / password protection settings. mode is 'none' (no lock),
+    // 'pin' (numeric PIN), or 'password' (arbitrary passphrase). hash and salt
+    // are Base64-encoded PBKDF2-SHA256 output and random salt respectively.
+    // Stored in chrome.storage.sync so the lock follows the user across devices.
+    protection: { mode: 'none', hash: null, salt: null }
 };
 
 // Stable opaque identifier for a Rule. Prefer crypto.randomUUID() (available in
@@ -99,6 +104,67 @@ function createGroup(name, opts = {}) {
         createdAt: opts.createdAt || Date.now(),
         schedule: opts.schedule || null
     };
+}
+
+// ---------------------------------------------------------------------------
+// PBKDF2-SHA256 helpers for PIN / password protection (feature #17)
+// ---------------------------------------------------------------------------
+
+// Encode a JS string as UTF-8 bytes (Uint8Array).
+function strToBytes(str) {
+    return new TextEncoder().encode(str);
+}
+
+// Encode a Uint8Array as a URL-safe Base64 string.
+function bytesToBase64(bytes) {
+    let binary = '';
+    bytes.forEach(b => { binary += String.fromCharCode(b); });
+    return btoa(binary);
+}
+
+// Decode a URL-safe Base64 string back to a Uint8Array.
+function base64ToBytes(b64) {
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+}
+
+// Derive a PBKDF2-SHA256 key from a passphrase + salt.
+// Returns a Uint8Array (32 bytes / 256 bits).
+async function deriveKey(passphrase, saltBytes) {
+    const keyMaterial = await crypto.subtle.importKey(
+        'raw', strToBytes(passphrase), { name: 'PBKDF2' }, false, ['deriveBits']
+    );
+    const bits = await crypto.subtle.deriveBits(
+        { name: 'PBKDF2', hash: 'SHA-256', salt: saltBytes, iterations: 200000 },
+        keyMaterial,
+        256
+    );
+    return new Uint8Array(bits);
+}
+
+// Hash a passphrase and return { hash, salt } — both Base64 strings — ready
+// to persist in chrome.storage.sync as protection.hash / protection.salt.
+// A fresh 16-byte random salt is generated on every call so re-using the same
+// passphrase produces a different hash each time (safe for storage).
+async function hashPin(passphrase) {
+    const saltBytes = crypto.getRandomValues(new Uint8Array(16));
+    const hashBytes = await deriveKey(passphrase, saltBytes);
+    return { hash: bytesToBase64(hashBytes), salt: bytesToBase64(saltBytes) };
+}
+
+// Verify a passphrase against a stored { hash, salt } pair (both Base64).
+// Returns true if the passphrase is correct, false otherwise.
+async function verifyPin(passphrase, storedHash, storedSalt) {
+    try {
+        const saltBytes = base64ToBytes(storedSalt);
+        const derivedBytes = await deriveKey(passphrase, saltBytes);
+        const derivedB64 = bytesToBase64(derivedBytes);
+        return derivedB64 === storedHash;
+    } catch (_) {
+        return false;
+    }
 }
 
 // Split a stored path-rule pattern into its host and tail halves. Patterns are
@@ -317,14 +383,29 @@ chrome.runtime.onStartup.addListener(async () => {
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'updateRules') {
-        const opts = {
-            mode: MODES.includes(request.mode) ? request.mode : 'blocklist',
-            alwaysAllowed: Array.isArray(request.alwaysAllowed) ? request.alwaysAllowed : [],
-            groups: Array.isArray(request.groups) ? request.groups : []
-        };
-        updateRedirectRulesFromMessage(request.rules || [], request.redirectUrl, opts);
-        sendResponse({ success: true });
-        return;
+        // Defense-in-depth: if protection is active the request must carry a
+        // verified token. The options page sets request.protectionOk = true after
+        // the user has successfully passed the lock screen (checkLock() resolves).
+        // Background.js cannot re-verify the PIN itself — it trusts the page's
+        // attestation here — but this gate still blocks unauthenticated callers
+        // (e.g. injected scripts or external extensions) that don't know to set
+        // the flag. Real PIN verification happens exclusively in options.js.
+        chrome.storage.sync.get(['protection'], protResult => {
+            const prot = (protResult.protection) || { mode: 'none' };
+            if (prot.mode !== 'none' && !request.protectionOk) {
+                console.warn('[easy-redirect] updateRules blocked — protection active, protectionOk not set');
+                sendResponse({ success: false, error: 'locked' });
+                return;
+            }
+            const opts = {
+                mode: MODES.includes(request.mode) ? request.mode : 'blocklist',
+                alwaysAllowed: Array.isArray(request.alwaysAllowed) ? request.alwaysAllowed : [],
+                groups: Array.isArray(request.groups) ? request.groups : []
+            };
+            updateRedirectRulesFromMessage(request.rules || [], request.redirectUrl, opts);
+            sendResponse({ success: true });
+        });
+        return true; // keep channel open for async sendResponse
     }
     if (request.action === 'keywordHit') {
         // The content script found a keyword in the page title/body. DNR can't
