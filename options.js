@@ -956,6 +956,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (item) item.classList.toggle('rule-disabled', !checked);
             });
         });
+        // Bulk-select-cb: show the bulkActionBar and update selected count.
+        const selectedIds = new Set();
+        websiteListDiv.querySelectorAll('.bulk-select-cb').forEach(cb => {
+            cb.addEventListener('change', () => {
+                if (cb.checked) selectedIds.add(cb.dataset.ruleId);
+                else selectedIds.delete(cb.dataset.ruleId);
+                document.getElementById('selectedCount').textContent = `${selectedIds.size} selected`;
+                document.getElementById('bulkActionBar').style.display = selectedIds.size > 0 ? 'flex' : 'none';
+            });
+        });
+        // Wire the select-all checkbox in #bulkActionBar.
+        const selectAllCb = document.getElementById('selectAllCb');
+        if (selectAllCb) {
+            selectAllCb.checked = false;
+            selectAllCb.addEventListener('change', () => {
+                websiteListDiv.querySelectorAll('.bulk-select-cb').forEach(cb => {
+                    cb.checked = selectAllCb.checked;
+                    if (cb.checked) selectedIds.add(cb.dataset.ruleId);
+                    else selectedIds.delete(cb.dataset.ruleId);
+                });
+                document.getElementById('selectedCount').textContent = `${selectedIds.size} selected`;
+                document.getElementById('bulkActionBar').style.display = selectedIds.size > 0 ? 'flex' : 'none';
+            });
+        }
     }
 
     // Set enabled state for all rules that are currently checked in the bulk-
