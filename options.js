@@ -878,6 +878,10 @@ document.addEventListener('DOMContentLoaded', function() {
             return `
                 <div class="website-item${isEnabled ? '' : ' rule-disabled'}" data-rule-id="${escapeHtml(rule.id)}">
                     <div class="rule-main-row">
+                        <input type="checkbox" class="rule-enabled-cb" data-rule-id="${escapeHtml(rule.id)}"
+                          ${rule.enabled !== false ? 'checked' : ''}
+                          title="${rule.enabled !== false ? 'Disable this rule' : 'Enable this rule'}"
+                          style="width:16px;height:16px;cursor:pointer;flex-shrink:0;">
                         <span class="rule-meta">
                             <input type="checkbox" class="rule-select-checkbox" data-rule-id="${escapeHtml(rule.id)}" style="margin:0 4px 0 0;cursor:pointer;" title="Select this rule">
                             <span class="${badgeClass}">${badgeLabel}</span>
@@ -935,6 +939,22 @@ document.addEventListener('DOMContentLoaded', function() {
         // Group dropdown — move a rule to a different group on change.
         websiteListDiv.querySelectorAll('.rule-group-select').forEach(sel => {
             sel.addEventListener('change', () => moveRuleToGroup(sel.dataset.ruleId, sel.value));
+        });
+        // Per-row enabled toggle checkbox — flip enabled without a full re-render
+        // to preserve focus and avoid scroll position jumps.
+        websiteListDiv.querySelectorAll('.rule-enabled-cb').forEach(cb => {
+            cb.addEventListener('change', async () => {
+                const ruleId = cb.dataset.ruleId;
+                const checked = cb.checked;
+                const result = await chrome.storage.sync.get(['rules']);
+                const rules = Array.isArray(result.rules) ? result.rules : [];
+                const next = rules.map(r => r.id === ruleId ? { ...r, enabled: checked } : r);
+                await chrome.storage.sync.set({ rules: next });
+                await updateRedirectRules();
+                // Update just this item's opacity instead of full re-render to preserve focus
+                const item = websiteListDiv.querySelector(`.website-item[data-rule-id="${CSS.escape(ruleId)}"]`);
+                if (item) item.classList.toggle('rule-disabled', !checked);
+            });
         });
     }
 
