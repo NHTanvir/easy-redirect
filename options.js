@@ -532,6 +532,39 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Remove lock button — verify current password then clear protection (feature #17, commit 9).
+    const secRemoveBtn = document.getElementById('secRemoveBtn');
+    if (secRemoveBtn) {
+        secRemoveBtn.addEventListener('click', async () => {
+            const secStatusEl = document.getElementById('secStatus');
+            // Inline prompt: ask for current password before removing.
+            const current = window.prompt('Enter your current PIN or password to remove the lock:');
+            if (current === null) return; // user cancelled
+            try {
+                secRemoveBtn.disabled = true;
+                secStatusEl.textContent = 'Verifying…';
+                secStatusEl.style.color = 'var(--text-muted)';
+                const pResult = await chrome.storage.sync.get(['protection']);
+                const prot = pResult.protection || {};
+                const ok = await _verifyPin(current, prot.hash, prot.salt);
+                if (!ok) {
+                    secStatusEl.textContent = 'Incorrect password. Lock not removed.';
+                    secStatusEl.style.color = '#c62828';
+                    return;
+                }
+                await chrome.storage.sync.set({ protection: { mode: 'none', hash: null, salt: null } });
+                secStatusEl.textContent = 'Lock removed.';
+                secStatusEl.style.color = '#2e7d32';
+                await loadSecuritySection();
+            } catch (err) {
+                secStatusEl.textContent = 'Error: ' + err.message;
+                secStatusEl.style.color = '#c62828';
+            } finally {
+                secRemoveBtn.disabled = false;
+            }
+        });
+    }
+
     function renderCategories() {
         const container = document.getElementById('categoryList');
         if (!container || typeof PREBUILT_CATEGORIES === 'undefined') return;
