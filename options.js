@@ -29,6 +29,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // Lock screen helpers (feature #17)
     // ---------------------------------------------------------------------------
 
+    // Rate-limiting constants for the lock screen:
+    //   LOCK_MAX_ATTEMPTS — wrong guesses allowed before a lockout kicks in.
+    //   LOCK_BACKOFF_MS   — how long (ms) the user must wait after hitting the cap.
+    // Both are stored / read from chrome.storage.local under the 'lockAttempts' key
+    // so they survive page refreshes and extension restarts without using sync quota.
+    const LOCK_MAX_ATTEMPTS = 10;
+    const LOCK_BACKOFF_MS = 60 * 1000; // 60 seconds
+
     // Encode / decode Base64 (mirrors background.js helpers but runs in the page
     // context so the UI can verify a PIN without round-tripping to the worker).
     function _strToBytes(str) { return new TextEncoder().encode(str); }
@@ -71,8 +79,8 @@ document.addEventListener('DOMContentLoaded', function() {
         function refreshAttemptDisplay() {
             chrome.storage.local.get(['lockAttempts'], lr => {
                 const attempts = (lr.lockAttempts || {});
-                const remaining = Math.max(0, 10 - (attempts.count || 0));
-                attemptsEl.textContent = remaining < 10
+                const remaining = Math.max(0, LOCK_MAX_ATTEMPTS - (attempts.count || 0));
+                attemptsEl.textContent = remaining < LOCK_MAX_ATTEMPTS
                     ? `${remaining} attempt${remaining !== 1 ? 's' : ''} remaining`
                     : '';
             });
@@ -98,7 +106,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     resolve();
                 } else {
                     const newCount = (attempts.count || 0) + 1;
-                    const lockedUntil = newCount >= 10 ? Date.now() + 60000 : null;
+                    const lockedUntil = newCount >= LOCK_MAX_ATTEMPTS ? Date.now() + LOCK_BACKOFF_MS : null;
                     await chrome.storage.local.set({ lockAttempts: { count: newCount, lockedUntil } });
                     errorEl.textContent = 'Incorrect PIN or password.';
                     input.value = '';
