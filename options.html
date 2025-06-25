@@ -644,6 +644,33 @@
         <button id="importBtn" style="background:#ff9800;margin-top:8px;">Import file…</button>
     </div>
 
+    <!-- Security / lock section (feature #17) -->
+    <div class="section" id="securitySection">
+        <h3>Security</h3>
+        <div class="help-text" style="margin-bottom:14px;">
+            Set a PIN or password to lock the settings page. Anyone who opens
+            Easy Redirect will need to enter it before viewing or changing rules.
+        </div>
+        <div id="securityNone" style="display:none;">
+            <p style="margin:0 0 12px;color:var(--text-muted);font-size:13px;">No lock is currently set.</p>
+            <label style="font-size:13px;display:block;margin-bottom:6px;">New PIN or password</label>
+            <input type="password" id="secNewPin" placeholder="Enter PIN or password" autocomplete="new-password"
+                   style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+            <label style="font-size:13px;display:block;margin-bottom:6px;">Confirm</label>
+            <input type="password" id="secConfirmPin" placeholder="Re-enter PIN or password" autocomplete="new-password"
+                   style="width:100%;box-sizing:border-box;margin-bottom:10px;">
+            <button id="secSetBtn">Set lock</button>
+        </div>
+        <div id="securityActive" style="display:none;">
+            <p style="margin:0 0 10px;font-size:13px;">
+                <strong>Lock is active.</strong>
+                The settings page will require a PIN or password each time it is opened.
+            </p>
+            <button id="secRemoveBtn" style="background:#f44336;">Remove lock</button>
+        </div>
+        <div id="secStatus" style="min-height:18px;font-size:13px;margin-top:10px;"></div>
+    </div>
+
     <div id="status" class="status" style="display: none;"></div>
 
     <script src="categories.js"></script>

@@ -427,9 +427,67 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         renderCategories();
+        loadSecuritySection();
         } catch (error) {
             showStatus('Error loading data: ' + error.message, 'error');
         }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Security section — set a new PIN/password (feature #17, commit 7)
+    // ---------------------------------------------------------------------------
+
+    // Hash a passphrase using PBKDF2-SHA256 (page-context mirror of background.js hashPin).
+    async function _hashPin(passphrase) {
+        const enc = new TextEncoder();
+        function toB64(bytes) {
+            let b = ''; bytes.forEach(x => { b += String.fromCharCode(x); }); return btoa(b);
+        }
+        const saltBytes = crypto.getRandomValues(new Uint8Array(16));
+        const km = await crypto.subtle.importKey('raw', enc.encode(passphrase), { name: 'PBKDF2' }, false, ['deriveBits']);
+        const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: saltBytes, iterations: 200000 }, km, 256);
+        return { hash: toB64(new Uint8Array(bits)), salt: toB64(saltBytes) };
+    }
+
+    // Load the current protection state and show the appropriate sub-panel.
+    async function loadSecuritySection() {
+        const result = await chrome.storage.sync.get(['protection']);
+        const prot = result.protection || { mode: 'none', hash: null, salt: null };
+        const isLocked = prot.mode !== 'none' && prot.hash && prot.salt;
+        const noneEl = document.getElementById('securityNone');
+        const activeEl = document.getElementById('securityActive');
+        if (!noneEl || !activeEl) return;
+        noneEl.style.display = isLocked ? 'none' : 'block';
+        activeEl.style.display = isLocked ? 'block' : 'none';
+    }
+
+    // Set lock button — validate, hash, and persist.
+    const secSetBtn = document.getElementById('secSetBtn');
+    if (secSetBtn) {
+        secSetBtn.addEventListener('click', async () => {
+            const secStatusEl = document.getElementById('secStatus');
+            const pin = (document.getElementById('secNewPin') || {}).value || '';
+            const confirm = (document.getElementById('secConfirmPin') || {}).value || '';
+            if (!pin) { secStatusEl.textContent = 'Please enter a PIN or password.'; secStatusEl.style.color = '#c62828'; return; }
+            if (pin !== confirm) { secStatusEl.textContent = 'Entries do not match.'; secStatusEl.style.color = '#c62828'; return; }
+            try {
+                secSetBtn.disabled = true;
+                secStatusEl.textContent = 'Hashing…';
+                secStatusEl.style.color = 'var(--text-muted)';
+                const { hash, salt } = await _hashPin(pin);
+                await chrome.storage.sync.set({ protection: { mode: 'pin', hash, salt } });
+                secStatusEl.textContent = 'Lock set successfully.';
+                secStatusEl.style.color = '#2e7d32';
+                document.getElementById('secNewPin').value = '';
+                document.getElementById('secConfirmPin').value = '';
+                await loadSecuritySection();
+            } catch (err) {
+                secStatusEl.textContent = 'Error: ' + err.message;
+                secStatusEl.style.color = '#c62828';
+            } finally {
+                secSetBtn.disabled = false;
+            }
+        });
     }
 
     function renderCategories() {
