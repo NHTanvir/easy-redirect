@@ -383,14 +383,29 @@ chrome.runtime.onStartup.addListener(async () => {
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'updateRules') {
-        const opts = {
-            mode: MODES.includes(request.mode) ? request.mode : 'blocklist',
-            alwaysAllowed: Array.isArray(request.alwaysAllowed) ? request.alwaysAllowed : [],
-            groups: Array.isArray(request.groups) ? request.groups : []
-        };
-        updateRedirectRulesFromMessage(request.rules || [], request.redirectUrl, opts);
-        sendResponse({ success: true });
-        return;
+        // Defense-in-depth: if protection is active the request must carry a
+        // verified token. The options page sets request.protectionOk = true after
+        // the user has successfully passed the lock screen (checkLock() resolves).
+        // Background.js cannot re-verify the PIN itself — it trusts the page's
+        // attestation here — but this gate still blocks unauthenticated callers
+        // (e.g. injected scripts or external extensions) that don't know to set
+        // the flag. Real PIN verification happens exclusively in options.js.
+        chrome.storage.sync.get(['protection'], protResult => {
+            const prot = (protResult.protection) || { mode: 'none' };
+            if (prot.mode !== 'none' && !request.protectionOk) {
+                console.warn('[easy-redirect] updateRules blocked — protection active, protectionOk not set');
+                sendResponse({ success: false, error: 'locked' });
+                return;
+            }
+            const opts = {
+                mode: MODES.includes(request.mode) ? request.mode : 'blocklist',
+                alwaysAllowed: Array.isArray(request.alwaysAllowed) ? request.alwaysAllowed : [],
+                groups: Array.isArray(request.groups) ? request.groups : []
+            };
+            updateRedirectRulesFromMessage(request.rules || [], request.redirectUrl, opts);
+            sendResponse({ success: true });
+        });
+        return true; // keep channel open for async sendResponse
     }
     if (request.action === 'keywordHit') {
         // The content script found a keyword in the page title/body. DNR can't

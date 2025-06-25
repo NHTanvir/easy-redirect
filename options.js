@@ -981,6 +981,7 @@ document.addEventListener('DOMContentLoaded', function() {
                           title="${rule.enabled !== false ? 'Disable this rule' : 'Enable this rule'}"
                           style="width:16px;height:16px;cursor:pointer;flex-shrink:0;">
                         <span class="rule-meta">
+                            <input type="checkbox" class="bulk-select-cb" data-rule-id="${escapeHtml(rule.id)}" style="width:14px;height:14px;margin-right:4px;">
                             <input type="checkbox" class="rule-select-checkbox" data-rule-id="${escapeHtml(rule.id)}" style="margin:0 4px 0 0;cursor:pointer;" title="Select this rule">
                             <span class="${badgeClass}">${badgeLabel}</span>
                             <span class="rule-pattern">${highlightMatch(rule.pattern, searchQuery)}</span>
@@ -1316,14 +1317,18 @@ document.addEventListener('DOMContentLoaded', function() {
             const mode = MODES.includes(result.mode) ? result.mode : 'blocklist';
             const alwaysAllowed = Array.isArray(result.alwaysAllowed) ? result.alwaysAllowed : [];
 
-            // Send message to background script to update rules
+            // Send message to background script to update rules.
+            // protectionOk: true signals that the user has already passed the
+            // lock screen (checkLock() resolved before init() called loadData()).
+            // Background.js uses this to gate mutations when protection is active.
             chrome.runtime.sendMessage({
                 action: 'updateRules',
                 rules: isEnabled ? rules : [],
                 redirectUrl: redirectUrl,
                 mode: mode,
                 alwaysAllowed: alwaysAllowed,
-                groups: currentGroups
+                groups: currentGroups,
+                protectionOk: true
             });
         } catch (error) {
             console.error('Error updating redirect rules:', error);
