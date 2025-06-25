@@ -62,7 +62,11 @@ const DEFAULTS = {
     // pasted) into the Add Rule input before any rule can be saved. Length is
     // configurable between 32 and 256 characters (default 64). Stored in
     // chrome.storage.sync so the setting follows the user across devices.
-    accessCode: { enabled: false, length: 64 }
+    accessCode: { enabled: false, length: 64 },
+    // URL to open when the extension is uninstalled (feature #19). Defaults to
+    // DEFAULT_UNINSTALL_URL. The user can override this in the options page.
+    // Empty string means use the DEFAULT_UNINSTALL_URL constant.
+    uninstallUrl: ''
 };
 
 // Stable opaque identifier for a Rule. Prefer crypto.randomUUID() (available in
