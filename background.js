@@ -85,6 +85,34 @@ async function saveDailyCounts(dc) {
     await chrome.storage.local.set({ dailyCounts: dc });
 }
 
+// Compute the number of milliseconds until the next midnight UTC. Used to
+// schedule the daily-quota reset alarm precisely at the day boundary.
+function msUntilMidnightUTC() {
+    const now = new Date();
+    const midnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+    return midnight.getTime() - Date.now();
+}
+
+// Schedule the 'resetDailyQuota' alarm to fire at the next midnight UTC.
+// If an alarm already exists it is replaced so we never end up with duplicates.
+async function scheduleMidnightAlarm() {
+    const when = Date.now() + msUntilMidnightUTC();
+    await chrome.alarms.create('resetDailyQuota', { when });
+    console.log(`[daily-quota] Next reset alarm scheduled for ${new Date(when).toISOString()}`);
+}
+
+// Handle the 'resetDailyQuota' alarm: wipe the per-rule counts, re-build DNR
+// rules (which re-enables any rules that were suspended mid-day), and schedule
+// the next midnight alarm.
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+    if (alarm.name !== 'resetDailyQuota') return;
+    const fresh = { date: todayUTC(), counts: {} };
+    await saveDailyCounts(fresh);
+    console.log('[daily-quota] Daily counts reset for', fresh.date);
+    await updateRedirectRules();
+    await scheduleMidnightAlarm();
+});
+
 // Stable opaque identifier for a Rule. Prefer crypto.randomUUID() (available in
 // MV3 service workers) but fall back to a timestamp+random combo for unusual
 // environments so rule creation never silently fails to assign an id.
@@ -324,6 +352,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     await ensureKeywordContentScriptRegistered();
     updateRedirectRules();
     registerContextMenus();
+    scheduleMidnightAlarm();
 });
 
 // Content script registration is dynamic instead of declared in manifest.json
@@ -451,6 +480,7 @@ chrome.runtime.onStartup.addListener(async () => {
     await ensureKeywordContentScriptRegistered();
     updateRedirectRules();
     registerContextMenus();
+    scheduleMidnightAlarm();
 });
 
 // Listen for messages from popup
