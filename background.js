@@ -80,7 +80,11 @@ function createRule(pattern, type, opts = {}) {
         groupId: opts.groupId || 'default',
         createdAt: opts.createdAt || Date.now(),
         hitCount: opts.hitCount || 0,
-        lastHitAt: opts.lastHitAt || null
+        lastHitAt: opts.lastHitAt || null,
+        // Daily quota: maximum redirects allowed per calendar day (UTC). null
+        // means no limit. When the day's hit count reaches this value the rule's
+        // DNR entries are removed until the midnight alarm resets dailyCounts.
+        quota: opts.quota !== undefined ? opts.quota : null
     };
     // Every rule type carries an exceptions[] list — URL patterns that should
     // NOT be redirected even though the parent rule would match. Exceptions are
