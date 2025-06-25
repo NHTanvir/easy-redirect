@@ -25,8 +25,98 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentGroups = [];
     let activeGroupId = 'default';
 
-    // Load saved data
-    loadData();
+    // ---------------------------------------------------------------------------
+    // Lock screen helpers (feature #17)
+    // ---------------------------------------------------------------------------
+
+    // Encode / decode Base64 (mirrors background.js helpers but runs in the page
+    // context so the UI can verify a PIN without round-tripping to the worker).
+    function _strToBytes(str) { return new TextEncoder().encode(str); }
+    function _bytesToBase64(bytes) {
+        let b = ''; bytes.forEach(x => { b += String.fromCharCode(x); }); return btoa(b);
+    }
+    function _base64ToBytes(b64) {
+        const s = atob(b64); const a = new Uint8Array(s.length);
+        for (let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return a;
+    }
+    async function _deriveKey(passphrase, saltBytes) {
+        const km = await crypto.subtle.importKey('raw', _strToBytes(passphrase), { name: 'PBKDF2' }, false, ['deriveBits']);
+        const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: saltBytes, iterations: 200000 }, km, 256);
+        return new Uint8Array(bits);
+    }
+    async function _verifyPin(passphrase, storedHash, storedSalt) {
+        try {
+            const derived = await _deriveKey(passphrase, _base64ToBytes(storedSalt));
+            return _bytesToBase64(derived) === storedHash;
+        } catch (_) { return false; }
+    }
+
+    // Show the lock overlay, focus the input, and wire the submit button / Enter key.
+    // Resolves only when the correct passphrase has been entered.
+    async function checkLock() {
+        const result = await chrome.storage.sync.get(['protection']);
+        const prot = result.protection || { mode: 'none', hash: null, salt: null };
+        if (prot.mode === 'none' || !prot.hash || !prot.salt) return; // no lock set
+
+        const overlay = document.getElementById('lockOverlay');
+        const input = document.getElementById('lockPinInput');
+        const errorEl = document.getElementById('lockError');
+        const attemptsEl = document.getElementById('lockAttemptsLeft');
+        if (!overlay || !input) return;
+
+        overlay.classList.add('visible');
+        input.focus();
+
+        // Update attempt display from stored counter.
+        function refreshAttemptDisplay() {
+            chrome.storage.local.get(['lockAttempts'], lr => {
+                const attempts = (lr.lockAttempts || {});
+                const remaining = Math.max(0, 10 - (attempts.count || 0));
+                attemptsEl.textContent = remaining < 10
+                    ? `${remaining} attempt${remaining !== 1 ? 's' : ''} remaining`
+                    : '';
+            });
+        }
+        refreshAttemptDisplay();
+
+        await new Promise(resolve => {
+            async function tryUnlock() {
+                errorEl.textContent = '';
+                const lr = await new Promise(r => chrome.storage.local.get(['lockAttempts'], r));
+                const attempts = lr.lockAttempts || { count: 0, lockedUntil: null };
+                // Rate-limit: if locked until a future time, block.
+                if (attempts.lockedUntil && Date.now() < attempts.lockedUntil) {
+                    const secs = Math.ceil((attempts.lockedUntil - Date.now()) / 1000);
+                    errorEl.textContent = `Too many failed attempts. Try again in ${secs}s.`;
+                    return;
+                }
+                const ok = await _verifyPin(input.value, prot.hash, prot.salt);
+                if (ok) {
+                    // Reset attempt counter on success.
+                    await chrome.storage.local.set({ lockAttempts: { count: 0, lockedUntil: null } });
+                    overlay.classList.remove('visible');
+                    resolve();
+                } else {
+                    const newCount = (attempts.count || 0) + 1;
+                    const lockedUntil = newCount >= 10 ? Date.now() + 60000 : null;
+                    await chrome.storage.local.set({ lockAttempts: { count: newCount, lockedUntil } });
+                    errorEl.textContent = 'Incorrect PIN or password.';
+                    input.value = '';
+                    input.focus();
+                    refreshAttemptDisplay();
+                }
+            }
+            document.getElementById('lockSubmitBtn').addEventListener('click', tryUnlock);
+            input.addEventListener('keydown', e => { if (e.key === 'Enter') tryUnlock(); });
+        });
+    }
+
+    // Load saved data (called after lock check resolves)
+    async function init() {
+        await checkLock();
+        loadData();
+    }
+    init();
 
     // Event listeners
     document.getElementById('saveRedirectUrl').addEventListener('click', saveRedirectUrl);
