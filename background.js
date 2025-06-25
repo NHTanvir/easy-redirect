@@ -567,6 +567,61 @@ async function updateRedirectRulesFromMessage(rules, redirectUrl, opts) {
     }
 }
 
+// Track per-rule daily hit counts using the declarativeNetRequestFeedback API.
+// When a DNR rule fires, reverse the rule ID to find the source rule index:
+//   sourceIndex = Math.floor(dnrId / DNR_ID_STRIDE) - 1
+// Increment that rule's count in dailyCounts. If the count reaches the rule's
+// quota, immediately remove the rule's DNR entries (runtime-only suspension —
+// does not touch chrome.storage.sync, so re-enabling at midnight requires no
+// user action). Only redirect-action rules are counted; allow rules are skipped.
+if (chrome.declarativeNetRequest && chrome.declarativeNetRequest.onRuleMatchedDebug) {
+    chrome.declarativeNetRequest.onRuleMatchedDebug.addListener(async (info) => {
+        // Only count matches for redirect rules (not allow/alwaysAllowed entries).
+        const dnrId = info.rule && info.rule.ruleId;
+        if (!dnrId || dnrId < 100) return; // global IDs 1..99 are not source rules
+
+        const sourceIndex = Math.floor(dnrId / DNR_ID_STRIDE) - 1;
+        if (sourceIndex < 0) return;
+
+        const result = await chrome.storage.sync.get(['rules']);
+        const rules = Array.isArray(result.rules) ? result.rules : [];
+        const rule = rules[sourceIndex];
+        if (!rule || rule.quota === null || rule.quota === undefined) return; // no quota set
+
+        const dc = await getDailyCounts();
+        const prev = dc.counts[rule.id] || 0;
+        const next = prev + 1;
+        dc.counts[rule.id] = next;
+        await saveDailyCounts(dc);
+
+        if (next >= rule.quota) {
+            // Quota reached: remove this rule's DNR entries without touching sync.
+            console.log(`[daily-quota] Quota reached for rule "${rule.pattern}" (${next}/${rule.quota}). Suspending until midnight.`);
+            await removeDNREntriesForRule(sourceIndex);
+        }
+    });
+}
+
+// Remove all DNR dynamic rules associated with a single source rule index.
+// This is a runtime-only suspension: chrome.storage.sync is not touched, so
+// the rule will be re-emitted at the next updateRedirectRules() call (which
+// happens when the midnight alarm fires and resets the daily counts).
+async function removeDNREntriesForRule(sourceIndex) {
+    try {
+        const baseId = (sourceIndex + 1) * DNR_ID_STRIDE;
+        // Collect all IDs in the block [baseId, baseId + DNR_ID_STRIDE - 1].
+        const existing = await chrome.declarativeNetRequest.getDynamicRules();
+        const toRemove = existing
+            .map(r => r.id)
+            .filter(id => id >= baseId && id < baseId + DNR_ID_STRIDE);
+        if (toRemove.length > 0) {
+            await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: toRemove });
+        }
+    } catch (err) {
+        console.error('[daily-quota] Failed to remove DNR entries:', err);
+    }
+}
+
 /*
  * DNR rule-ID layout
  * ------------------
