@@ -252,7 +252,11 @@ document.addEventListener('DOMContentLoaded', function() {
             groupId: opts.groupId || 'default',
             createdAt: opts.createdAt || Date.now(),
             hitCount: opts.hitCount || 0,
-            lastHitAt: opts.lastHitAt || null
+            lastHitAt: opts.lastHitAt || null,
+            // Daily quota: max redirects per day. null means no limit. Mirrors
+            // the same field in background.js createRule() so round-tripping a
+            // rule through import/export preserves the quota setting.
+            quota: opts.quota !== undefined ? opts.quota : null
         };
         // All rule types support exceptions[] (mirrors background.js createRule).
         rule.exceptions = Array.isArray(opts.exceptions) ? opts.exceptions.slice() : [];
@@ -384,7 +388,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const result = await chrome.storage.sync.get([
                 'redirectUrl', 'rules', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups', 'theme',
-                'accessCode'
+                'accessCode', 'uninstallUrl'
             ]);
 
             redirectUrlInput.value = result.redirectUrl || 'https://www.google.com';
@@ -439,6 +443,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (acLengthEl) acLengthEl.value = Math.max(32, Math.min(256, ac.length || 64));
         if (acLengthDisplay) acLengthDisplay.textContent = acLengthEl ? acLengthEl.value : 64;
         if (acLengthRow) acLengthRow.style.display = (ac.enabled === true) ? 'block' : 'none';
+        // Populate uninstall URL settings (feature #19).
+        const uninstallUrlInput = document.getElementById('uninstallUrlInput');
+        const uninstallDefaultDisplay = document.getElementById('uninstallDefaultDisplay');
+        if (uninstallUrlInput) uninstallUrlInput.value = result.uninstallUrl || '';
+        if (uninstallDefaultDisplay) uninstallDefaultDisplay.textContent = 'https://forms.gle/easyredirect-uninstall';
         } catch (error) {
             showStatus('Error loading data: ' + error.message, 'error');
         }
