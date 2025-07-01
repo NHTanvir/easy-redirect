@@ -33,6 +33,10 @@ const RULE_TYPES = ['domain', 'wildcard', 'path', 'keyword', 'regex'];
 // restoreFromLocalIfSyncEmpty(); switching modes must never delete rules.
 const MODES = ['blocklist', 'allowlist'];
 
+// Maximum disable-delay in seconds (feature #20). Any user value above this cap
+// is clamped to DISABLE_DELAY_MAX before the countdown starts.
+const DISABLE_DELAY_MAX = 300;
+
 const DEFAULTS = {
     redirectUrl: 'https://www.google.com',
     blockedWebsites: [],
@@ -66,7 +70,10 @@ const DEFAULTS = {
     // URL to open when the extension is uninstalled (feature #19). Defaults to
     // DEFAULT_UNINSTALL_URL. The user can override this in the options page.
     // Empty string means use the DEFAULT_UNINSTALL_URL constant.
-    uninstallUrl: ''
+    uninstallUrl: '',
+    // Number of seconds to count down before the extension actually disables
+    // (feature #20). 0 means disable immediately (legacy behaviour). Max 300 s.
+    disableDelaySecs: 0
 };
 
 // Stable opaque identifier for a Rule. Prefer crypto.randomUUID() (available in
