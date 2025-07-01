@@ -644,6 +644,28 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Save button — persist uninstall URL setting to chrome.storage.sync (feature #19).
+    const saveUninstallUrlBtn = document.getElementById('saveUninstallUrlBtn');
+    if (saveUninstallUrlBtn) {
+        saveUninstallUrlBtn.addEventListener('click', async () => {
+            const statusEl = document.getElementById('uninstallUrlStatus');
+            const inputEl = document.getElementById('uninstallUrlInput');
+            const url = inputEl ? inputEl.value.trim() : '';
+            // Validate: must be empty (use default) or a valid http(s) URL.
+            if (url && !/^https?:\/\//.test(url)) {
+                if (statusEl) { statusEl.textContent = 'URL must start with https://'; statusEl.style.color = '#c62828'; }
+                return;
+            }
+            try {
+                await chrome.storage.sync.set({ uninstallUrl: url });
+                if (statusEl) { statusEl.textContent = 'Saved.'; statusEl.style.color = '#2e7d32'; }
+                setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 2000);
+            } catch (err) {
+                if (statusEl) { statusEl.textContent = 'Error: ' + err.message; statusEl.style.color = '#c62828'; }
+            }
+        });
+    }
+
     // ---------------------------------------------------------------------------
     // Access code challenge helpers (feature #18, commit 5)
     // ---------------------------------------------------------------------------

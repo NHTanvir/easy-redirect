@@ -231,3 +231,14 @@ Each rule carries a `quota` field (integer or null). When set, it limits how man
 **DNR emission** — `createRedirectRules()` reads `dailyCounts` before emitting and skips any rule whose today-count already meets its quota. This ensures quota-suspended rules stay inactive after a service-worker restart until the midnight reset.
 
 **Options UI** — each rule row shows a "Daily limit" number input (placeholder ∞, min 1). Changing it saves the new `quota` value to the rule in `chrome.storage.sync` and triggers `updateRedirectRules()`. A "X today" label next to the input shows the current day's hit count, populated from `dailyCounts` in `chrome.storage.local`.
+
+### Uninstall feedback URL (feature #19)
+
+The `uninstallUrl` key in `DEFAULTS` / `chrome.storage.sync` holds a string (default `''`):
+
+- When non-empty it must be a valid `https?://` URL; background.js passes it to `chrome.runtime.setUninstallURL`.
+- When empty the extension falls back to `DEFAULT_UNINSTALL_URL` (`'https://forms.gle/easyredirect-uninstall'`).
+
+**Registration** — `registerUninstallUrl()` in `background.js` reads `uninstallUrl` from sync storage and calls `chrome.runtime.setUninstallURL`. It is called on `onInstalled`, `onStartup`, and whenever the `uninstallUrl` key changes in `chrome.storage.onChanged`.
+
+**Settings UI** — the "Uninstall feedback URL" section in options.html (`#uninstallUrlSection`) contains a text input (`#uninstallUrlInput`), a display of the default URL (`#uninstallDefaultDisplay`), a Save button (`#saveUninstallUrlBtn`), and a status line (`#uninstallUrlStatus`). The Save handler in `options.js` validates that the value is empty or starts with `https?://`, then writes to `chrome.storage.sync`. The `chrome.storage.onChanged` listener in `background.js` then picks up the change and re-registers the URL automatically.

@@ -729,6 +729,22 @@
         <div id="accessCodeStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
     </div>
 
+    <!-- Uninstall warning URL section (feature #19) -->
+    <div class="section" id="uninstallUrlSection">
+        <h3>Uninstall feedback URL</h3>
+        <div class="help-text" style="margin-bottom:10px;">
+            When the extension is uninstalled Chrome will open this URL. Leave blank
+            to use the default feedback form, or enter your own. Clear the field and
+            save to disable the redirect entirely.
+        </div>
+        <input type="text" id="uninstallUrlInput" placeholder="https://… (leave blank for default)">
+        <div class="help-text" style="margin-top:4px;">
+            Default: <code id="uninstallDefaultDisplay"></code>
+        </div>
+        <button id="saveUninstallUrlBtn" style="margin-top:8px;">Save</button>
+        <div id="uninstallUrlStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
+    </div>
+
     <div id="status" class="status" style="display: none;"></div>
 
     <script src="categories.js"></script>
