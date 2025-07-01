@@ -218,3 +218,14 @@ The `accessCode` key in `DEFAULTS` / `chrome.storage.sync` holds `{ enabled: boo
 **Challenge flow** — when `addRule()` detects `accessCode.enabled`, it calls `_generateCode()` and `_showAccessChallenge(code)`. The challenge div (`#accessCodeChallenge`) reveals the generated code in a monospace display and provides a text input where the user must type it manually. Paste is blocked via a `paste` event listener that shows a "typing only" error message. The user must type the entire code exactly before clicking Confirm (or pressing Enter); Cancel aborts the rule addition. The challenge div hides after success or cancel.
 
 **Settings UI** — the "Add-rule friction code" section in options.html contains a checkbox (`#accessCodeEnabled`), a range slider (`#accessCodeLength`, 32–256 step 8), and a Save button. The length row is hidden when disabled. Saving calls `chrome.storage.sync.set({ accessCode: { enabled, length } })`.
+
+### Uninstall feedback URL (feature #19)
+
+The `uninstallUrl` key in `DEFAULTS` / `chrome.storage.sync` holds a string (default `''`):
+
+- When non-empty it must be a valid `https?://` URL; background.js passes it to `chrome.runtime.setUninstallURL`.
+- When empty the extension falls back to `DEFAULT_UNINSTALL_URL` (`'https://forms.gle/easyredirect-uninstall'`).
+
+**Registration** — `registerUninstallUrl()` in `background.js` reads `uninstallUrl` from sync storage and calls `chrome.runtime.setUninstallURL`. It is called on `onInstalled`, `onStartup`, and whenever the `uninstallUrl` key changes in `chrome.storage.onChanged`.
+
+**Settings UI** — the "Uninstall feedback URL" section in options.html (`#uninstallUrlSection`) contains a text input (`#uninstallUrlInput`), a display of the default URL (`#uninstallDefaultDisplay`), a Save button (`#saveUninstallUrlBtn`), and a status line (`#uninstallUrlStatus`). The Save handler in `options.js` validates that the value is empty or starts with `https?://`, then writes to `chrome.storage.sync`. The `chrome.storage.onChanged` listener in `background.js` then picks up the change and re-registers the URL automatically.
