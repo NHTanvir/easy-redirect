@@ -701,6 +701,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
         return true;
     }
+    // Start the Pomodoro timer (feature #10). Immediately switches to 'work'
+    // state and schedules the first 'pomodoroWork' alarm to fire after the
+    // configured work-session duration. Calling startPomodoro while a session is
+    // already active restarts the timer (resets the current phase).
+    if (request.action === 'startPomodoro') {
+        startPomodoro()
+            .then(() => sendResponse({ success: true }))
+            .catch(err => sendResponse({ success: false, error: String(err && err.message || err) }));
+        return true;
+    }
+    // Stop the Pomodoro timer and clear any pending alarms. Restores normal
+    // rule enforcement (equivalent to pomodoroState = 'off').
+    if (request.action === 'stopPomodoro') {
+        stopPomodoro()
+            .then(() => sendResponse({ success: true }))
+            .catch(err => sendResponse({ success: false, error: String(err && err.message || err) }));
+        return true;
+    }
 });
 
 async function handleKeywordHit(sender, request) {
@@ -709,6 +727,44 @@ async function handleKeywordHit(sender, request) {
     if (settings.extensionEnabled === false) return;
     const target = settings.redirectUrl || 'https://www.google.com';
     await chrome.tabs.update(sender.tab.id, { url: target });
+}
+
+// Start the Pomodoro timer from scratch. Always begins with a 'work' phase.
+// Any previously scheduled pomodoroWork/pomodoroBreak alarms are cleared first
+// so restarting is safe regardless of the current phase.
+async function startPomodoro() {
+    const result = await chrome.storage.sync.get([
+        'pomodoroWorkMinutes', 'pomodoroBreakMinutes'
+    ]);
+    const workMins = result.pomodoroWorkMinutes || 25;
+    // Clear old alarms (idempotent if they don't exist).
+    await chrome.alarms.clear('pomodoroWork');
+    await chrome.alarms.clear('pomodoroBreak');
+    // Persist new state before creating the alarm so updateRedirectRules()
+    // called by other listeners sees a consistent snapshot.
+    await persist({
+        pomodoroEnabled: true,
+        pomodoroState: 'work',
+        pomodoroStartedAt: Date.now()
+    });
+    // 'pomodoroWork' fires when the work session ends (time to take a break).
+    chrome.alarms.create('pomodoroWork', { delayInMinutes: workMins });
+    await updateRedirectRules();
+    console.log(`[pomodoro] Timer started — work session (${workMins} min).`);
+}
+
+// Stop the Pomodoro timer. Clears all pending alarms and resets state to 'off'.
+// Rules are re-installed immediately so normal blocking resumes.
+async function stopPomodoro() {
+    await chrome.alarms.clear('pomodoroWork');
+    await chrome.alarms.clear('pomodoroBreak');
+    await persist({
+        pomodoroEnabled: false,
+        pomodoroState: 'off',
+        pomodoroStartedAt: null
+    });
+    await updateRedirectRules();
+    console.log('[pomodoro] Timer stopped.');
 }
 
 async function updateRedirectRules() {
