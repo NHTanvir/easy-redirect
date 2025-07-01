@@ -134,12 +134,40 @@ async function scheduleMidnightAlarm() {
 // rules (which re-enables any rules that were suspended mid-day), and schedule
 // the next midnight alarm.
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-    if (alarm.name !== 'resetDailyQuota') return;
-    const fresh = { date: todayUTC(), counts: {} };
-    await saveDailyCounts(fresh);
-    console.log('[daily-quota] Daily counts reset for', fresh.date);
-    await updateRedirectRules();
-    await scheduleMidnightAlarm();
+    if (alarm.name === 'resetDailyQuota') {
+        const fresh = { date: todayUTC(), counts: {} };
+        await saveDailyCounts(fresh);
+        console.log('[daily-quota] Daily counts reset for', fresh.date);
+        await updateRedirectRules();
+        await scheduleMidnightAlarm();
+        return;
+    }
+
+    // Pomodoro phase transitions: 'pomodoroWork' fires when a work session ends
+    // (switch to break) and 'pomodoroBreak' fires when a break ends (switch to work).
+    if (alarm.name === 'pomodoroWork' || alarm.name === 'pomodoroBreak') {
+        const result = await chrome.storage.sync.get([
+            'pomodoroWorkMinutes', 'pomodoroBreakMinutes', 'pomodoroEnabled'
+        ]);
+        if (result.pomodoroEnabled === false) return; // was disabled mid-session
+
+        const workMins = result.pomodoroWorkMinutes || 25;
+        const breakMins = result.pomodoroBreakMinutes || 5;
+
+        if (alarm.name === 'pomodoroBreak') {
+            // Break ended → switch to work. Rules become active again.
+            await persist({ pomodoroState: 'work', pomodoroStartedAt: Date.now() });
+            await updateRedirectRules();
+            chrome.alarms.create('pomodoroBreak', { delayInMinutes: workMins });
+            console.log(`[pomodoro] Work session started (${workMins} min).`);
+        } else {
+            // Work ended → switch to break. Rules are suspended.
+            await persist({ pomodoroState: 'break', pomodoroStartedAt: Date.now() });
+            await updateRedirectRules();
+            chrome.alarms.create('pomodoroWork', { delayInMinutes: breakMins });
+            console.log(`[pomodoro] Break started (${breakMins} min).`);
+        }
+    }
 });
 
 // Stable opaque identifier for a Rule. Prefer crypto.randomUUID() (available in
