@@ -881,6 +881,21 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             wrapper.appendChild(btn);
 
+            // Schedule indicator and edit button — shown for all groups (including Default).
+            const schedCtrl = document.createElement('button');
+            schedCtrl.style.cssText =
+                'font-size:10px;padding:2px 5px;margin-top:0;border-radius:10px;' +
+                (group.schedule ? 'background:#1565C0;color:#fff;' : 'background:var(--bg-section);color:var(--text-muted);border:1px solid var(--border);');
+            schedCtrl.title = group.schedule
+                ? `Schedule active — days: ${(group.schedule.days||[]).map(d=>['Su','Mo','Tu','We','Th','Fr','Sa'][d]).join(',')} ${group.schedule.startTime}–${group.schedule.endTime}`
+                : 'Set schedule (always active)';
+            schedCtrl.textContent = group.schedule ? '⏰' : '—';
+            schedCtrl.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openScheduleModal(group);
+            });
+            wrapper.appendChild(schedCtrl);
+
             // Toggle + delete controls — only for non-default groups.
             if (group.id !== 'default') {
                 const toggleCtrl = document.createElement('button');
