@@ -76,6 +76,62 @@ const DEFAULTS = {
     disableDelaySecs: 0
 };
 
+// Daily quota counts. Stored in chrome.storage.local (not sync) because they
+// are per-device runtime state that resets every midnight UTC. The shape is:
+//   { date: "YYYY-MM-DD", counts: { [ruleId]: number } }
+// A mismatched date means the counts are stale and should be zeroed out.
+const DAILY_COUNTS_DEFAULT = { date: null, counts: {} };
+
+// Return today's date in YYYY-MM-DD format (UTC).
+function todayUTC() {
+    return new Date().toISOString().slice(0, 10);
+}
+
+// Read the current dailyCounts from chrome.storage.local. If the stored date
+// does not match today (UTC), the counts are stale: return a fresh zero object.
+async function getDailyCounts() {
+    const result = await chrome.storage.local.get(['dailyCounts']);
+    const stored = result.dailyCounts || DAILY_COUNTS_DEFAULT;
+    const today = todayUTC();
+    if (stored.date !== today) {
+        return { date: today, counts: {} };
+    }
+    return stored;
+}
+
+// Persist dailyCounts to chrome.storage.local.
+async function saveDailyCounts(dc) {
+    await chrome.storage.local.set({ dailyCounts: dc });
+}
+
+// Compute the number of milliseconds until the next midnight UTC. Used to
+// schedule the daily-quota reset alarm precisely at the day boundary.
+function msUntilMidnightUTC() {
+    const now = new Date();
+    const midnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+    return midnight.getTime() - Date.now();
+}
+
+// Schedule the 'resetDailyQuota' alarm to fire at the next midnight UTC.
+// If an alarm already exists it is replaced so we never end up with duplicates.
+async function scheduleMidnightAlarm() {
+    const when = Date.now() + msUntilMidnightUTC();
+    await chrome.alarms.create('resetDailyQuota', { when });
+    console.log(`[daily-quota] Next reset alarm scheduled for ${new Date(when).toISOString()}`);
+}
+
+// Handle the 'resetDailyQuota' alarm: wipe the per-rule counts, re-build DNR
+// rules (which re-enables any rules that were suspended mid-day), and schedule
+// the next midnight alarm.
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+    if (alarm.name !== 'resetDailyQuota') return;
+    const fresh = { date: todayUTC(), counts: {} };
+    await saveDailyCounts(fresh);
+    console.log('[daily-quota] Daily counts reset for', fresh.date);
+    await updateRedirectRules();
+    await scheduleMidnightAlarm();
+});
+
 // Stable opaque identifier for a Rule. Prefer crypto.randomUUID() (available in
 // MV3 service workers) but fall back to a timestamp+random combo for unusual
 // environments so rule creation never silently fails to assign an id.
@@ -99,7 +155,11 @@ function createRule(pattern, type, opts = {}) {
         groupId: opts.groupId || 'default',
         createdAt: opts.createdAt || Date.now(),
         hitCount: opts.hitCount || 0,
-        lastHitAt: opts.lastHitAt || null
+        lastHitAt: opts.lastHitAt || null,
+        // Daily quota: maximum redirects allowed per calendar day (UTC). null
+        // means no limit. When the day's hit count reaches this value the rule's
+        // DNR entries are removed until the midnight alarm resets dailyCounts.
+        quota: opts.quota !== undefined ? opts.quota : null
     };
     // Every rule type carries an exceptions[] list — URL patterns that should
     // NOT be redirected even though the parent rule would match. Exceptions are
@@ -411,6 +471,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     await ensureKeywordContentScriptRegistered();
     updateRedirectRules();
     registerContextMenus();
+    scheduleMidnightAlarm();
 });
 
 // Content script registration is dynamic instead of declared in manifest.json
@@ -540,6 +601,7 @@ chrome.runtime.onStartup.addListener(async () => {
     await resumeCountdownIfPending(); // Resume any countdown that was running before worker shutdown.
     updateRedirectRules();
     registerContextMenus();
+    scheduleMidnightAlarm();
 });
 
 // Listen for messages from popup
@@ -669,6 +731,64 @@ async function updateRedirectRulesFromMessage(rules, redirectUrl, opts) {
     }
 }
 
+// Track per-rule daily hit counts using the declarativeNetRequestFeedback API.
+// When a DNR rule fires, reverse the rule ID to find the source rule index:
+//   sourceIndex = Math.floor(dnrId / DNR_ID_STRIDE) - 1
+// Increment that rule's count in dailyCounts. If the count reaches the rule's
+// quota, immediately remove the rule's DNR entries (runtime-only suspension —
+// does not touch chrome.storage.sync, so re-enabling at midnight requires no
+// user action). Only redirect-action rules are counted; allow rules are skipped.
+if (chrome.declarativeNetRequest && chrome.declarativeNetRequest.onRuleMatchedDebug) {
+    chrome.declarativeNetRequest.onRuleMatchedDebug.addListener(async (info) => {
+        // Only count matches for redirect rules (not allow/alwaysAllowed entries).
+        const dnrId = info.rule && info.rule.ruleId;
+        if (!dnrId || dnrId < 100) return; // global IDs 1..99 are not source rules
+
+        const sourceIndex = Math.floor(dnrId / DNR_ID_STRIDE) - 1;
+        if (sourceIndex < 0) return;
+
+        const result = await chrome.storage.sync.get(['rules']);
+        const rules = Array.isArray(result.rules) ? result.rules : [];
+        const rule = rules[sourceIndex];
+        if (!rule || rule.quota === null || rule.quota === undefined) return; // no quota set
+
+        const dc = await getDailyCounts();
+        const prev = dc.counts[rule.id] || 0;
+        const next = prev + 1;
+        dc.counts[rule.id] = next;
+        await saveDailyCounts(dc);
+
+        if (next >= rule.quota) {
+            // Quota reached: remove this rule's DNR entries without touching sync.
+            console.log(`[daily-quota] Quota reached for rule "${rule.pattern}" (${next}/${rule.quota}). Suspending until midnight.`);
+            await removeDNREntriesForRule(sourceIndex);
+        }
+    });
+}
+
+// Immediately remove all DNR dynamic rules associated with a single source
+// rule index. Called as soon as the daily quota is reached so the rule stops
+// redirecting for the rest of the day without waiting for the next full
+// updateRedirectRules() call. This is a runtime-only suspension:
+// chrome.storage.sync is not touched, so the rule will be re-emitted when the
+// midnight alarm fires and getDailyCounts() returns a fresh zeroed object.
+async function removeDNREntriesForRule(sourceIndex) {
+    try {
+        const baseId = (sourceIndex + 1) * DNR_ID_STRIDE;
+        // Collect all IDs in the block [baseId, baseId + DNR_ID_STRIDE - 1].
+        const existing = await chrome.declarativeNetRequest.getDynamicRules();
+        const toRemove = existing
+            .map(r => r.id)
+            .filter(id => id >= baseId && id < baseId + DNR_ID_STRIDE);
+        if (toRemove.length > 0) {
+            await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: toRemove });
+            console.log(`[daily-quota] Immediately removed ${toRemove.length} DNR entries for source index ${sourceIndex}.`);
+        }
+    } catch (err) {
+        console.error('[daily-quota] Failed to remove DNR entries:', err);
+    }
+}
+
 /*
  * DNR rule-ID layout
  * ------------------
@@ -779,6 +899,12 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
         const groups = Array.isArray(opts.groups) ? opts.groups : [];
         const groupMap = new Map(groups.map(g => [g.id, g]));
 
+        // Read today's per-rule hit counts so quota-exceeded rules can be skipped
+        // during DNR emission. This keeps suspended rules out of DNR without
+        // touching chrome.storage.sync — they will be re-emitted once the midnight
+        // alarm fires and getDailyCounts() returns a fresh zero object.
+        const dailyCounts = await getDailyCounts();
+
         // Build DNR rules. Disabled source rules are skipped here, not deleted —
         // toggling enabled back to true must restore behaviour without touching
         // storage. Unknown types log a warning so future contributors see they
@@ -800,6 +926,15 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
             // Disabled rules are intentionally skipped here, not deleted — re-enabling restores them without a storage write.
             if (!rule || rule.enabled === false) {
                 return;
+            }
+
+            // Skip rules whose daily quota has been reached. The rule stays in
+            // storage; it will be re-emitted after midnight resets dailyCounts.
+            if (rule.quota !== null && rule.quota !== undefined && rule.quota > 0) {
+                const todayCount = (dailyCounts.counts && dailyCounts.counts[rule.id]) || 0;
+                if (todayCount >= rule.quota) {
+                    return;
+                }
             }
 
             // Skip rules whose group is explicitly disabled. Rules with an

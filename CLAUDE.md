@@ -102,7 +102,8 @@ A `Rule` is:
   lastHitAt: number | null,
   exceptions: string[],         // URL patterns exempt from redirect for this rule
   caseSensitive?: boolean,      // keyword rules only
-  wholeWord?: boolean           // keyword rules only
+  wholeWord?: boolean,          // keyword rules only
+  quota: number | null          // max redirects per day (null = no limit); see daily-quota
 }
 ```
 
@@ -218,6 +219,18 @@ The `accessCode` key in `DEFAULTS` / `chrome.storage.sync` holds `{ enabled: boo
 **Challenge flow** — when `addRule()` detects `accessCode.enabled`, it calls `_generateCode()` and `_showAccessChallenge(code)`. The challenge div (`#accessCodeChallenge`) reveals the generated code in a monospace display and provides a text input where the user must type it manually. Paste is blocked via a `paste` event listener that shows a "typing only" error message. The user must type the entire code exactly before clicking Confirm (or pressing Enter); Cancel aborts the rule addition. The challenge div hides after success or cancel.
 
 **Settings UI** — the "Add-rule friction code" section in options.html contains a checkbox (`#accessCodeEnabled`), a range slider (`#accessCodeLength`, 32–256 step 8), and a Save button. The length row is hidden when disabled. Saving calls `chrome.storage.sync.set({ accessCode: { enabled, length } })`.
+
+### Daily quota (feature #9)
+
+Each rule carries a `quota` field (integer or null). When set, it limits how many times that rule can fire per calendar day (UTC). Once the count reaches the quota, the rule's DNR entries are removed immediately (runtime-only suspension) — `chrome.storage.sync` is not touched. At midnight UTC a `chrome.alarms` alarm (`'resetDailyQuota'`) fires, resets `dailyCounts` in `chrome.storage.local`, and calls `updateRedirectRules()` to re-emit the suspended rules.
+
+**Storage** — `dailyCounts` lives in `chrome.storage.local` (not sync) as `{ date: "YYYY-MM-DD", counts: { [ruleId]: number } }`. A stale date means the counts are from a previous day and are zeroed out on next read.
+
+**Hit counting** — `chrome.declarativeNetRequest.onRuleMatchedDebug` (requires the `declarativeNetRequestFeedback` permission) fires for each DNR rule match. The listener reverses the DNR ID to the source rule index (`sourceIndex = Math.floor(dnrId / DNR_ID_STRIDE) - 1`), increments the count in `dailyCounts`, and if the count meets the quota calls `removeDNREntriesForRule(sourceIndex)` to immediately remove that rule's DNR entries without touching sync.
+
+**DNR emission** — `createRedirectRules()` reads `dailyCounts` before emitting and skips any rule whose today-count already meets its quota. This ensures quota-suspended rules stay inactive after a service-worker restart until the midnight reset.
+
+**Options UI** — each rule row shows a "Daily limit" number input (placeholder ∞, min 1). Changing it saves the new `quota` value to the rule in `chrome.storage.sync` and triggers `updateRedirectRules()`. A "X today" label next to the input shows the current day's hit count, populated from `dailyCounts` in `chrome.storage.local`.
 
 ### Uninstall feedback URL (feature #19)
 

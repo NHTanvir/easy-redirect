@@ -25,6 +25,10 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentGroups = [];
     let activeGroupId = 'default';
 
+    // Daily quota counts loaded from chrome.storage.local. Populated in loadData()
+    // so displayRules() can show today's hit count without an extra async read.
+    let currentDailyCounts = { date: null, counts: {} };
+
     // ---------------------------------------------------------------------------
     // Lock screen helpers (feature #17)
     // ---------------------------------------------------------------------------
@@ -252,7 +256,11 @@ document.addEventListener('DOMContentLoaded', function() {
             groupId: opts.groupId || 'default',
             createdAt: opts.createdAt || Date.now(),
             hitCount: opts.hitCount || 0,
-            lastHitAt: opts.lastHitAt || null
+            lastHitAt: opts.lastHitAt || null,
+            // Daily quota: max redirects per day. null means no limit. Mirrors
+            // the same field in background.js createRule() so round-tripping a
+            // rule through import/export preserves the quota setting.
+            quota: opts.quota !== undefined ? opts.quota : null
         };
         // All rule types support exceptions[] (mirrors background.js createRule).
         rule.exceptions = Array.isArray(opts.exceptions) ? opts.exceptions.slice() : [];
@@ -406,6 +414,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 ).join('');
             }
             displayRules(rules);
+
+            // Load today's daily quota counts from local storage and refresh the
+            // hit-count badges in the rule list without a full re-render.
+            chrome.storage.local.get(['dailyCounts'], lr => {
+                const today = new Date().toISOString().slice(0, 10);
+                const dc = lr.dailyCounts || {};
+                currentDailyCounts = (dc.date === today) ? dc : { date: today, counts: {} };
+                const websiteListDiv = document.getElementById('websiteList');
+                if (websiteListDiv) {
+                    websiteListDiv.querySelectorAll('.rule-today-count').forEach(span => {
+                        const ruleId = span.dataset.ruleId;
+                        const count = (currentDailyCounts.counts && currentDailyCounts.counts[ruleId]) || 0;
+                        span.textContent = count > 0 ? `${count} today` : '';
+                    });
+                }
+            });
 
             const isEnabled = result.extensionEnabled !== false; // Default to true
             updateToggleButton(isEnabled);
@@ -1355,6 +1379,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 `<option value="${escapeHtml(g.id)}" ${g.id === (rule.groupId || 'default') ? 'selected' : ''}>${escapeHtml(g.name)}</option>`
             ).join('');
             const toggleClass = isEnabled ? 'rule-toggle-btn' : 'rule-toggle-btn rule-disabled-btn';
+            const quotaVal = (rule.quota !== null && rule.quota !== undefined) ? rule.quota : '';
             return `
                 <div class="website-item${isEnabled ? '' : ' rule-disabled'}" data-rule-id="${escapeHtml(rule.id)}">
                     <div class="rule-main-row">
@@ -1374,6 +1399,14 @@ document.addEventListener('DOMContentLoaded', function() {
                             <button class="add-exception-btn" data-rule-id="${escapeHtml(rule.id)}" title="Add exception">+ except</button>
                             <button class="remove-btn" data-rule-id="${escapeHtml(rule.id)}">Remove</button>
                         </span>
+                    </div>
+                    <div class="rule-quota-row" style="display:flex;align-items:center;gap:6px;margin-top:4px;font-size:12px;color:var(--text-muted);">
+                        <label style="white-space:nowrap;">Daily limit:</label>
+                        <input type="number" class="rule-quota-input" data-rule-id="${escapeHtml(rule.id)}"
+                            min="1" value="${escapeHtml(String(quotaVal))}" placeholder="∞"
+                            title="Max redirects per day (leave blank for no limit)"
+                            style="width:64px;padding:2px 6px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
+                        <span class="rule-today-count" data-rule-id="${escapeHtml(rule.id)}" style="color:var(--text-muted);"></span>
                     </div>
                     ${exceptions.length > 0 ? `<div class="exception-list">${exceptionItems}</div>` : ''}
                 </div>
@@ -1421,6 +1454,20 @@ document.addEventListener('DOMContentLoaded', function() {
         websiteListDiv.querySelectorAll('.rule-group-select').forEach(sel => {
             sel.addEventListener('change', () => moveRuleToGroup(sel.dataset.ruleId, sel.value));
         });
+        // Quota input — save updated daily limit when the user changes it.
+        websiteListDiv.querySelectorAll('.rule-quota-input').forEach(input => {
+            input.addEventListener('change', async () => {
+                const ruleId = input.dataset.ruleId;
+                const raw = input.value.trim();
+                const newQuota = raw === '' ? null : Math.max(1, parseInt(raw, 10));
+                const result = await chrome.storage.sync.get(['rules']);
+                const allRules = Array.isArray(result.rules) ? result.rules : [];
+                const next = allRules.map(r => r.id === ruleId ? { ...r, quota: newQuota } : r);
+                await chrome.storage.sync.set({ rules: next });
+                await updateRedirectRules();
+            });
+        });
+
         // Per-row enabled toggle checkbox — flip enabled without a full re-render
         // to preserve focus and avoid scroll position jumps.
         websiteListDiv.querySelectorAll('.rule-enabled-cb').forEach(cb => {
@@ -1486,6 +1533,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 showStatus(`Disabled ${selectedIds.size} rules.`, 'success');
             };
         }
+
+        // Populate today's hit count for each rule from dailyCounts in local storage.
+        chrome.storage.local.get(['dailyCounts'], lr => {
+            const dc = lr.dailyCounts || {};
+            const today = new Date().toISOString().slice(0, 10);
+            const counts = (dc.date === today && dc.counts) ? dc.counts : {};
+            websiteListDiv.querySelectorAll('.rule-today-count').forEach(span => {
+                const ruleId = span.dataset.ruleId;
+                const count = counts[ruleId] || 0;
+                span.textContent = count > 0 ? `${count} today` : '';
+            });
+        });
     }
 
     // Set enabled state for all rules that are currently checked in the bulk-
