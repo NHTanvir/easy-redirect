@@ -715,7 +715,7 @@ async function updateRedirectRules() {
     try {
         const result = await chrome.storage.sync.get([
             'rules', 'redirectUrl', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups',
-            'disableDelaySecs'
+            'disableDelaySecs', 'pomodoroState', 'pomodoroEnabled'
         ]);
         const rules = Array.isArray(result.rules) ? result.rules : [];
         const redirectUrl = result.redirectUrl || 'https://www.google.com';
@@ -723,6 +723,16 @@ async function updateRedirectRules() {
         const mode = MODES.includes(result.mode) ? result.mode : 'blocklist';
         const alwaysAllowed = Array.isArray(result.alwaysAllowed) ? result.alwaysAllowed : [];
         const groups = Array.isArray(result.groups) ? result.groups : [];
+
+        // Suspend all redirect rules while a Pomodoro break is in progress.
+        // Rules are re-installed when the break alarm fires (pomodoroBreak handler
+        // calls updateRedirectRules() after switching state back to 'work').
+        if (result.pomodoroEnabled && result.pomodoroState === 'break') {
+            await clearAllRules();
+            setActionIcon(true); // extension is still "on", just paused for the break
+            console.log('[pomodoro] Rules suspended during break.');
+            return;
+        }
 
         if (!isEnabled) {
             // Check if a delay is configured (feature #20). If so, and if no
