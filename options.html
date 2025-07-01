@@ -498,6 +498,21 @@
             font-size: 12px;
             color: var(--text-muted);
         }
+        /* Pomodoro section (feature #10) */
+        #pomodoroSection h3 {
+            color: var(--text-muted);
+        }
+        #pomodoroCountdown {
+            font-variant-numeric: tabular-nums;
+        }
+        /* Work phase: green tint to the countdown */
+        #pomodoroCountdown.pomo-work {
+            color: #43a047;
+        }
+        /* Break phase: blue tint */
+        #pomodoroCountdown.pomo-break {
+            color: #1e88e5;
+        }
     </style>
 </head>
 <body>
