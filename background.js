@@ -875,6 +875,12 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace !== 'sync') return;
     const watched = ['rules', 'blockedWebsites', 'redirectUrl', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups'];
     const relevant = watched.filter(k => k in changes);
+    // Also mirror uninstallUrl changes to local storage and re-register.
+    if ('uninstallUrl' in changes) {
+        const newUrl = changes.uninstallUrl.newValue;
+        if (newUrl !== undefined) chrome.storage.local.set({ uninstallUrl: newUrl });
+        registerUninstallUrl();
+    }
     if (relevant.length === 0) return;
 
     const mirror = {};
