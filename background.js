@@ -306,6 +306,59 @@ async function registerContextMenus() {
 }
 
 // ---------------------------------------------------------------------------
+// Per-group scheduling (feature #8)
+// ---------------------------------------------------------------------------
+
+// A Group's `schedule` field is either null (always active) or an object:
+//   { days: number[], startTime: "HH:MM", endTime: "HH:MM" }
+// `days` is an array of integers 0..6 (Sun=0, Mon=1, … Sat=6).
+// startTime and endTime are inclusive; if endTime < startTime the window wraps
+// midnight (e.g. 22:00–06:00 covers 10 pm to 6 am).
+
+// Return true if a group's schedule allows it to be active right now.
+// Groups without a schedule (schedule === null) are always considered active.
+function isGroupScheduleActive(group) {
+    const sched = group && group.schedule;
+    if (!sched || !Array.isArray(sched.days) || sched.days.length === 0) return true;
+    const now = new Date();
+    const todayDay = now.getDay(); // 0 = Sunday
+    if (!sched.days.includes(todayDay)) return false;
+    // Parse HH:MM strings into minutes-since-midnight.
+    function toMins(hhmm) {
+        if (typeof hhmm !== 'string') return null;
+        const parts = hhmm.split(':');
+        if (parts.length !== 2) return null;
+        const h = parseInt(parts[0], 10), m = parseInt(parts[1], 10);
+        if (isNaN(h) || isNaN(m)) return null;
+        return h * 60 + m;
+    }
+    const start = toMins(sched.startTime);
+    const end = toMins(sched.endTime);
+    if (start === null || end === null) return true; // malformed — treat as always active
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+    if (start <= end) {
+        return nowMins >= start && nowMins < end;
+    } else {
+        // Wraps midnight: active from start→midnight and midnight→end.
+        return nowMins >= start || nowMins < end;
+    }
+}
+
+// Ensure the 1-minute periodic alarm exists (idempotent). Called on install and
+// startup. If no group has a non-null schedule, we still keep the alarm running
+// (cheap) so newly-added schedules take effect within one minute without needing
+// to reload the extension.
+async function ensureScheduleAlarm() {
+    if (!chrome.alarms) return; // API not available (non-standard environments)
+    const existing = await chrome.alarms.get(SCHEDULE_ALARM_NAME);
+    if (!existing) {
+        // Period of 1 minute; first fire after 1 minute.
+        chrome.alarms.create(SCHEDULE_ALARM_NAME, { periodInMinutes: 1 });
+        console.log('[schedule] Created periodic alarm:', SCHEDULE_ALARM_NAME);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Disable-delay countdown (feature #20)
 // ---------------------------------------------------------------------------
 // When the user turns the extension off and disableDelaySecs > 0, we do not
