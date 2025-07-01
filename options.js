@@ -803,6 +803,73 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Read the current pomodoro state from storage and update the UI.
+    // Called on page load and after start/stop actions.
+    let _pomodoroTickInterval = null;
+
+    function initPomodoroUi() {
+        chrome.storage.sync.get(
+            ['pomodoroEnabled', 'pomodoroState', 'pomodoroStartedAt',
+             'pomodoroWorkMinutes', 'pomodoroBreakMinutes'],
+            result => {
+                const startBtn = document.getElementById('pomodoroStartBtn');
+                const stopBtn = document.getElementById('pomodoroStopBtn');
+                const statusEl = document.getElementById('pomodoroStatus');
+                const countdownEl = document.getElementById('pomodoroCountdown');
+
+                const enabled = !!result.pomodoroEnabled;
+                const state = result.pomodoroState || 'off';
+
+                if (!enabled || state === 'off') {
+                    if (startBtn) startBtn.style.display = '';
+                    if (stopBtn) stopBtn.style.display = 'none';
+                    if (statusEl) statusEl.textContent = 'Timer not running.';
+                    if (countdownEl) { countdownEl.style.display = 'none'; countdownEl.textContent = ''; }
+                    if (_pomodoroTickInterval) { clearInterval(_pomodoroTickInterval); _pomodoroTickInterval = null; }
+                    return;
+                }
+
+                if (startBtn) startBtn.style.display = 'none';
+                if (stopBtn) stopBtn.style.display = '';
+
+                const isWork = state === 'work';
+                const totalMins = isWork
+                    ? (result.pomodoroWorkMinutes || 25)
+                    : (result.pomodoroBreakMinutes || 5);
+                const startedAt = result.pomodoroStartedAt || Date.now();
+
+                if (countdownEl) {
+                    countdownEl.style.display = '';
+                    countdownEl.className = isWork ? 'pomo-work' : 'pomo-break';
+                }
+                if (statusEl) statusEl.textContent = isWork ? 'Work session in progress.' : 'Break in progress — rules suspended.';
+
+                // Clear previous tick if any
+                if (_pomodoroTickInterval) clearInterval(_pomodoroTickInterval);
+
+                function updateCountdown() {
+                    const elapsedMs = Date.now() - startedAt;
+                    const remainingMs = Math.max(0, (totalMins * 60 * 1000) - elapsedMs);
+                    const m = Math.floor(remainingMs / 60000);
+                    const s = Math.floor((remainingMs % 60000) / 1000);
+                    const display = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+                    if (countdownEl) countdownEl.textContent = display;
+                    if (remainingMs === 0 && _pomodoroTickInterval) {
+                        clearInterval(_pomodoroTickInterval);
+                        _pomodoroTickInterval = null;
+                        // Phase must have already ended — refresh UI to pick up new state
+                        setTimeout(initPomodoroUi, 2000);
+                    }
+                }
+                updateCountdown();
+                _pomodoroTickInterval = setInterval(updateCountdown, 500);
+            }
+        );
+    }
+
+    // Initialize on page load.
+    initPomodoroUi();
+
     // ---------------------------------------------------------------------------
     // Access code challenge helpers (feature #18, commit 5)
     // ---------------------------------------------------------------------------
