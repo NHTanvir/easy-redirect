@@ -637,6 +637,7 @@ chrome.runtime.onStartup.addListener(async () => {
     await runSchemaMigration();
     await ensureKeywordContentScriptRegistered();
     await resumeCountdownIfPending(); // Resume any countdown that was running before worker shutdown.
+    await restorePomodoroAlarm(); // Re-arm pomodoro alarm if a session was running before worker restart.
     updateRedirectRules();
     registerContextMenus();
     scheduleMidnightAlarm();
@@ -765,6 +766,46 @@ async function stopPomodoro() {
     });
     await updateRedirectRules();
     console.log('[pomodoro] Timer stopped.');
+}
+
+// On service-worker restart Chrome discards all in-memory alarms. If the user
+// had an active Pomodoro session we must re-arm the alarm so phase transitions
+// keep firing. We compute the remaining time from pomodoroStartedAt rather than
+// recreating the full duration, which avoids giving the user a "free" extension.
+async function restorePomodoroAlarm() {
+    const result = await chrome.storage.sync.get([
+        'pomodoroEnabled', 'pomodoroState', 'pomodoroStartedAt',
+        'pomodoroWorkMinutes', 'pomodoroBreakMinutes'
+    ]);
+    if (!result.pomodoroEnabled) return;
+    if (result.pomodoroState !== 'work' && result.pomodoroState !== 'break') return;
+
+    const isWork = result.pomodoroState === 'work';
+    const totalMins = isWork
+        ? (result.pomodoroWorkMinutes || 25)
+        : (result.pomodoroBreakMinutes || 5);
+    const startedAt = result.pomodoroStartedAt || Date.now();
+    const elapsedMs = Date.now() - startedAt;
+    const remainingMs = (totalMins * 60 * 1000) - elapsedMs;
+
+    if (remainingMs <= 0) {
+        // Phase has already expired while the worker was down. Transition now.
+        if (isWork) {
+            await persist({ pomodoroState: 'break', pomodoroStartedAt: Date.now() });
+            chrome.alarms.create('pomodoroBreak', { delayInMinutes: result.pomodoroBreakMinutes || 5 });
+            console.log('[pomodoro] Startup: work phase expired — switching to break.');
+        } else {
+            await persist({ pomodoroState: 'work', pomodoroStartedAt: Date.now() });
+            chrome.alarms.create('pomodoroWork', { delayInMinutes: result.pomodoroWorkMinutes || 25 });
+            console.log('[pomodoro] Startup: break phase expired — switching to work.');
+        }
+        return;
+    }
+
+    const remainingMins = remainingMs / 60000;
+    const alarmName = isWork ? 'pomodoroWork' : 'pomodoroBreak';
+    chrome.alarms.create(alarmName, { delayInMinutes: remainingMins });
+    console.log(`[pomodoro] Startup: restored ${result.pomodoroState} alarm (${remainingMins.toFixed(1)} min remaining).`);
 }
 
 async function updateRedirectRules() {
