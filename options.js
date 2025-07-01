@@ -384,7 +384,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const result = await chrome.storage.sync.get([
                 'redirectUrl', 'rules', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups', 'theme',
-                'accessCode'
+                'accessCode', 'uninstallUrl', 'disableDelaySecs'
             ]);
 
             redirectUrlInput.value = result.redirectUrl || 'https://www.google.com';
@@ -439,6 +439,17 @@ document.addEventListener('DOMContentLoaded', function() {
         if (acLengthEl) acLengthEl.value = Math.max(32, Math.min(256, ac.length || 64));
         if (acLengthDisplay) acLengthDisplay.textContent = acLengthEl ? acLengthEl.value : 64;
         if (acLengthRow) acLengthRow.style.display = (ac.enabled === true) ? 'block' : 'none';
+        // Populate uninstall URL settings (feature #19).
+        const uninstallUrlInput = document.getElementById('uninstallUrlInput');
+        const uninstallDefaultDisplay = document.getElementById('uninstallDefaultDisplay');
+        if (uninstallUrlInput) uninstallUrlInput.value = result.uninstallUrl || '';
+        if (uninstallDefaultDisplay) uninstallDefaultDisplay.textContent = 'https://forms.gle/easyredirect-uninstall';
+        // Populate disable-delay settings (feature #20).
+        const disableDelayInput = document.getElementById('disableDelayInput');
+        if (disableDelayInput) {
+            const stored = typeof result.disableDelaySecs === 'number' ? result.disableDelaySecs : 0;
+            disableDelayInput.value = Math.max(0, Math.min(300, stored));
+        }
         } catch (error) {
             showStatus('Error loading data: ' + error.message, 'error');
         }
@@ -636,6 +647,86 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // ---------------------------------------------------------------------------
+    // Disable-delay settings and countdown banner (feature #20)
+    // ---------------------------------------------------------------------------
+
+    // Save button — persist disable-delay setting to chrome.storage.sync.
+    const saveDisableDelayBtn = document.getElementById('saveDisableDelayBtn');
+    if (saveDisableDelayBtn) {
+        saveDisableDelayBtn.addEventListener('click', async () => {
+            const statusEl = document.getElementById('disableDelayStatus');
+            const inputEl = document.getElementById('disableDelayInput');
+            const raw = inputEl ? parseInt(inputEl.value, 10) : 0;
+            const secs = isNaN(raw) ? 0 : Math.max(0, Math.min(300, raw));
+            try {
+                await chrome.storage.sync.set({ disableDelaySecs: secs });
+                if (statusEl) { statusEl.textContent = 'Saved.'; statusEl.style.color = '#2e7d32'; }
+                setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 2000);
+            } catch (err) {
+                if (statusEl) { statusEl.textContent = 'Error: ' + err.message; statusEl.style.color = '#c62828'; }
+            }
+        });
+    }
+
+    // Cancel-countdown button — tells background.js to abort the pending disable.
+    const cancelDisableBtn = document.getElementById('cancelDisableBtn');
+    if (cancelDisableBtn) {
+        cancelDisableBtn.addEventListener('click', () => {
+            chrome.runtime.sendMessage({ action: 'cancelDisableCountdown' }, () => {
+                _hideBanner();
+                loadData(); // refresh toggle state
+            });
+        });
+    }
+
+    // Show / hide the countdown banner and tick the seconds display.
+    const _banner = document.getElementById('disableCountdownBanner');
+    const _secsEl = document.getElementById('disableCountdownSecs');
+    let _bannerInterval = null;
+
+    function _showBanner(remaining) {
+        if (_banner) _banner.style.display = 'flex';
+        if (_secsEl) _secsEl.textContent = remaining;
+    }
+
+    function _hideBanner() {
+        if (_banner) _banner.style.display = 'none';
+        if (_bannerInterval) { clearInterval(_bannerInterval); _bannerInterval = null; }
+    }
+
+    function _startBannerTick(endsAtMs) {
+        if (_bannerInterval) clearInterval(_bannerInterval);
+        function tick() {
+            const remaining = Math.max(0, Math.ceil((endsAtMs - Date.now()) / 1000));
+            if (_secsEl) _secsEl.textContent = remaining;
+            if (remaining === 0) {
+                _hideBanner();
+                loadData(); // reload toggle state after countdown fires
+            }
+        }
+        tick();
+        _bannerInterval = setInterval(tick, 500);
+    }
+
+    // Poll background for an active countdown once on page load.
+    function _checkCountdown() {
+        chrome.runtime.sendMessage({ action: 'getDisableCountdown' }, response => {
+            if (chrome.runtime.lastError || !response || !response.active) { _hideBanner(); return; }
+            _showBanner(response.remaining);
+            _startBannerTick(response.endsAt);
+        });
+    }
+    _checkCountdown();
+
+    // Listen for background notification that the countdown fired.
+    chrome.runtime.onMessage.addListener((msg) => {
+        if (msg && msg.action === 'disableCountdownFired') {
+            _hideBanner();
+            loadData();
+        }
+    });
 
     // ---------------------------------------------------------------------------
     // Access code challenge helpers (feature #18, commit 5)
