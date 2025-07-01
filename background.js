@@ -73,7 +73,17 @@ const DEFAULTS = {
     uninstallUrl: '',
     // Number of seconds to count down before the extension actually disables
     // (feature #20). 0 means disable immediately (legacy behaviour). Max 300 s.
-    disableDelaySecs: 0
+    disableDelaySecs: 0,
+    // Pomodoro timer state (feature #10). pomodoroEnabled toggles the feature;
+    // pomodoroState tracks the current phase ('off'|'work'|'break');
+    // pomodoroWorkMinutes and pomodoroBreakMinutes set session lengths (defaults
+    // 25 and 5 respectively, matching the classic Pomodoro technique).
+    // pomodoroStartedAt is the ms epoch when the current phase began.
+    pomodoroEnabled: false,
+    pomodoroState: 'off',
+    pomodoroWorkMinutes: 25,
+    pomodoroBreakMinutes: 5,
+    pomodoroStartedAt: null
 };
 
 // Daily quota counts. Stored in chrome.storage.local (not sync) because they
