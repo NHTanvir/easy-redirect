@@ -289,3 +289,30 @@ Groups can be time-gated so their rules are only active on certain days and duri
 - Save writes `{ ...group, schedule }` to storage and calls `updateRedirectRules()`.
 - Clear writes `{ ...group, schedule: null }` (removes scheduling).
 - Group redirect-URL field shows a schedule summary with an inline Edit link.
+
+### Pomodoro timer (feature #10)
+
+A built-in Pomodoro timer that alternates between timed **work sessions** (redirect rules enforced as normal) and **break sessions** (all redirect rules suspended so the user can browse freely). The cycle continues until the user manually stops it.
+
+**Storage keys** (all in `chrome.storage.sync`, added to `DEFAULTS`):
+- `pomodoroEnabled` — `boolean`, `false` by default. Set to `true` while a session is running.
+- `pomodoroState` — `'off' | 'work' | 'break'`. `'off'` when the timer is not running.
+- `pomodoroWorkMinutes` — `number`, default `25`. Duration of the work phase in minutes.
+- `pomodoroBreakMinutes` — `number`, default `5`. Duration of the break phase in minutes.
+- `pomodoroStartedAt` — `number | null`. `Date.now()` value when the current phase began. Used to reconstruct remaining time after a service-worker restart.
+
+**background.js**:
+- `startPomodoro()` — clears any existing `pomodoroWork` / `pomodoroBreak` alarms, persists `{ pomodoroEnabled: true, pomodoroState: 'work', pomodoroStartedAt: Date.now() }`, creates a `'pomodoroWork'` alarm at `delayInMinutes: workMins`, then calls `updateRedirectRules()`.
+- `stopPomodoro()` — clears both alarms, persists `{ pomodoroEnabled: false, pomodoroState: 'off', pomodoroStartedAt: null }`, calls `updateRedirectRules()`.
+- `restorePomodoroAlarm()` — called inside `chrome.runtime.onStartup`. Reads persisted state and re-arms the appropriate alarm with the remaining time (computed from `pomodoroStartedAt`). If the phase expired while the worker was down, transitions to the next phase immediately.
+- `chrome.alarms.onAlarm` — handles `'pomodoroWork'` (work session ended → switch to break: persist `pomodoroState: 'break'`, create `'pomodoroBreak'` alarm, call `updateRedirectRules()`) and `'pomodoroBreak'` (break ended → switch to work: persist `pomodoroState: 'work'`, create `'pomodoroWork'` alarm, call `updateRedirectRules()`). Both handlers are no-ops when `pomodoroEnabled === false`.
+- `updateRedirectRules()` — reads `pomodoroEnabled` and `pomodoroState`. When `pomodoroEnabled && pomodoroState === 'break'`, calls `clearAllRules()` and returns early (rules suspended). Otherwise proceeds normally.
+- Message handlers: `startPomodoro` and `stopPomodoro` actions invoke the respective helpers.
+
+**options.html / options.js**:
+- `#pomodoroSection` — section containing two `<input type="number">` fields (`#pomodoroWorkInput`, `#pomodoroBreakInput`), a **Start timer** button (`#pomodoroStartBtn`), a **Stop timer** button (`#pomodoroStopBtn`, hidden while stopped), a status span (`#pomodoroStatus`), and a live countdown display (`#pomodoroCountdown`).
+- Duration inputs `change` event — calls `_savePomodoroDurations()` which writes `pomodoroWorkMinutes` / `pomodoroBreakMinutes` to `chrome.storage.sync`.
+- Start button — calls `_savePomodoroDurations()` then sends `{ action: 'startPomodoro' }`, then calls `initPomodoroUi()`.
+- Stop button — sends `{ action: 'stopPomodoro' }`, then calls `initPomodoroUi()`.
+- `initPomodoroUi()` — reads `pomodoroEnabled / pomodoroState / pomodoroStartedAt / pomodoroWorkMinutes / pomodoroBreakMinutes` from sync storage, toggles button visibility, updates `#pomodoroStatus` text, and starts / clears a `setInterval` tick that updates `#pomodoroCountdown` every 500 ms. The countdown displays `MM:SS` remaining in the current phase. Applies CSS class `.pomo-work` (green) or `.pomo-break` (blue) to the countdown element.
+- Called once on page load (`initPomodoroUi()` at module level) so the UI is correct whether the user opens the page mid-session or not.
