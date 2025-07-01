@@ -870,6 +870,11 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
             if (group && group.enabled === false) {
                 return;
             }
+            // Skip rules whose group has a schedule that is not currently active
+            // (feature #8). A null schedule means always active.
+            if (group && !isGroupScheduleActive(group)) {
+                return;
+            }
 
             // Redirect URL precedence: rule.redirectUrl > group.redirectUrl > global.
             const effectiveRedirectUrl = (rule.redirectUrl) ||
