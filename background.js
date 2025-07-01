@@ -471,6 +471,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     await initializeMissingDefaults();
 
     await ensureKeywordContentScriptRegistered();
+    await ensureScheduleAlarm();
     updateRedirectRules();
     registerContextMenus();
 });
@@ -599,6 +600,7 @@ chrome.runtime.onStartup.addListener(async () => {
     await restoreFromLocalIfSyncEmpty();
     await runSchemaMigration();
     await ensureKeywordContentScriptRegistered();
+    await ensureScheduleAlarm();
     await resumeCountdownIfPending(); // Resume any countdown that was running before worker shutdown.
     updateRedirectRules();
     registerContextMenus();
@@ -1098,6 +1100,17 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 
     updateRedirectRules();
 });
+
+// Schedule alarm handler (feature #8): fired every minute by the periodic alarm
+// created in ensureScheduleAlarm(). Rebuilds DNR rules so that groups whose
+// schedule has just become active or inactive take effect within ~1 minute.
+if (chrome.alarms) {
+    chrome.alarms.onAlarm.addListener((alarm) => {
+        if (alarm.name === SCHEDULE_ALARM_NAME) {
+            updateRedirectRules();
+        }
+    });
+}
 
 // Clicking the toolbar icon opens the settings page in a new tab. We intentionally
 // do not declare `default_popup` in the manifest — without that, Chrome fires this
