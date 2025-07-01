@@ -37,6 +37,11 @@ const MODES = ['blocklist', 'allowlist'];
 // is clamped to DISABLE_DELAY_MAX before the countdown starts.
 const DISABLE_DELAY_MAX = 300;
 
+// Alarm name for the 1-minute schedule checker (feature #8). A single periodic
+// alarm fires every minute; the handler checks each group's schedule and
+// rebuilds DNR rules if any group's active state has changed.
+const SCHEDULE_ALARM_NAME = 'checkGroupSchedules';
+
 const DEFAULTS = {
     redirectUrl: 'https://www.google.com',
     blockedWebsites: [],
@@ -52,7 +57,11 @@ const DEFAULTS = {
     // entry (the 'default' group) so rules with groupId='default' always have
     // a home. Participates in persist() and restoreFromLocalIfSyncEmpty() like
     // every other key in DEFAULTS.
-    groups: [{ id: 'default', name: 'Default', color: '#2196F3', enabled: true, redirectUrl: null }],
+    // Default group — always present, never deletable. The `schedule` field is
+    // null for groups that are always active; a non-null schedule object
+    // (feature #8) carries `days` (0-indexed Sun=0..Sat=6 bitmask or array)
+    // and `startTime` / `endTime` in "HH:MM" 24-h format.
+    groups: [{ id: 'default', name: 'Default', color: '#2196F3', enabled: true, redirectUrl: null, schedule: null }],
     // User theme preference: 'auto' defers to prefers-color-scheme, 'light' forces
     // light regardless of OS setting, 'dark' forces dark regardless of OS setting.
     theme: 'auto',
