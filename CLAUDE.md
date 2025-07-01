@@ -229,3 +229,23 @@ The `uninstallUrl` key in `DEFAULTS` / `chrome.storage.sync` holds a string (def
 **Registration** — `registerUninstallUrl()` in `background.js` reads `uninstallUrl` from sync storage and calls `chrome.runtime.setUninstallURL`. It is called on `onInstalled`, `onStartup`, and whenever the `uninstallUrl` key changes in `chrome.storage.onChanged`.
 
 **Settings UI** — the "Uninstall feedback URL" section in options.html (`#uninstallUrlSection`) contains a text input (`#uninstallUrlInput`), a display of the default URL (`#uninstallDefaultDisplay`), a Save button (`#saveUninstallUrlBtn`), and a status line (`#uninstallUrlStatus`). The Save handler in `options.js` validates that the value is empty or starts with `https?://`, then writes to `chrome.storage.sync`. The `chrome.storage.onChanged` listener in `background.js` then picks up the change and re-registers the URL automatically.
+
+### Disable delay (feature #20)
+
+The `disableDelaySecs` key in `DEFAULTS` / `chrome.storage.sync` holds a number (default `0`, max `DISABLE_DELAY_MAX = 300`):
+
+- When `0`, disabling the extension is immediate (legacy behaviour).
+- When `> 0`, toggling the extension off starts a countdown. During the countdown the DNR rules remain active and blocking continues. Only when the countdown expires (or the service worker resumes and detects the deadline has passed) does the extension actually disable.
+
+**Countdown state** is persisted to `chrome.storage.local` under `disableCountdownUntil` (epoch ms). This survives service-worker termination: `onStartup` calls `resumeCountdownIfPending()` which resumes the `setTimeout` for the remaining duration or immediately executes the disable if the deadline already passed.
+
+**In-memory timers**:
+- `_countdownTimer` — `setTimeout` handle for the final disable action.
+- `_badgeInterval` — `setInterval` handle that calls `setCountdownBadge(remaining)` every second to update the toolbar badge (orange background, remaining seconds as text, capped at `'99+'`).
+
+**Cancel** — the options page sends `{ action: 'cancelDisableCountdown' }` to background.js. `cancelDisableCountdown()` clears both timers, wipes `disableCountdownUntil` from local storage, restores `extensionEnabled: true` in sync storage, and calls `updateRedirectRules()` to reactivate blocking.
+
+**Options page integration**:
+- `#disableDelaySection` — numeric input (0–300) and Save button that writes `disableDelaySecs` to `chrome.storage.sync`.
+- `#disableCountdownBanner` — orange banner (hidden unless active) with a live `#disableCountdownSecs` counter and a `#cancelDisableBtn`. The banner polls `getDisableCountdown` once on load via `_checkCountdown()` and listens for the `disableCountdownFired` runtime message to hide itself and reload the toggle state.
+- `chrome.runtime.onMessage` listener for `disableCountdownFired` reloads `loadData()` to update the toggle button.
