@@ -326,6 +326,7 @@ async function _clearCountdownState() {
 // countdown expires (or immediately if delay == 0).
 async function _executeDisable() {
     if (_countdownTimer) { clearTimeout(_countdownTimer); _countdownTimer = null; }
+    stopBadgeTick();
     await _clearCountdownState();
     await persist({ extensionEnabled: false });
     setActionIcon(false);
@@ -340,6 +341,7 @@ async function _executeDisable() {
 // Cancel a running countdown (called by the options page via message).
 async function cancelDisableCountdown() {
     if (_countdownTimer) { clearTimeout(_countdownTimer); _countdownTimer = null; }
+    stopBadgeTick();
     await _clearCountdownState();
     // Re-enable (restore extensionEnabled to true) so the toggle reflects reality.
     await persist({ extensionEnabled: true });
@@ -355,6 +357,7 @@ async function startDisableCountdown(delaySecs) {
     await _persistCountdown(endsAt);
     if (_countdownTimer) clearTimeout(_countdownTimer);
     _countdownTimer = setTimeout(() => _executeDisable(), secs * 1000);
+    startBadgeTick(endsAt);
     console.log(`[disable-delay] Countdown started: ${secs}s (fires at ${new Date(endsAt).toISOString()})`);
 }
 
@@ -372,6 +375,7 @@ async function resumeCountdownIfPending() {
         console.log(`[disable-delay] Resuming countdown: ${Math.ceil(remaining / 1000)}s remaining.`);
         if (_countdownTimer) clearTimeout(_countdownTimer);
         _countdownTimer = setTimeout(() => _executeDisable(), remaining);
+        startBadgeTick(endsAt);
     }
 }
 
@@ -1065,6 +1069,38 @@ function setActionIcon(enabled) {
             128: `icons/icon-128${variant}.png`
         }
     });
+}
+
+// Show a countdown badge (orange background, remaining-seconds text) on the
+// toolbar icon during a pending disable-delay (feature #20). Call with no
+// arguments or null to clear the badge.
+function setCountdownBadge(remainingSecs) {
+    if (remainingSecs == null) {
+        chrome.action.setBadgeText({ text: '' });
+        return;
+    }
+    const label = remainingSecs <= 99 ? String(remainingSecs) : '99+';
+    chrome.action.setBadgeText({ text: label });
+    chrome.action.setBadgeBackgroundColor({ color: '#E65100' }); // deep orange
+}
+
+// In-memory interval handle that ticks the badge every second during countdown.
+let _badgeInterval = null;
+
+function startBadgeTick(endsAtMs) {
+    stopBadgeTick();
+    function tick() {
+        const remaining = Math.max(0, Math.ceil((endsAtMs - Date.now()) / 1000));
+        setCountdownBadge(remaining);
+        if (remaining === 0) stopBadgeTick();
+    }
+    tick(); // immediate first paint
+    _badgeInterval = setInterval(tick, 1000);
+}
+
+function stopBadgeTick() {
+    if (_badgeInterval) { clearInterval(_badgeInterval); _badgeInterval = null; }
+    setCountdownBadge(null);
 }
 
 async function addRuleFromBackground(pattern, type, groupId) {
