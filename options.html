@@ -769,6 +769,38 @@
         <div id="uninstallUrlStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
     </div>
 
+    <!-- Pomodoro timer section (feature #10) -->
+    <div class="section" id="pomodoroSection">
+        <h3>Pomodoro Timer</h3>
+        <p class="help-text">
+            During a <strong>work session</strong> all redirect rules are enforced as normal.
+            During a <strong>break</strong> all rules are temporarily suspended so you can
+            browse freely. The timer cycles automatically between work and break until you
+            stop it.
+        </p>
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:12px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:14px;">
+                Work session
+                <input type="number" id="pomodoroWorkInput" min="1" max="120" step="1" value="25"
+                    style="width:60px;padding:4px 6px;border-radius:4px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);">
+                min
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:14px;">
+                Break
+                <input type="number" id="pomodoroBreakInput" min="1" max="60" step="1" value="5"
+                    style="width:60px;padding:4px 6px;border-radius:4px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);">
+                min
+            </label>
+        </div>
+        <div style="margin-top:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <button id="pomodoroStartBtn" style="background:#43a047;">Start timer</button>
+            <button id="pomodoroStopBtn" style="background:#e53935;display:none;">Stop timer</button>
+            <span id="pomodoroStatus" style="font-size:14px;color:var(--text-muted);"></span>
+        </div>
+        <div id="pomodoroCountdown" style="margin-top:10px;font-size:22px;font-weight:700;
+            color:var(--text);letter-spacing:1px;display:none;"></div>
+    </div>
+
     <div id="status" class="status" style="display: none;"></div>
 
     <script src="categories.js"></script>
