@@ -296,6 +296,85 @@ async function registerContextMenus() {
     });
 }
 
+// ---------------------------------------------------------------------------
+// Disable-delay countdown (feature #20)
+// ---------------------------------------------------------------------------
+// When the user turns the extension off and disableDelaySecs > 0, we do not
+// immediately clear DNR rules. Instead we schedule a one-shot setTimeout for
+// N seconds. During that window blocking stays active. The options page
+// (options.js) polls chrome.storage.local for `disableCountdown` and shows a
+// cancel button with a live countdown display.
+//
+// Service workers can be killed at any time, so the deadline is also written to
+// chrome.storage.local (`disableCountdownUntil` epoch ms). On every worker
+// restart (onStartup) we check whether a countdown was in progress and, if the
+// deadline hasn't passed yet, resume it; if it has passed, execute the disable.
+
+let _countdownTimer = null; // in-memory handle — cleared on cancel or fire
+
+// Write the countdown state to chrome.storage.local so the options page can
+// read it and so we can resume if the worker restarts.
+async function _persistCountdown(endsAtMs) {
+    await chrome.storage.local.set({ disableCountdownUntil: endsAtMs });
+}
+
+async function _clearCountdownState() {
+    await chrome.storage.local.remove('disableCountdownUntil');
+}
+
+// Actually flip extensionEnabled to false and update everything. Called when the
+// countdown expires (or immediately if delay == 0).
+async function _executeDisable() {
+    if (_countdownTimer) { clearTimeout(_countdownTimer); _countdownTimer = null; }
+    await _clearCountdownState();
+    await persist({ extensionEnabled: false });
+    setActionIcon(false);
+    await clearAllRules();
+    // Notify the options page so it can refresh its toggle state.
+    try {
+        chrome.runtime.sendMessage({ action: 'disableCountdownFired' });
+    } catch (_) { /* options page may not be open */ }
+    console.log('[disable-delay] Extension disabled after countdown.');
+}
+
+// Cancel a running countdown (called by the options page via message).
+async function cancelDisableCountdown() {
+    if (_countdownTimer) { clearTimeout(_countdownTimer); _countdownTimer = null; }
+    await _clearCountdownState();
+    // Re-enable (restore extensionEnabled to true) so the toggle reflects reality.
+    await persist({ extensionEnabled: true });
+    setActionIcon(true);
+    updateRedirectRules();
+    console.log('[disable-delay] Countdown cancelled; extension remains enabled.');
+}
+
+// Start (or restart after worker resume) the countdown. `delaySecs` must be > 0.
+async function startDisableCountdown(delaySecs) {
+    const secs = Math.max(1, Math.min(DISABLE_DELAY_MAX, delaySecs));
+    const endsAt = Date.now() + secs * 1000;
+    await _persistCountdown(endsAt);
+    if (_countdownTimer) clearTimeout(_countdownTimer);
+    _countdownTimer = setTimeout(() => _executeDisable(), secs * 1000);
+    console.log(`[disable-delay] Countdown started: ${secs}s (fires at ${new Date(endsAt).toISOString()})`);
+}
+
+// Called on worker startup: if a countdown was in flight before the worker
+// died, resume it (or execute immediately if the deadline already passed).
+async function resumeCountdownIfPending() {
+    const result = await chrome.storage.local.get(['disableCountdownUntil']);
+    const endsAt = result.disableCountdownUntil;
+    if (!endsAt || typeof endsAt !== 'number') return;
+    const remaining = endsAt - Date.now();
+    if (remaining <= 0) {
+        console.log('[disable-delay] Countdown expired while worker was inactive; disabling now.');
+        await _executeDisable();
+    } else {
+        console.log(`[disable-delay] Resuming countdown: ${Math.ceil(remaining / 1000)}s remaining.`);
+        if (_countdownTimer) clearTimeout(_countdownTimer);
+        _countdownTimer = setTimeout(() => _executeDisable(), remaining);
+    }
+}
+
 // Read the stored uninstall URL (may be customised by the user) and call
 // chrome.runtime.setUninstallURL. Must be called on both onInstalled and
 // onStartup because Chrome resets the URL on browser restart.
@@ -454,6 +533,7 @@ chrome.runtime.onStartup.addListener(async () => {
     await restoreFromLocalIfSyncEmpty();
     await runSchemaMigration();
     await ensureKeywordContentScriptRegistered();
+    await resumeCountdownIfPending(); // Resume any countdown that was running before worker shutdown.
     updateRedirectRules();
     registerContextMenus();
 });
@@ -498,6 +578,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             });
         return true; // keep the message channel open for the async response
     }
+    // Cancel a pending disable countdown (feature #20). The options page sends
+    // this when the user clicks the Cancel button during the countdown window.
+    if (request.action === 'cancelDisableCountdown') {
+        cancelDisableCountdown()
+            .then(() => sendResponse({ success: true }))
+            .catch(err => sendResponse({ success: false, error: String(err && err.message || err) }));
+        return true;
+    }
+    // Query the current countdown state (feature #20). Options page uses this
+    // to learn the remaining seconds without polling chrome.storage.local.
+    if (request.action === 'getDisableCountdown') {
+        chrome.storage.local.get(['disableCountdownUntil'], result => {
+            const endsAt = result.disableCountdownUntil;
+            if (!endsAt) { sendResponse({ active: false }); return; }
+            const remaining = Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
+            sendResponse({ active: remaining > 0, remaining, endsAt });
+        });
+        return true;
+    }
 });
 
 async function handleKeywordHit(sender, request) {
@@ -511,7 +610,8 @@ async function handleKeywordHit(sender, request) {
 async function updateRedirectRules() {
     try {
         const result = await chrome.storage.sync.get([
-            'rules', 'redirectUrl', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups'
+            'rules', 'redirectUrl', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups',
+            'disableDelaySecs'
         ]);
         const rules = Array.isArray(result.rules) ? result.rules : [];
         const redirectUrl = result.redirectUrl || 'https://www.google.com';
@@ -521,12 +621,35 @@ async function updateRedirectRules() {
         const groups = Array.isArray(result.groups) ? result.groups : [];
 
         if (!isEnabled) {
-            // Clear all rules if extension is disabled
-            await clearAllRules();
-            setActionIcon(false);
+            // Check if a delay is configured (feature #20). If so, and if no
+            // countdown is already running, start one rather than disabling now.
+            const delaySecs = typeof result.disableDelaySecs === 'number'
+                ? Math.max(0, Math.min(DISABLE_DELAY_MAX, result.disableDelaySecs))
+                : 0;
+            const cdResult = await chrome.storage.local.get(['disableCountdownUntil']);
+            const countdownActive = !!cdResult.disableCountdownUntil;
+            if (delaySecs > 0 && !countdownActive) {
+                // Start the countdown; rules remain active during the delay.
+                await startDisableCountdown(delaySecs);
+                // Keep rules active (don't clear yet) — just update the icon to
+                // indicate a pending disable.
+                await createRedirectRules(rules, redirectUrl, { mode, alwaysAllowed, groups });
+                return;
+            }
+            if (!countdownActive) {
+                // No delay configured and no countdown running — disable immediately.
+                await clearAllRules();
+                setActionIcon(false);
+            }
+            // If countdownActive is true we are mid-countdown; leave rules intact.
             return;
         }
 
+        // Extension is enabled — cancel any pending countdown (user re-enabled).
+        if (_countdownTimer) {
+            await cancelDisableCountdown();
+            return; // cancelDisableCountdown calls updateRedirectRules again
+        }
         await createRedirectRules(rules, redirectUrl, { mode, alwaysAllowed, groups });
         setActionIcon(true);
     } catch (error) {
