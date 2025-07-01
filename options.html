@@ -532,6 +532,13 @@
         </div>
     </div>
 
+    <!-- Disable-delay countdown banner (feature #20) — hidden unless a countdown is active -->
+    <div id="disableCountdownBanner" style="display:none;align-items:center;gap:12px;padding:10px 16px;background:#FFF3E0;border:1px solid #E65100;border-radius:8px;margin-top:8px;font-size:14px;">
+        <span style="color:#E65100;font-size:18px;">&#9202;</span>
+        <span>Blocking active for <strong id="disableCountdownSecs">--</strong> more seconds&hellip;</span>
+        <button id="cancelDisableBtn" style="margin-top:0;padding:6px 14px;font-size:13px;background:#E65100;color:#fff;border:none;border-radius:6px;cursor:pointer;">Cancel</button>
+    </div>
+
     <div class="section mode-section">
         <div class="mode-copy">
             <h3 style="margin: 0;">Matching mode</h3>
@@ -727,6 +734,23 @@
         </div>
         <button id="saveAccessCodeBtn" style="margin-top:8px;">Save</button>
         <div id="accessCodeStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
+    </div>
+
+    <!-- Disable delay settings section (feature #20) -->
+    <div class="section" id="disableDelaySection">
+        <h3>Disable delay</h3>
+        <div class="help-text" style="margin-bottom:10px;">
+            Wait this many seconds after you press <strong>Disable</strong> before blocking actually stops.
+            During the countdown, blocking remains active and a badge shows the time left.
+            Set to 0 for instant disable (default).
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <input type="number" id="disableDelayInput" min="0" max="300" step="1" value="0"
+                   style="width:80px;">
+            <span class="help-text" style="margin:0;">seconds (0 – 300)</span>
+        </div>
+        <button id="saveDisableDelayBtn" style="margin-top:8px;">Save</button>
+        <div id="disableDelayStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
     </div>
 
     <!-- Uninstall warning URL section (feature #19) -->
