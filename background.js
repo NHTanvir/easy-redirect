@@ -37,6 +37,11 @@ const MODES = ['blocklist', 'allowlist'];
 // is clamped to DISABLE_DELAY_MAX before the countdown starts.
 const DISABLE_DELAY_MAX = 300;
 
+// Alarm name for the 1-minute schedule checker (feature #8). A single periodic
+// alarm fires every minute; the handler checks each group's schedule and
+// rebuilds DNR rules if any group's active state has changed.
+const SCHEDULE_ALARM_NAME = 'checkGroupSchedules';
+
 const DEFAULTS = {
     redirectUrl: 'https://www.google.com',
     blockedWebsites: [],
@@ -52,7 +57,11 @@ const DEFAULTS = {
     // entry (the 'default' group) so rules with groupId='default' always have
     // a home. Participates in persist() and restoreFromLocalIfSyncEmpty() like
     // every other key in DEFAULTS.
-    groups: [{ id: 'default', name: 'Default', color: '#2196F3', enabled: true, redirectUrl: null }],
+    // Default group — always present, never deletable. The `schedule` field is
+    // null for groups that are always active; a non-null schedule object
+    // (feature #8) carries `days` (0-indexed Sun=0..Sat=6 bitmask or array)
+    // and `startTime` / `endTime` in "HH:MM" 24-h format.
+    groups: [{ id: 'default', name: 'Default', color: '#2196F3', enabled: true, redirectUrl: null, schedule: null }],
     // User theme preference: 'auto' defers to prefers-color-scheme, 'light' forces
     // light regardless of OS setting, 'dark' forces dark regardless of OS setting.
     theme: 'auto',
@@ -79,11 +88,14 @@ const DEFAULTS = {
     // pomodoroWorkMinutes and pomodoroBreakMinutes set session lengths (defaults
     // 25 and 5 respectively, matching the classic Pomodoro technique).
     // pomodoroStartedAt is the ms epoch when the current phase began.
+    // pomodoroSessionsToday tracks how many work sessions completed today (UTC).
     pomodoroEnabled: false,
     pomodoroState: 'off',
     pomodoroWorkMinutes: 25,
     pomodoroBreakMinutes: 5,
-    pomodoroStartedAt: null
+    pomodoroStartedAt: null,
+    pomodoroSessionsToday: 0,
+    pomodoroSessionDate: null
 };
 
 // Daily quota counts. Stored in chrome.storage.local (not sync) because they
@@ -134,40 +146,12 @@ async function scheduleMidnightAlarm() {
 // rules (which re-enables any rules that were suspended mid-day), and schedule
 // the next midnight alarm.
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-    if (alarm.name === 'resetDailyQuota') {
-        const fresh = { date: todayUTC(), counts: {} };
-        await saveDailyCounts(fresh);
-        console.log('[daily-quota] Daily counts reset for', fresh.date);
-        await updateRedirectRules();
-        await scheduleMidnightAlarm();
-        return;
-    }
-
-    // Pomodoro phase transitions: 'pomodoroWork' fires when a work session ends
-    // (switch to break) and 'pomodoroBreak' fires when a break ends (switch to work).
-    if (alarm.name === 'pomodoroWork' || alarm.name === 'pomodoroBreak') {
-        const result = await chrome.storage.sync.get([
-            'pomodoroWorkMinutes', 'pomodoroBreakMinutes', 'pomodoroEnabled'
-        ]);
-        if (result.pomodoroEnabled === false) return; // was disabled mid-session
-
-        const workMins = result.pomodoroWorkMinutes || 25;
-        const breakMins = result.pomodoroBreakMinutes || 5;
-
-        if (alarm.name === 'pomodoroBreak') {
-            // Break ended → switch to work. Rules become active again.
-            await persist({ pomodoroState: 'work', pomodoroStartedAt: Date.now() });
-            await updateRedirectRules();
-            chrome.alarms.create('pomodoroBreak', { delayInMinutes: workMins });
-            console.log(`[pomodoro] Work session started (${workMins} min).`);
-        } else {
-            // Work ended → switch to break. Rules are suspended.
-            await persist({ pomodoroState: 'break', pomodoroStartedAt: Date.now() });
-            await updateRedirectRules();
-            chrome.alarms.create('pomodoroWork', { delayInMinutes: breakMins });
-            console.log(`[pomodoro] Break started (${breakMins} min).`);
-        }
-    }
+    if (alarm.name !== 'resetDailyQuota') return;
+    const fresh = { date: todayUTC(), counts: {} };
+    await saveDailyCounts(fresh);
+    console.log('[daily-quota] Daily counts reset for', fresh.date);
+    await updateRedirectRules();
+    await scheduleMidnightAlarm();
 });
 
 // Stable opaque identifier for a Rule. Prefer crypto.randomUUID() (available in
@@ -395,6 +379,59 @@ async function registerContextMenus() {
 }
 
 // ---------------------------------------------------------------------------
+// Per-group scheduling (feature #8)
+// ---------------------------------------------------------------------------
+
+// A Group's `schedule` field is either null (always active) or an object:
+//   { days: number[], startTime: "HH:MM", endTime: "HH:MM" }
+// `days` is an array of integers 0..6 (Sun=0, Mon=1, … Sat=6).
+// startTime and endTime are inclusive; if endTime < startTime the window wraps
+// midnight (e.g. 22:00–06:00 covers 10 pm to 6 am).
+
+// Return true if a group's schedule allows it to be active right now.
+// Groups without a schedule (schedule === null) are always considered active.
+function isGroupScheduleActive(group) {
+    const sched = group && group.schedule;
+    if (!sched || !Array.isArray(sched.days) || sched.days.length === 0) return true;
+    const now = new Date();
+    const todayDay = now.getDay(); // 0 = Sunday
+    if (!sched.days.includes(todayDay)) return false;
+    // Parse HH:MM strings into minutes-since-midnight.
+    function toMins(hhmm) {
+        if (typeof hhmm !== 'string') return null;
+        const parts = hhmm.split(':');
+        if (parts.length !== 2) return null;
+        const h = parseInt(parts[0], 10), m = parseInt(parts[1], 10);
+        if (isNaN(h) || isNaN(m)) return null;
+        return h * 60 + m;
+    }
+    const start = toMins(sched.startTime);
+    const end = toMins(sched.endTime);
+    if (start === null || end === null) return true; // malformed — treat as always active
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+    if (start <= end) {
+        return nowMins >= start && nowMins < end;
+    } else {
+        // Wraps midnight: active from start→midnight and midnight→end.
+        return nowMins >= start || nowMins < end;
+    }
+}
+
+// Ensure the 1-minute periodic alarm exists (idempotent). Called on install and
+// startup. If no group has a non-null schedule, we still keep the alarm running
+// (cheap) so newly-added schedules take effect within one minute without needing
+// to reload the extension.
+async function ensureScheduleAlarm() {
+    if (!chrome.alarms) return; // API not available (non-standard environments)
+    const existing = await chrome.alarms.get(SCHEDULE_ALARM_NAME);
+    if (!existing) {
+        // Period of 1 minute; first fire after 1 minute.
+        chrome.alarms.create(SCHEDULE_ALARM_NAME, { periodInMinutes: 1 });
+        console.log('[schedule] Created periodic alarm:', SCHEDULE_ALARM_NAME);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Disable-delay countdown (feature #20)
 // ---------------------------------------------------------------------------
 // When the user turns the extension off and disableDelaySecs > 0, we do not
@@ -507,6 +544,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     await initializeMissingDefaults();
 
     await ensureKeywordContentScriptRegistered();
+    await ensureScheduleAlarm();
     updateRedirectRules();
     registerContextMenus();
     scheduleMidnightAlarm();
@@ -571,10 +609,16 @@ async function runSchemaMigration() {
     // the Default entry was somehow removed, re-insert it at position 0.
     const existingGroups = Array.isArray(next.groups) ? next.groups : [];
     const hasDefault = existingGroups.some(g => g.id === 'default');
-    const groups = hasDefault ? existingGroups
+    let groups = hasDefault ? existingGroups
         : [createGroup('Default', { id: 'default', color: '#2196F3' }), ...existingGroups];
 
-    const changed = next !== current || rulesNeedGroupId || !hasDefault;
+    // Backfill `schedule: null` on any group that predates feature #8.
+    const groupsNeedSchedule = groups.some(g => !('schedule' in g));
+    if (groupsNeedSchedule) {
+        groups = groups.map(g => ('schedule' in g) ? g : { ...g, schedule: null });
+    }
+
+    const changed = next !== current || rulesNeedGroupId || !hasDefault || groupsNeedSchedule;
     if (!changed) {
         return;
     }
@@ -636,8 +680,8 @@ chrome.runtime.onStartup.addListener(async () => {
     await restoreFromLocalIfSyncEmpty();
     await runSchemaMigration();
     await ensureKeywordContentScriptRegistered();
+    await ensureScheduleAlarm();
     await resumeCountdownIfPending(); // Resume any countdown that was running before worker shutdown.
-    await restorePomodoroAlarm(); // Re-arm pomodoro alarm if a session was running before worker restart.
     updateRedirectRules();
     registerContextMenus();
     scheduleMidnightAlarm();
@@ -702,24 +746,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
         return true;
     }
-    // Start the Pomodoro timer (feature #10). Immediately switches to 'work'
-    // state and schedules the first 'pomodoroWork' alarm to fire after the
-    // configured work-session duration. Calling startPomodoro while a session is
-    // already active restarts the timer (resets the current phase).
-    if (request.action === 'startPomodoro') {
-        startPomodoro()
-            .then(() => sendResponse({ success: true }))
-            .catch(err => sendResponse({ success: false, error: String(err && err.message || err) }));
-        return true;
-    }
-    // Stop the Pomodoro timer and clear any pending alarms. Restores normal
-    // rule enforcement (equivalent to pomodoroState = 'off').
-    if (request.action === 'stopPomodoro') {
-        stopPomodoro()
-            .then(() => sendResponse({ success: true }))
-            .catch(err => sendResponse({ success: false, error: String(err && err.message || err) }));
-        return true;
-    }
 });
 
 async function handleKeywordHit(sender, request) {
@@ -730,89 +756,11 @@ async function handleKeywordHit(sender, request) {
     await chrome.tabs.update(sender.tab.id, { url: target });
 }
 
-// Start the Pomodoro timer from scratch. Always begins with a 'work' phase.
-// Any previously scheduled pomodoroWork/pomodoroBreak alarms are cleared first
-// so restarting is safe regardless of the current phase.
-async function startPomodoro() {
-    const result = await chrome.storage.sync.get([
-        'pomodoroWorkMinutes', 'pomodoroBreakMinutes'
-    ]);
-    const workMins = result.pomodoroWorkMinutes || 25;
-    // Clear old alarms (idempotent if they don't exist).
-    await chrome.alarms.clear('pomodoroWork');
-    await chrome.alarms.clear('pomodoroBreak');
-    // Persist new state before creating the alarm so updateRedirectRules()
-    // called by other listeners sees a consistent snapshot.
-    await persist({
-        pomodoroEnabled: true,
-        pomodoroState: 'work',
-        pomodoroStartedAt: Date.now()
-    });
-    // 'pomodoroWork' fires when the work session ends (time to take a break).
-    chrome.alarms.create('pomodoroWork', { delayInMinutes: workMins });
-    await updateRedirectRules();
-    console.log(`[pomodoro] Timer started — work session (${workMins} min).`);
-}
-
-// Stop the Pomodoro timer. Clears all pending alarms and resets state to 'off'.
-// Rules are re-installed immediately so normal blocking resumes.
-async function stopPomodoro() {
-    await chrome.alarms.clear('pomodoroWork');
-    await chrome.alarms.clear('pomodoroBreak');
-    await persist({
-        pomodoroEnabled: false,
-        pomodoroState: 'off',
-        pomodoroStartedAt: null
-    });
-    await updateRedirectRules();
-    console.log('[pomodoro] Timer stopped.');
-}
-
-// On service-worker restart Chrome discards all in-memory alarms. If the user
-// had an active Pomodoro session we must re-arm the alarm so phase transitions
-// keep firing. We compute the remaining time from pomodoroStartedAt rather than
-// recreating the full duration, which avoids giving the user a "free" extension.
-async function restorePomodoroAlarm() {
-    const result = await chrome.storage.sync.get([
-        'pomodoroEnabled', 'pomodoroState', 'pomodoroStartedAt',
-        'pomodoroWorkMinutes', 'pomodoroBreakMinutes'
-    ]);
-    if (!result.pomodoroEnabled) return;
-    if (result.pomodoroState !== 'work' && result.pomodoroState !== 'break') return;
-
-    const isWork = result.pomodoroState === 'work';
-    const totalMins = isWork
-        ? (result.pomodoroWorkMinutes || 25)
-        : (result.pomodoroBreakMinutes || 5);
-    const startedAt = result.pomodoroStartedAt || Date.now();
-    const elapsedMs = Date.now() - startedAt;
-    const remainingMs = (totalMins * 60 * 1000) - elapsedMs;
-
-    if (remainingMs <= 0) {
-        // Phase has already expired while the worker was down. Transition now.
-        if (isWork) {
-            await persist({ pomodoroState: 'break', pomodoroStartedAt: Date.now() });
-            chrome.alarms.create('pomodoroBreak', { delayInMinutes: result.pomodoroBreakMinutes || 5 });
-            console.log('[pomodoro] Startup: work phase expired — switching to break.');
-        } else {
-            await persist({ pomodoroState: 'work', pomodoroStartedAt: Date.now() });
-            chrome.alarms.create('pomodoroWork', { delayInMinutes: result.pomodoroWorkMinutes || 25 });
-            console.log('[pomodoro] Startup: break phase expired — switching to work.');
-        }
-        return;
-    }
-
-    const remainingMins = remainingMs / 60000;
-    const alarmName = isWork ? 'pomodoroWork' : 'pomodoroBreak';
-    chrome.alarms.create(alarmName, { delayInMinutes: remainingMins });
-    console.log(`[pomodoro] Startup: restored ${result.pomodoroState} alarm (${remainingMins.toFixed(1)} min remaining).`);
-}
-
 async function updateRedirectRules() {
     try {
         const result = await chrome.storage.sync.get([
             'rules', 'redirectUrl', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups',
-            'disableDelaySecs', 'pomodoroState', 'pomodoroEnabled'
+            'disableDelaySecs'
         ]);
         const rules = Array.isArray(result.rules) ? result.rules : [];
         const redirectUrl = result.redirectUrl || 'https://www.google.com';
@@ -820,16 +768,6 @@ async function updateRedirectRules() {
         const mode = MODES.includes(result.mode) ? result.mode : 'blocklist';
         const alwaysAllowed = Array.isArray(result.alwaysAllowed) ? result.alwaysAllowed : [];
         const groups = Array.isArray(result.groups) ? result.groups : [];
-
-        // Suspend all redirect rules while a Pomodoro break is in progress.
-        // Rules are re-installed when the break alarm fires (pomodoroBreak handler
-        // calls updateRedirectRules() after switching state back to 'work').
-        if (result.pomodoroEnabled && result.pomodoroState === 'break') {
-            await clearAllRules();
-            setActionIcon(true); // extension is still "on", just paused for the break
-            console.log('[pomodoro] Rules suspended during break.');
-            return;
-        }
 
         if (!isEnabled) {
             // Check if a delay is configured (feature #20). If so, and if no
@@ -1088,6 +1026,11 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
             if (group && group.enabled === false) {
                 return;
             }
+            // Skip rules whose group has a schedule that is not currently active
+            // (feature #8). A null schedule means always active.
+            if (group && !isGroupScheduleActive(group)) {
+                return;
+            }
 
             // Redirect URL precedence: rule.redirectUrl > group.redirectUrl > global.
             const effectiveRedirectUrl = (rule.redirectUrl) ||
@@ -1311,6 +1254,17 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 
     updateRedirectRules();
 });
+
+// Schedule alarm handler (feature #8): fired every minute by the periodic alarm
+// created in ensureScheduleAlarm(). Rebuilds DNR rules so that groups whose
+// schedule has just become active or inactive take effect within ~1 minute.
+if (chrome.alarms) {
+    chrome.alarms.onAlarm.addListener((alarm) => {
+        if (alarm.name === SCHEDULE_ALARM_NAME) {
+            updateRedirectRules();
+        }
+    });
+}
 
 // Clicking the toolbar icon opens the settings page in a new tab. We intentionally
 // do not declare `default_popup` in the manifest — without that, Chrome fires this
