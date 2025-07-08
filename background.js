@@ -694,10 +694,18 @@ async function runSchemaMigration() {
     let next = migrateLegacyBlockedWebsites(current);
 
     // Backfill groupId='default' on rules that predate groups (created before #7).
+    // Also backfill redirectUrl: null on rules that predate feature #14.
     const existingRules = Array.isArray(next.rules) ? next.rules : [];
     const rulesNeedGroupId = existingRules.some(r => !r.groupId);
-    const backfilledRules = rulesNeedGroupId
-        ? existingRules.map(r => r.groupId ? r : { ...r, groupId: 'default' })
+    const rulesNeedRedirectUrl = existingRules.some(r => !('redirectUrl' in r));
+    const needsRuleBackfill = rulesNeedGroupId || rulesNeedRedirectUrl;
+    const backfilledRules = needsRuleBackfill
+        ? existingRules.map(r => {
+            let out = r;
+            if (!r.groupId) out = { ...out, groupId: 'default' };
+            if (!('redirectUrl' in r)) out = { ...out, redirectUrl: null };
+            return out;
+        })
         : existingRules;
 
     // Ensure groups[] always has the Default group. If the key is missing or
@@ -719,7 +727,7 @@ async function runSchemaMigration() {
         groups = groups.map(g => ('delaySeconds' in g) ? g : { ...g, delaySeconds: 0, allowWindowSecs: 0 });
     }
 
-    const changed = next !== current || rulesNeedGroupId || !hasDefault || groupsNeedSchedule || groupsNeedDelay;
+    const changed = next !== current || needsRuleBackfill || !hasDefault || groupsNeedSchedule || groupsNeedDelay;
     if (!changed) {
         return;
     }
