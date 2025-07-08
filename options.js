@@ -1577,9 +1577,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 <button id="saveGroupRedirect" style="margin-top:0;white-space:nowrap;">Save</button>
             </div>
             <div style="margin-top:6px;font-size:12px;color:#999;">
-                Schedule: <em>(coming soon — scheduled activation is planned for a future release)</em>
+                Schedule: ${group.schedule
+                    ? `<strong style="color:#1565C0;">&#10002; Active</strong> — ` +
+                      `${(group.schedule.days||[]).map(d=>['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d]).join(', ')} ` +
+                      `${group.schedule.startTime}–${group.schedule.endTime} ` +
+                      `<a href="#" id="editSchedLink" style="font-size:12px;">Edit</a>`
+                    : `<em>No schedule (always active)</em> <a href="#" id="editSchedLink" style="font-size:12px;">Set schedule</a>`
+                }
             </div>
         `;
+        // Wire the edit-schedule link in the redirect field.
+        const editSchedLink = document.getElementById('editSchedLink');
+        if (editSchedLink) {
+            editSchedLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                openScheduleModal(group);
+            });
+        }
+
         document.getElementById('saveGroupRedirect').addEventListener('click', async () => {
             const raw = (document.getElementById('groupRedirectInput').value || '').trim();
             let url = raw;
