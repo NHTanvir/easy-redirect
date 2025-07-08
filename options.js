@@ -1247,6 +1247,13 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
+        // Lockdown check (feature #11): adding rules is blocked during lockdown.
+        const ldAddChk = await chrome.storage.sync.get(['lockdownUntil']);
+        if (typeof ldAddChk.lockdownUntil === 'number' && ldAddChk.lockdownUntil > Date.now()) {
+            showStatus('Cannot add rules during lockdown.', 'error');
+            return;
+        }
+
         // Access code friction gate (feature #18): if enabled, show the challenge
         // and abort if the user cancels or fails to type the code correctly.
         const acResult = await chrome.storage.sync.get(['accessCode']);
@@ -1281,6 +1288,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function removeRule(ruleId) {
         try {
+            // Lockdown check (feature #11).
+            const ldChk = await chrome.storage.sync.get(['lockdownUntil']);
+            if (typeof ldChk.lockdownUntil === 'number' && ldChk.lockdownUntil > Date.now()) {
+                showStatus('Cannot remove rules during lockdown.', 'error');
+                return;
+            }
             const result = await chrome.storage.sync.get(['rules']);
             const rules = Array.isArray(result.rules) ? result.rules : [];
 
@@ -1361,6 +1374,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function clearAllWebsites() {
+        // Lockdown check (feature #11).
+        const ldChk = await chrome.storage.sync.get(['lockdownUntil']);
+        if (typeof ldChk.lockdownUntil === 'number' && ldChk.lockdownUntil > Date.now()) {
+            showStatus('Cannot clear rules during lockdown.', 'error');
+            return;
+        }
         const result = await chrome.storage.sync.get(['mode']);
         const mode = MODES.includes(result.mode) ? result.mode : 'blocklist';
         const label = mode === 'allowlist' ? 'allowed sites' : 'block rules';
@@ -1378,6 +1397,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function toggleExtension() {
         try {
+            // Check lockdown state (feature #11) before allowing disable.
+            const ldResult = await chrome.storage.sync.get(['lockdownUntil']);
+            const lockdownUntil = ldResult.lockdownUntil;
+            if (typeof lockdownUntil === 'number' && lockdownUntil > Date.now()) {
+                showStatus('Cannot disable during lockdown.', 'error');
+                return;
+            }
+
             const result = await chrome.storage.sync.get(['extensionEnabled']);
             const isEnabled = result.extensionEnabled !== false;
             const newState = !isEnabled;
