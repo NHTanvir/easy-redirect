@@ -392,7 +392,8 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const result = await chrome.storage.sync.get([
                 'redirectUrl', 'rules', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups', 'theme',
-                'accessCode', 'uninstallUrl', 'disableDelaySecs'
+                'accessCode', 'uninstallUrl', 'disableDelaySecs',
+                'pomodoroWorkMinutes', 'pomodoroBreakMinutes'
             ]);
 
             redirectUrlInput.value = result.redirectUrl || 'https://www.google.com';
@@ -473,6 +474,17 @@ document.addEventListener('DOMContentLoaded', function() {
         if (disableDelayInput) {
             const stored = typeof result.disableDelaySecs === 'number' ? result.disableDelaySecs : 0;
             disableDelayInput.value = Math.max(0, Math.min(300, stored));
+        }
+        // Populate pomodoro duration inputs (feature #10).
+        const pomodoroWorkInput = document.getElementById('pomodoroWorkInput');
+        const pomodoroBreakInput = document.getElementById('pomodoroBreakInput');
+        if (pomodoroWorkInput) {
+            pomodoroWorkInput.value = typeof result.pomodoroWorkMinutes === 'number'
+                ? result.pomodoroWorkMinutes : 25;
+        }
+        if (pomodoroBreakInput) {
+            pomodoroBreakInput.value = typeof result.pomodoroBreakMinutes === 'number'
+                ? result.pomodoroBreakMinutes : 5;
         }
         } catch (error) {
             showStatus('Error loading data: ' + error.message, 'error');
@@ -751,6 +763,112 @@ document.addEventListener('DOMContentLoaded', function() {
             loadData();
         }
     });
+
+    // ---------------------------------------------------------------------------
+    // Pomodoro timer wiring (feature #10)
+    // ---------------------------------------------------------------------------
+
+    // Save work/break durations to chrome.storage.sync whenever they change.
+    function _savePomodoroDurations() {
+        const workEl = document.getElementById('pomodoroWorkInput');
+        const breakEl = document.getElementById('pomodoroBreakInput');
+        const workMins = workEl ? Math.max(1, Math.min(120, parseInt(workEl.value, 10) || 25)) : 25;
+        const breakMins = breakEl ? Math.max(1, Math.min(60, parseInt(breakEl.value, 10) || 5)) : 5;
+        chrome.storage.sync.set({ pomodoroWorkMinutes: workMins, pomodoroBreakMinutes: breakMins });
+    }
+
+    const pomWorkInput = document.getElementById('pomodoroWorkInput');
+    const pomBreakInput = document.getElementById('pomodoroBreakInput');
+    if (pomWorkInput) pomWorkInput.addEventListener('change', _savePomodoroDurations);
+    if (pomBreakInput) pomBreakInput.addEventListener('change', _savePomodoroDurations);
+
+    // Start button — persist durations first so background picks them up.
+    const pomStartBtn = document.getElementById('pomodoroStartBtn');
+    if (pomStartBtn) {
+        pomStartBtn.addEventListener('click', () => {
+            _savePomodoroDurations();
+            chrome.runtime.sendMessage({ action: 'startPomodoro' }, () => {
+                initPomodoroUi(); // refresh UI immediately
+            });
+        });
+    }
+
+    // Stop button — stop the timer via background message.
+    const pomStopBtn = document.getElementById('pomodoroStopBtn');
+    if (pomStopBtn) {
+        pomStopBtn.addEventListener('click', () => {
+            chrome.runtime.sendMessage({ action: 'stopPomodoro' }, () => {
+                initPomodoroUi();
+            });
+        });
+    }
+
+    // Read the current pomodoro state from storage and update the UI.
+    // Called on page load and after start/stop actions.
+    let _pomodoroTickInterval = null;
+
+    function initPomodoroUi() {
+        chrome.storage.sync.get(
+            ['pomodoroEnabled', 'pomodoroState', 'pomodoroStartedAt',
+             'pomodoroWorkMinutes', 'pomodoroBreakMinutes'],
+            result => {
+                const startBtn = document.getElementById('pomodoroStartBtn');
+                const stopBtn = document.getElementById('pomodoroStopBtn');
+                const statusEl = document.getElementById('pomodoroStatus');
+                const countdownEl = document.getElementById('pomodoroCountdown');
+
+                const enabled = !!result.pomodoroEnabled;
+                const state = result.pomodoroState || 'off';
+
+                if (!enabled || state === 'off') {
+                    if (startBtn) startBtn.style.display = '';
+                    if (stopBtn) stopBtn.style.display = 'none';
+                    if (statusEl) statusEl.textContent = 'Timer not running.';
+                    if (countdownEl) { countdownEl.style.display = 'none'; countdownEl.textContent = ''; }
+                    if (_pomodoroTickInterval) { clearInterval(_pomodoroTickInterval); _pomodoroTickInterval = null; }
+                    return;
+                }
+
+                if (startBtn) startBtn.style.display = 'none';
+                if (stopBtn) stopBtn.style.display = '';
+
+                const isWork = state === 'work';
+                const totalMins = isWork
+                    ? (result.pomodoroWorkMinutes || 25)
+                    : (result.pomodoroBreakMinutes || 5);
+                const startedAt = result.pomodoroStartedAt || Date.now();
+
+                if (countdownEl) {
+                    countdownEl.style.display = '';
+                    countdownEl.className = isWork ? 'pomo-work' : 'pomo-break';
+                }
+                if (statusEl) statusEl.textContent = isWork ? 'Work session in progress.' : 'Break in progress — rules suspended.';
+
+                // Clear previous tick if any
+                if (_pomodoroTickInterval) clearInterval(_pomodoroTickInterval);
+
+                function updateCountdown() {
+                    const elapsedMs = Date.now() - startedAt;
+                    const remainingMs = Math.max(0, (totalMins * 60 * 1000) - elapsedMs);
+                    const m = Math.floor(remainingMs / 60000);
+                    const s = Math.floor((remainingMs % 60000) / 1000);
+                    const display = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+                    if (countdownEl) countdownEl.textContent = display;
+                    if (remainingMs === 0 && _pomodoroTickInterval) {
+                        clearInterval(_pomodoroTickInterval);
+                        _pomodoroTickInterval = null;
+                        // Phase must have already ended — refresh UI to pick up new state
+                        setTimeout(initPomodoroUi, 2000);
+                    }
+                }
+                updateCountdown();
+                _pomodoroTickInterval = setInterval(updateCountdown, 500);
+            }
+        );
+    }
+
+    // Initialize on page load.
+    initPomodoroUi();
 
     // ---------------------------------------------------------------------------
     // Access code challenge helpers (feature #18, commit 5)

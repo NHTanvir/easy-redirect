@@ -82,7 +82,20 @@ const DEFAULTS = {
     uninstallUrl: '',
     // Number of seconds to count down before the extension actually disables
     // (feature #20). 0 means disable immediately (legacy behaviour). Max 300 s.
-    disableDelaySecs: 0
+    disableDelaySecs: 0,
+    // Pomodoro timer state (feature #10). pomodoroEnabled toggles the feature;
+    // pomodoroState tracks the current phase ('off'|'work'|'break');
+    // pomodoroWorkMinutes and pomodoroBreakMinutes set session lengths (defaults
+    // 25 and 5 respectively, matching the classic Pomodoro technique).
+    // pomodoroStartedAt is the ms epoch when the current phase began.
+    // pomodoroSessionsToday tracks how many work sessions completed today (UTC).
+    pomodoroEnabled: false,
+    pomodoroState: 'off',
+    pomodoroWorkMinutes: 25,
+    pomodoroBreakMinutes: 5,
+    pomodoroStartedAt: null,
+    pomodoroSessionsToday: 0,
+    pomodoroSessionDate: null
 };
 
 // Daily quota counts. Stored in chrome.storage.local (not sync) because they
@@ -133,12 +146,60 @@ async function scheduleMidnightAlarm() {
 // rules (which re-enables any rules that were suspended mid-day), and schedule
 // the next midnight alarm.
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-    if (alarm.name !== 'resetDailyQuota') return;
-    const fresh = { date: todayUTC(), counts: {} };
-    await saveDailyCounts(fresh);
-    console.log('[daily-quota] Daily counts reset for', fresh.date);
-    await updateRedirectRules();
-    await scheduleMidnightAlarm();
+    if (alarm.name === 'resetDailyQuota') {
+        const fresh = { date: todayUTC(), counts: {} };
+        await saveDailyCounts(fresh);
+        console.log('[daily-quota] Daily counts reset for', fresh.date);
+        await updateRedirectRules();
+        await scheduleMidnightAlarm();
+        return;
+    }
+
+    // Pomodoro phase transitions (feature #10):
+    //   'pomodoroWork'  fires when a work session ends  → switch to break
+    //   'pomodoroBreak' fires when a break session ends → switch back to work
+    if (alarm.name === 'pomodoroWork' || alarm.name === 'pomodoroBreak') {
+        const result = await chrome.storage.sync.get([
+            'pomodoroWorkMinutes', 'pomodoroBreakMinutes', 'pomodoroEnabled',
+            'pomodoroSessionsToday', 'pomodoroSessionDate'
+        ]);
+        if (result.pomodoroEnabled === false) return; // was disabled mid-session
+
+        const workMins = result.pomodoroWorkMinutes || 25;
+        const breakMins = result.pomodoroBreakMinutes || 5;
+        const today = todayUTC();
+
+        if (alarm.name === 'pomodoroWork') {
+            // Work session ended → start break. Tally completed session.
+            const sessionDate = result.pomodoroSessionDate;
+            const sessionsToday = (sessionDate === today ? (result.pomodoroSessionsToday || 0) : 0) + 1;
+            await persist({
+                pomodoroState: 'break',
+                pomodoroStartedAt: Date.now(),
+                pomodoroSessionsToday: sessionsToday,
+                pomodoroSessionDate: today
+            });
+            await updateRedirectRules(); // suspends DNR rules during break
+            chrome.alarms.create('pomodoroBreak', { delayInMinutes: breakMins });
+            chrome.notifications.create(`pomo-break-${Date.now()}`, {
+                type: 'basic', iconUrl: 'icons/icon-48.png',
+                title: 'Easy Redirect — Pomodoro',
+                message: `Work session complete (#${sessionsToday} today)! Take a ${breakMins}-min break.`
+            });
+            console.log(`[pomodoro] Break started (${breakMins} min). Sessions today: ${sessionsToday}`);
+        } else {
+            // Break ended → start new work session.
+            await persist({ pomodoroState: 'work', pomodoroStartedAt: Date.now() });
+            await updateRedirectRules(); // re-installs DNR rules
+            chrome.alarms.create('pomodoroWork', { delayInMinutes: workMins });
+            chrome.notifications.create(`pomo-work-${Date.now()}`, {
+                type: 'basic', iconUrl: 'icons/icon-48.png',
+                title: 'Easy Redirect — Pomodoro',
+                message: `Break over! Starting ${workMins}-min work session.`
+            });
+            console.log(`[pomodoro] Work session started (${workMins} min).`);
+        }
+    }
 });
 
 // Stable opaque identifier for a Rule. Prefer crypto.randomUUID() (available in
