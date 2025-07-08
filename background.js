@@ -108,7 +108,15 @@ const DEFAULTS = {
     // 'groups' = current group only, 'allowlist-exempt' = all but always-allowed).
     lockdownUntil: null,
     lockdownDurationSecs: 3600,
-    lockdownScope: 'all'
+    lockdownScope: 'all',
+    // Custom blocked page (feature #13). blockedPageEnabled switches the default
+    // redirect URL from the user's chosen URL to the built-in blocked.html page.
+    // blockedPageTitle / blockedMessage allow the user to customise the copy shown
+    // on that page. The image is stored separately in chrome.storage.local as a
+    // data URL (too large for sync quota) under the key 'blockedImageDataUrl'.
+    blockedPageEnabled: false,
+    blockedPageTitle: '',
+    blockedMessage: ''
 };
 
 // Daily quota counts. Stored in chrome.storage.local (not sync) because they
