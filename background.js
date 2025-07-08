@@ -535,10 +535,16 @@ async function runSchemaMigration() {
     // the Default entry was somehow removed, re-insert it at position 0.
     const existingGroups = Array.isArray(next.groups) ? next.groups : [];
     const hasDefault = existingGroups.some(g => g.id === 'default');
-    const groups = hasDefault ? existingGroups
+    let groups = hasDefault ? existingGroups
         : [createGroup('Default', { id: 'default', color: '#2196F3' }), ...existingGroups];
 
-    const changed = next !== current || rulesNeedGroupId || !hasDefault;
+    // Backfill `schedule: null` on any group that predates feature #8.
+    const groupsNeedSchedule = groups.some(g => !('schedule' in g));
+    if (groupsNeedSchedule) {
+        groups = groups.map(g => ('schedule' in g) ? g : { ...g, schedule: null });
+    }
+
+    const changed = next !== current || rulesNeedGroupId || !hasDefault || groupsNeedSchedule;
     if (!changed) {
         return;
     }
