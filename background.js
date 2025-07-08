@@ -265,7 +265,11 @@ function createRule(pattern, type, opts = {}) {
         // Daily quota: maximum redirects allowed per calendar day (UTC). null
         // means no limit. When the day's hit count reaches this value the rule's
         // DNR entries are removed until the midnight alarm resets dailyCounts.
-        quota: opts.quota !== undefined ? opts.quota : null
+        quota: opts.quota !== undefined ? opts.quota : null,
+        // Per-rule redirect URL override (feature #14). When set, this takes
+        // precedence over the group redirect URL and the global redirect URL.
+        // null means "use the group/global default".
+        redirectUrl: opts.redirectUrl || null
     };
     // Every rule type carries an exceptions[] list — URL patterns that should
     // NOT be redirected even though the parent rule would match. Exceptions are
