@@ -815,11 +815,16 @@ async function updateRedirectRules() {
     try {
         const result = await chrome.storage.sync.get([
             'rules', 'redirectUrl', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups',
-            'disableDelaySecs'
+            'disableDelaySecs', 'lockdownUntil'
         ]);
         const rules = Array.isArray(result.rules) ? result.rules : [];
         const redirectUrl = result.redirectUrl || 'https://www.google.com';
-        const isEnabled = result.extensionEnabled !== false;
+
+        // During lockdown, treat the extension as always enabled regardless of the
+        // extensionEnabled toggle. This prevents the user from disabling blocking
+        // while a lockdown session is active.
+        const lockdownActive = typeof result.lockdownUntil === 'number' && Date.now() < result.lockdownUntil;
+        const isEnabled = lockdownActive || result.extensionEnabled !== false;
         const mode = MODES.includes(result.mode) ? result.mode : 'blocklist';
         const alwaysAllowed = Array.isArray(result.alwaysAllowed) ? result.alwaysAllowed : [];
         const groups = Array.isArray(result.groups) ? result.groups : [];
