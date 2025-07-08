@@ -134,6 +134,26 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('saveRedirectUrl').addEventListener('click', saveRedirectUrl);
     document.getElementById('addWebsite').addEventListener('click', addRule);
     document.getElementById('clearAll').addEventListener('click', clearAllWebsites);
+
+    // Reset all delay allow-windows (feature #12): clear every allowedUntil:* key
+    // from chrome.storage.local so the next visit re-triggers the countdown.
+    const resetAllowWindowsBtn = document.getElementById('resetAllowWindowsBtn');
+    if (resetAllowWindowsBtn) {
+        resetAllowWindowsBtn.addEventListener('click', async () => {
+            try {
+                const all = await chrome.storage.local.get(null);
+                const keys = Object.keys(all).filter(k => k.startsWith('allowedUntil:'));
+                if (keys.length === 0) {
+                    showStatus('No active allow windows to reset.', 'success');
+                    return;
+                }
+                await chrome.storage.local.remove(keys);
+                showStatus(`Reset ${keys.length} delay allow window${keys.length > 1 ? 's' : ''}.`, 'success');
+            } catch (err) {
+                showStatus('Error resetting allow windows: ' + err.message, 'error');
+            }
+        });
+    }
     document.getElementById('toggleBtn').addEventListener('click', toggleExtension);
     modeBlocklistBtn.addEventListener('click', () => switchMode('blocklist'));
     modeAllowlistBtn.addEventListener('click', () => switchMode('allowlist'));

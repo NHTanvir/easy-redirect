@@ -675,8 +675,13 @@
         <div id="websiteList" class="website-list">
             <div style="text-align: center; color: var(--text-muted); font-size: 13px;">No rules configured</div>
         </div>
-        <button id="clearAll" style="background: #ff9800; margin-top: 10px;">Clear All</button>
-    </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap;">
+            <button id="clearAll" style="background: #ff9800; margin-top: 0;">Clear All</button>
+            <button id="resetAllowWindowsBtn" title="Clear all stored delay allow-windows so the countdown shows again"
+                    style="margin-top:0;background:transparent;color:var(--text-muted);border:1px solid var(--border);padding:8px 14px;font-size:13px;">
+                Reset delay windows
+            </button>
+        </div>
 
     <div class="section">
         <h3>Bulk Add Rules</h3>
