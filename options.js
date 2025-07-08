@@ -1715,6 +1715,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // select panel. Operates on the global rules array so groups not currently
     // shown are NOT affected — only the rules visible in the current group view.
     async function bulkSetEnabled(visibleRules, enable) {
+        // Lockdown check (feature #11).
+        const ldBulkChk = await chrome.storage.sync.get(['lockdownUntil']);
+        if (typeof ldBulkChk.lockdownUntil === 'number' && ldBulkChk.lockdownUntil > Date.now()) {
+            showStatus('Cannot change rules during lockdown.', 'error');
+            return;
+        }
         const checkboxes = websiteListDiv.querySelectorAll('.rule-select-checkbox:checked');
         const selectedIds = new Set([...checkboxes].map(cb => cb.dataset.ruleId));
         if (selectedIds.size === 0) {
