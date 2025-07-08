@@ -413,7 +413,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await chrome.storage.sync.get([
                 'redirectUrl', 'rules', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups', 'theme',
                 'accessCode', 'uninstallUrl', 'disableDelaySecs',
-                'pomodoroWorkMinutes', 'pomodoroBreakMinutes'
+                'pomodoroWorkMinutes', 'pomodoroBreakMinutes',
+                'blockedPageEnabled', 'blockedPageTitle', 'blockedMessage'
             ]);
 
             redirectUrlInput.value = result.redirectUrl || 'https://www.google.com';
@@ -506,6 +507,8 @@ document.addEventListener('DOMContentLoaded', function() {
             pomodoroBreakInput.value = typeof result.pomodoroBreakMinutes === 'number'
                 ? result.pomodoroBreakMinutes : 5;
         }
+        // Populate blocked page settings (feature #13).
+        _loadBlockedPageSettings(result);
         } catch (error) {
             showStatus('Error loading data: ' + error.message, 'error');
         }
@@ -893,6 +896,78 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initialize on page load.
     initPomodoroUi();
+
+    // ---------------------------------------------------------------------------
+    // Custom blocked page settings (feature #13)
+    // ---------------------------------------------------------------------------
+
+    const blockedPageEnabledCb = document.getElementById('blockedPageEnabled');
+    const blockedPageOptions   = document.getElementById('blockedPageOptions');
+    const blockedPageTitleEl   = document.getElementById('blockedPageTitle');
+    const blockedMessageEl     = document.getElementById('blockedMessage');
+    const blockedPageStatusEl  = document.getElementById('blockedPageStatus');
+
+    // Show/hide the options panel based on the checkbox state.
+    if (blockedPageEnabledCb) {
+        blockedPageEnabledCb.addEventListener('change', () => {
+            if (blockedPageOptions) {
+                blockedPageOptions.style.display = blockedPageEnabledCb.checked ? '' : 'none';
+            }
+        });
+    }
+
+    // Populate UI from stored values — called from loadData().
+    function _loadBlockedPageSettings(result) {
+        if (blockedPageEnabledCb) {
+            blockedPageEnabledCb.checked = result.blockedPageEnabled === true;
+            if (blockedPageOptions) {
+                blockedPageOptions.style.display = blockedPageEnabledCb.checked ? '' : 'none';
+            }
+        }
+        if (blockedPageTitleEl) blockedPageTitleEl.value = result.blockedPageTitle || '';
+        if (blockedMessageEl)   blockedMessageEl.value   = result.blockedMessage   || '';
+        // Load stored image preview from local storage.
+        chrome.storage.local.get(['blockedImageDataUrl'], localResult => {
+            const previewDiv = document.getElementById('blockedImagePreview');
+            const previewImg = document.getElementById('blockedImagePreviewImg');
+            if (localResult.blockedImageDataUrl && previewDiv && previewImg) {
+                previewImg.src = localResult.blockedImageDataUrl;
+                previewDiv.style.display = '';
+            }
+        });
+    }
+
+    // Save blocked page settings.
+    const saveBlockedPageBtn = document.getElementById('saveBlockedPageBtn');
+    if (saveBlockedPageBtn) {
+        saveBlockedPageBtn.addEventListener('click', async () => {
+            const enabled = blockedPageEnabledCb ? blockedPageEnabledCb.checked : false;
+            const title   = (blockedPageTitleEl  && blockedPageTitleEl.value.trim())  || '';
+            const message = (blockedMessageEl    && blockedMessageEl.value.trim())    || '';
+            try {
+                await chrome.storage.sync.set({ blockedPageEnabled: enabled, blockedPageTitle: title, blockedMessage: message });
+                await updateRedirectRules();
+                if (blockedPageStatusEl) {
+                    blockedPageStatusEl.textContent = 'Saved.';
+                    blockedPageStatusEl.style.color = '#2e7d32';
+                    setTimeout(() => { if (blockedPageStatusEl) blockedPageStatusEl.textContent = ''; }, 2000);
+                }
+            } catch (err) {
+                if (blockedPageStatusEl) {
+                    blockedPageStatusEl.textContent = 'Error: ' + err.message;
+                    blockedPageStatusEl.style.color = '#c62828';
+                }
+            }
+        });
+    }
+
+    // Preview button — open blocked.html in a new tab.
+    const previewBlockedPageBtn = document.getElementById('previewBlockedPageBtn');
+    if (previewBlockedPageBtn) {
+        previewBlockedPageBtn.addEventListener('click', () => {
+            chrome.tabs.create({ url: chrome.runtime.getURL('blocked.html') });
+        });
+    }
 
     // ---------------------------------------------------------------------------
     // Access code challenge helpers (feature #18, commit 5)
