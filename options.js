@@ -1023,6 +1023,21 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             wrapper.appendChild(btn);
 
+            // Schedule indicator and edit button — shown for all groups (including Default).
+            const schedCtrl = document.createElement('button');
+            schedCtrl.style.cssText =
+                'font-size:10px;padding:2px 5px;margin-top:0;border-radius:10px;' +
+                (group.schedule ? 'background:#1565C0;color:#fff;' : 'background:var(--bg-section);color:var(--text-muted);border:1px solid var(--border);');
+            schedCtrl.title = group.schedule
+                ? `Schedule active — days: ${(group.schedule.days||[]).map(d=>['Su','Mo','Tu','We','Th','Fr','Sa'][d]).join(',')} ${group.schedule.startTime}–${group.schedule.endTime}`
+                : 'Set schedule (always active)';
+            schedCtrl.textContent = group.schedule ? '⏰' : '—';
+            schedCtrl.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openScheduleModal(group);
+            });
+            wrapper.appendChild(schedCtrl);
+
             // Toggle + delete controls — only for non-default groups.
             if (group.id !== 'default') {
                 const toggleCtrl = document.createElement('button');
@@ -1739,9 +1754,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 <button id="saveGroupRedirect" style="margin-top:0;white-space:nowrap;">Save</button>
             </div>
             <div style="margin-top:6px;font-size:12px;color:#999;">
-                Schedule: <em>(coming soon — scheduled activation is planned for a future release)</em>
+                Schedule: ${group.schedule
+                    ? `<strong style="color:#1565C0;">&#10002; Active</strong> — ` +
+                      `${(group.schedule.days||[]).map(d=>['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d]).join(', ')} ` +
+                      `${group.schedule.startTime}–${group.schedule.endTime} ` +
+                      `<a href="#" id="editSchedLink" style="font-size:12px;">Edit</a>`
+                    : `<em>No schedule (always active)</em> <a href="#" id="editSchedLink" style="font-size:12px;">Set schedule</a>`
+                }
             </div>
         `;
+        // Wire the edit-schedule link in the redirect field.
+        const editSchedLink = document.getElementById('editSchedLink');
+        if (editSchedLink) {
+            editSchedLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                openScheduleModal(group);
+            });
+        }
+
         document.getElementById('saveGroupRedirect').addEventListener('click', async () => {
             const raw = (document.getElementById('groupRedirectInput').value || '').trim();
             let url = raw;
@@ -1863,6 +1893,118 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             showStatus('Error toggling group: ' + error.message, 'error');
         }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Per-group schedule editor (feature #8)
+    // ---------------------------------------------------------------------------
+
+    // Track which group is being edited in the modal.
+    let _scheduleTargetGroupId = null;
+
+    function openScheduleModal(group) {
+        _scheduleTargetGroupId = group.id;
+        const modal = document.getElementById('scheduleModal');
+        const nameEl = document.getElementById('scheduleGroupName');
+        const daysEl = document.getElementById('scheduleDays');
+        const startEl = document.getElementById('scheduleStartTime');
+        const endEl = document.getElementById('scheduleEndTime');
+        const statusEl = document.getElementById('scheduleStatus');
+        if (!modal) return;
+        if (nameEl) nameEl.textContent = group.name;
+        if (statusEl) statusEl.textContent = '';
+        // Populate fields from existing schedule (or defaults).
+        const sched = group.schedule;
+        const days = (sched && Array.isArray(sched.days)) ? sched.days : [];
+        if (daysEl) {
+            daysEl.querySelectorAll('input[data-day]').forEach(cb => {
+                cb.checked = days.includes(parseInt(cb.dataset.day, 10));
+            });
+        }
+        if (startEl) startEl.value = (sched && sched.startTime) ? sched.startTime : '09:00';
+        if (endEl) endEl.value = (sched && sched.endTime) ? sched.endTime : '17:00';
+        modal.classList.add('visible');
+    }
+
+    function closeScheduleModal() {
+        const modal = document.getElementById('scheduleModal');
+        if (modal) modal.classList.remove('visible');
+        _scheduleTargetGroupId = null;
+    }
+
+    // Save schedule button.
+    const saveScheduleBtn = document.getElementById('saveScheduleBtn');
+    if (saveScheduleBtn) {
+        saveScheduleBtn.addEventListener('click', async () => {
+            const statusEl = document.getElementById('scheduleStatus');
+            if (!_scheduleTargetGroupId) return;
+            const daysEl = document.getElementById('scheduleDays');
+            const startEl = document.getElementById('scheduleStartTime');
+            const endEl = document.getElementById('scheduleEndTime');
+            const selectedDays = daysEl
+                ? Array.from(daysEl.querySelectorAll('input[data-day]:checked'))
+                      .map(cb => parseInt(cb.dataset.day, 10))
+                : [];
+            const startTime = startEl ? startEl.value : '09:00';
+            const endTime = endEl ? endEl.value : '17:00';
+            if (selectedDays.length === 0) {
+                if (statusEl) { statusEl.textContent = 'Select at least one day, or use Clear to remove scheduling.'; statusEl.style.color = '#c62828'; }
+                return;
+            }
+            const schedule = { days: selectedDays, startTime, endTime };
+            try {
+                const result = await chrome.storage.sync.get(['groups']);
+                const groups = Array.isArray(result.groups) ? result.groups : [];
+                const updated = groups.map(g =>
+                    g.id === _scheduleTargetGroupId ? { ...g, schedule } : g
+                );
+                await chrome.storage.sync.set({ groups: updated });
+                currentGroups = updated;
+                await updateRedirectRules();
+                renderGroupTabs(currentGroups);
+                closeScheduleModal();
+                showStatus('Schedule saved.', 'success');
+            } catch (err) {
+                if (statusEl) { statusEl.textContent = 'Error: ' + err.message; statusEl.style.color = '#c62828'; }
+            }
+        });
+    }
+
+    // Clear schedule button (removes scheduling — group becomes always active).
+    const clearScheduleBtn = document.getElementById('clearScheduleBtn');
+    if (clearScheduleBtn) {
+        clearScheduleBtn.addEventListener('click', async () => {
+            if (!_scheduleTargetGroupId) return;
+            try {
+                const result = await chrome.storage.sync.get(['groups']);
+                const groups = Array.isArray(result.groups) ? result.groups : [];
+                const updated = groups.map(g =>
+                    g.id === _scheduleTargetGroupId ? { ...g, schedule: null } : g
+                );
+                await chrome.storage.sync.set({ groups: updated });
+                currentGroups = updated;
+                await updateRedirectRules();
+                renderGroupTabs(currentGroups);
+                closeScheduleModal();
+                showStatus('Schedule cleared — group is always active.', 'success');
+            } catch (err) {
+                showStatus('Error clearing schedule: ' + err.message, 'error');
+            }
+        });
+    }
+
+    // Cancel button.
+    const cancelScheduleBtn = document.getElementById('cancelScheduleBtn');
+    if (cancelScheduleBtn) {
+        cancelScheduleBtn.addEventListener('click', closeScheduleModal);
+    }
+
+    // Close modal on overlay click.
+    const scheduleModal = document.getElementById('scheduleModal');
+    if (scheduleModal) {
+        scheduleModal.addEventListener('click', (e) => {
+            if (e.target === scheduleModal) closeScheduleModal();
+        });
     }
 
     async function updateRedirectRules() {
