@@ -961,11 +961,21 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Preview button — open blocked.html in a new tab.
+    // Preview button — save current settings then open blocked.html in a new tab.
+    // Passing ?preview=1 to blocked.html tells it we are previewing (no referrer
+    // URL, no 'go back' in history). The from= param is faked for display.
     const previewBlockedPageBtn = document.getElementById('previewBlockedPageBtn');
     if (previewBlockedPageBtn) {
-        previewBlockedPageBtn.addEventListener('click', () => {
-            chrome.tabs.create({ url: chrome.runtime.getURL('blocked.html') });
+        previewBlockedPageBtn.addEventListener('click', async () => {
+            // Save any unsaved changes first so the preview reflects the latest input.
+            const title   = (blockedPageTitleEl  && blockedPageTitleEl.value.trim())  || '';
+            const message = (blockedMessageEl    && blockedMessageEl.value.trim())    || '';
+            const enabled = blockedPageEnabledCb ? blockedPageEnabledCb.checked : false;
+            try {
+                await chrome.storage.sync.set({ blockedPageEnabled: enabled, blockedPageTitle: title, blockedMessage: message });
+            } catch (_) { /* ignore — preview still works with stale storage */ }
+            const qp = new URLSearchParams({ from: 'https://example.com', preview: '1' });
+            chrome.tabs.create({ url: `${chrome.runtime.getURL('blocked.html')}?${qp}` });
         });
     }
 
