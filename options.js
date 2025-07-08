@@ -1749,6 +1749,15 @@ document.addEventListener('DOMContentLoaded', function() {
                             style="width:64px;padding:2px 6px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
                         <span class="rule-today-count" data-rule-id="${escapeHtml(rule.id)}" style="color:var(--text-muted);"></span>
                     </div>
+                    <div class="rule-redirect-row" style="display:flex;align-items:center;gap:6px;margin-top:4px;font-size:12px;color:var(--text-muted);">
+                        <label style="white-space:nowrap;" title="Override the redirect URL for this rule only">Redirect to:</label>
+                        <input type="url" class="rule-redirect-input" data-rule-id="${escapeHtml(rule.id)}"
+                            value="${escapeHtml(rule.redirectUrl || '')}"
+                            placeholder="(use group / global default)"
+                            title="Per-rule redirect URL override. Leave blank to use group or global default."
+                            style="flex:1;min-width:180px;padding:2px 6px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
+                        ${rule.redirectUrl ? `<span style="font-size:11px;padding:1px 6px;border-radius:8px;background:#4a148c;color:#fff;white-space:nowrap;" title="This rule has its own redirect URL">custom</span>` : ''}
+                    </div>
                     ${exceptions.length > 0 ? `<div class="exception-list">${exceptionItems}</div>` : ''}
                 </div>
             `;
@@ -1806,6 +1815,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 const next = allRules.map(r => r.id === ruleId ? { ...r, quota: newQuota } : r);
                 await chrome.storage.sync.set({ rules: next });
                 await updateRedirectRules();
+            });
+        });
+        // Per-rule redirect URL input — save on change (feature #14).
+        websiteListDiv.querySelectorAll('.rule-redirect-input').forEach(input => {
+            input.addEventListener('change', async () => {
+                const ruleId = input.dataset.ruleId;
+                const raw = input.value.trim();
+                // Validate — empty string clears the override; non-empty must be absolute URL.
+                let newRedirectUrl = null;
+                if (raw !== '') {
+                    try {
+                        new URL(raw); // throws if invalid
+                        newRedirectUrl = raw;
+                    } catch (_) {
+                        showStatus('Invalid redirect URL — must start with https:// or similar.', 'error');
+                        return;
+                    }
+                }
+                const result = await chrome.storage.sync.get(['rules']);
+                const allRules = Array.isArray(result.rules) ? result.rules : [];
+                const next = allRules.map(r => r.id === ruleId ? { ...r, redirectUrl: newRedirectUrl } : r);
+                await chrome.storage.sync.set({ rules: next });
+                await updateRedirectRules();
+                displayRules(next); // re-render to show/hide the 'custom' badge
             });
         });
 
