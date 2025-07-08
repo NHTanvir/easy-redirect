@@ -1333,17 +1333,34 @@ chrome.action.onClicked.addListener(() => {
     chrome.runtime.openOptionsPage();
 });
 
-// Placeholder for the lockdown check that #11 will wire. Returns false until
-// the real implementation lands so the toggle shortcut behaves normally.
-function isLockedDown() { return false; /* wired in #11 */ }
+// Cached lockdown expiry timestamp (ms epoch). Updated whenever lockdownUntil
+// changes in chrome.storage.sync (via the onChanged listener below) and on
+// startup. Using a module-level cache keeps isLockedDown() synchronous so it
+// can be called from sync contexts (e.g. the commands handler).
+let _lockdownUntilCache = null;
+
+// Returns true if a lockdown session is currently active. Synchronous — reads
+// the cached value updated by the storage listener and initLockdownCache().
+function isLockedDown() {
+    return typeof _lockdownUntilCache === 'number' && Date.now() < _lockdownUntilCache;
+}
+
+// Warm the lockdown cache from storage. Called on onInstalled, onStartup, and
+// from the startLockdown / stopLockdown helpers to keep the cache consistent.
+async function initLockdownCache() {
+    const result = await chrome.storage.sync.get(['lockdownUntil']);
+    _lockdownUntilCache = typeof result.lockdownUntil === 'number' ? result.lockdownUntil : null;
+}
 
 chrome.commands.onCommand.addListener(async (command) => {
     if (command === 'open-settings') {
         chrome.runtime.openOptionsPage();
     }
     if (command === 'toggle-extension') {
-        // TODO: check lockdown state when #11 lands — if locked, skip toggle
-        if (isLockedDown()) return;
+        if (isLockedDown()) {
+            console.log('[lockdown] Toggle-extension blocked — lockdown active.');
+            return;
+        }
         const result = await chrome.storage.sync.get(['extensionEnabled']);
         const isEnabled = result.extensionEnabled !== false;
         const newState = !isEnabled;

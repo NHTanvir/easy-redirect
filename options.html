@@ -785,6 +785,56 @@
         <div id="disableDelayStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
     </div>
 
+    <!-- Lockdown / focus mode section (feature #11) -->
+    <div class="section" id="lockdownSection">
+        <h3>Lockdown / focus mode</h3>
+        <div class="help-text" style="margin-bottom:10px;">
+            Activate a hard lockdown for a fixed duration. While locked down you
+            <strong>cannot</strong> disable the extension, add or remove rules, or change
+            the redirect URL — even with the PIN or friction code. The lock expires
+            automatically when the timer runs out.
+        </div>
+        <div id="lockdownActivePanel" style="display:none;background:var(--danger-bg,#fdecea);border:1px solid #e53935;border-radius:6px;padding:12px 16px;margin-bottom:12px;">
+            <strong style="color:#b71c1c;">Lockdown active</strong>
+            <span id="lockdownCountdown" style="margin-left:12px;font-variant-numeric:tabular-nums;font-weight:700;"></span>
+            <div class="help-text" style="margin-top:4px;">You cannot modify rules until the countdown reaches zero.</div>
+        </div>
+        <div id="lockdownSetupPanel">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+                <label style="font-size:14px;display:flex;align-items:center;gap:6px;">
+                    Duration
+                    <input type="number" id="lockdownDurationInput" min="1" max="1440" step="1" value="60"
+                        style="width:70px;padding:4px 6px;border-radius:4px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);">
+                    minutes
+                </label>
+                <label style="font-size:14px;display:flex;align-items:center;gap:6px;">
+                    Scope
+                    <select id="lockdownScopeSelect" style="padding:4px 6px;border-radius:4px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);">
+                        <option value="all">All rules</option>
+                        <option value="groups">Current group only</option>
+                        <option value="allowlist-exempt">All except always-allowed</option>
+                    </select>
+                </label>
+            </div>
+            <button id="lockdownActivateBtn" style="background:#e53935;color:#fff;">
+                Activate lockdown
+            </button>
+            <div id="lockdownConfirmPanel" style="display:none;margin-top:12px;padding:12px;border:2px solid #e53935;border-radius:6px;background:var(--danger-bg,#fdecea);">
+                <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#b71c1c;">
+                    Are you sure? This cannot be cancelled once started.
+                </p>
+                <p style="margin:0 0 10px;font-size:13px;">Type <strong>LOCK</strong> to confirm:</p>
+                <input type="text" id="lockdownConfirmInput" placeholder="LOCK" autocomplete="off"
+                    style="width:120px;padding:6px;border-radius:4px;border:2px solid #e53935;font-size:15px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">
+                <button id="lockdownConfirmBtn" style="margin-left:8px;background:#b71c1c;color:#fff;" disabled>
+                    Lock now
+                </button>
+                <button id="lockdownCancelBtn" style="margin-left:6px;">Cancel</button>
+            </div>
+        </div>
+        <div id="lockdownStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
+    </div>
+
     <!-- Uninstall warning URL section (feature #19) -->
     <div class="section" id="uninstallUrlSection">
         <h3>Uninstall feedback URL</h3>
