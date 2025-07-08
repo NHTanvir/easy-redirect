@@ -95,7 +95,14 @@ const DEFAULTS = {
     pomodoroBreakMinutes: 5,
     pomodoroStartedAt: null,
     pomodoroSessionsToday: 0,
-    pomodoroSessionDate: null
+    pomodoroSessionDate: null,
+    // Lockdown mode (feature #11). When active, the user cannot disable the
+    // extension, modify rules, or clear the rule list until lockdownUntil has
+    // passed. lockdownUntil is a Unix ms timestamp (Date.now() + duration).
+    // null means lockdown is not active. lockdownDurationSecs is the configured
+    // duration in seconds (default 3600 = 1 hour, max 86400 = 24 hours).
+    lockdownUntil: null,
+    lockdownDurationSecs: 3600
 };
 
 // Daily quota counts. Stored in chrome.storage.local (not sync) because they
