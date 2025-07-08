@@ -2354,6 +2354,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // Persist the chosen duration whenever it changes so it survives page reloads.
+    const _lockDurInput = document.getElementById('lockdownDurationInput');
+    if (_lockDurInput) {
+        _lockDurInput.addEventListener('change', () => {
+            const mins = Math.max(1, Math.min(1440, parseInt(_lockDurInput.value, 10) || 60));
+            chrome.storage.sync.set({ lockdownDurationSecs: mins * 60 });
+        });
+    }
+
     // Initialise lockdown UI on page load.
     refreshLockdownUi();
 });
