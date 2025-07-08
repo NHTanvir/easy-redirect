@@ -1353,7 +1353,21 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
         if (newUrl !== undefined) chrome.storage.local.set({ uninstallUrl: newUrl });
         registerUninstallUrl();
     }
+    // Keep the lockdown cache in sync with storage changes (feature #11).
+    if ('lockdownUntil' in changes) {
+        const v = changes.lockdownUntil.newValue;
+        _lockdownUntilCache = typeof v === 'number' ? v : null;
+    }
     if (relevant.length === 0) return;
+
+    // During lockdown, ignore attempts to disable the extension. The user must
+    // stop the lockdown first (which requires authentication). We restore the
+    // previous value immediately so the storage stays consistent.
+    if ('extensionEnabled' in changes && changes.extensionEnabled.newValue === false && isLockedDown()) {
+        console.log('[lockdown] Blocked attempt to disable extension via storage write.');
+        chrome.storage.sync.set({ extensionEnabled: true });
+        return; // no need to update rules — they are already active
+    }
 
     const mirror = {};
     for (const k of relevant) {

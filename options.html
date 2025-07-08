@@ -530,6 +530,17 @@
             font-size: 12px;
             color: var(--text-muted);
         }
+        /* Lockdown active state (feature #11): hide Remove and toggle buttons
+           per rule row so the user cannot weaken protection during lockdown.
+           Applied by JS by toggling .lockdown-active on #ruleList. */
+        #ruleList.lockdown-active .remove-rule-btn,
+        #ruleList.lockdown-active .toggle-rule-btn {
+            display: none !important;
+        }
+        /* Danger background for lockdown active panel */
+        [data-theme="dark"] #lockdownActivePanel {
+            --danger-bg: #3b1212;
+        }
     </style>
 </head>
 <body>
