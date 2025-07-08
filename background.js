@@ -1216,13 +1216,37 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
                 (group && group.redirectUrl) ||
                 redirectUrl;
 
+            // Delay / cool-off countdown (feature #12). When the group has a
+            // positive delaySeconds, redirect to the countdown interstitial
+            // instead of the final URL. The interstitial checks the allow window
+            // from chrome.storage.local and navigates to the original URL after
+            // the countdown elapses. In allowlist mode delays don't apply (the
+            // rule is an 'allow' rule, not a redirect).
+            const groupDelay = group && typeof group.delaySeconds === 'number' ? group.delaySeconds : 0;
+            const groupWindow = group && typeof group.allowWindowSecs === 'number' ? group.allowWindowSecs : 0;
+            let finalRedirectUrl = effectiveRedirectUrl;
+            if (mode === 'blocklist' && groupDelay > 0) {
+                const extId = chrome.runtime.id;
+                const countdownBase = `chrome-extension://${extId}/countdown.html`;
+                // 'from' is left blank here — DNR cannot inject the matched URL
+                // into the redirect target. countdown.html reads document.referrer
+                // as a fallback. 'to' is the blocked-page redirect URL.
+                const qp = new URLSearchParams({
+                    to: effectiveRedirectUrl,
+                    delay: String(groupDelay),
+                    window: String(groupWindow),
+                    ruleId: rule.id
+                });
+                finalRedirectUrl = `${countdownBase}?${qp.toString()}`;
+            }
+
             const baseId = (index + 1) * DNR_ID_STRIDE;
             // In blocklist mode the rule redirects to the configured URL; in
             // allowlist mode the same pattern instead becomes a higher-priority
             // 'allow' rule that overrides the catch-all redirect.
             const ruleAction = mode === 'allowlist'
                 ? { type: 'allow' }
-                : { type: 'redirect', redirect: { url: effectiveRedirectUrl } };
+                : { type: 'redirect', redirect: { url: finalRedirectUrl } };
 
             if (rule.type === 'domain') {
                 const conditions = buildDomainConditions(rule.pattern);
