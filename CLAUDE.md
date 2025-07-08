@@ -108,7 +108,8 @@ A `Rule` is:
   exceptions: string[],         // URL patterns exempt from redirect for this rule
   caseSensitive?: boolean,      // keyword rules only
   wholeWord?: boolean,          // keyword rules only
-  quota: number | null          // max redirects per day (null = no limit); see daily-quota
+  quota: number | null,         // max redirects per day (null = no limit); see daily-quota
+  redirectUrl: string | null    // per-rule redirect URL override (null = use group/global); see #14
 }
 ```
 
@@ -411,3 +412,34 @@ Existing per-rule and per-group redirect URL overrides still take precedence.
 - `_loadBlockedPageSettings(result)` — called from `loadData()`; populates all fields.
 - Image upload: `FileReader` → data URL → `chrome.storage.local.set`. Max 1 MB.
 - Preview button saves current settings first, then opens `blocked.html?from=https://example.com`.
+
+### Per-rule redirect URL (feature #14)
+
+Each rule carries an optional `redirectUrl` field (string or null). When set, it overrides the
+group-level and global redirect targets for that specific rule. The precedence chain is:
+
+```
+rule.redirectUrl  >  group.redirectUrl  >  global redirectUrl
+```
+
+**background.js**:
+- `createRule()` factory initialises `redirectUrl: null` so all rules have the field from creation.
+- `runSchemaMigration()` backfills `redirectUrl: null` on any rules that predate feature #14 (those
+  lacking the key entirely).
+- `createRedirectRules()` resolves `effectiveRedirectUrl` via the precedence chain using a local
+  `isValidUrl()` helper. If a stored per-rule URL is malformed it falls through to the group or
+  global URL rather than emitting a broken redirect — graceful degradation at DNR emit time.
+- `isValidUrl(url)` — returns `true` when `url` is a non-empty string that the `URL` constructor
+  can parse without throwing. Declared inside `createRedirectRules()` so it is available to every
+  rule iteration.
+
+**options.html / options.js**:
+- Each rule row shows a **Redirect to:** text input (`class="rule-redirect-input"`). Placeholder text
+  `(use group / global default)` communicates that an empty value means fallback rather than a blank
+  redirect.
+- When the user sets a non-empty URL, the input's `change` handler validates it via `new URL()`
+  before writing to storage. Invalid input shows an error status and aborts the save.
+- A small **custom** badge (dark-purple, `background:#4a148c`) appears in the rule row next to the
+  input whenever `rule.redirectUrl` is non-null — visual confirmation that an override is active.
+  The badge is removed when the field is cleared.
+- `displayRules()` is called after every per-rule redirect save to re-render the badge immediately.
