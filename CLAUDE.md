@@ -316,3 +316,31 @@ A built-in Pomodoro timer that alternates between timed **work sessions** (redir
 - Stop button — sends `{ action: 'stopPomodoro' }`, then calls `initPomodoroUi()`.
 - `initPomodoroUi()` — reads `pomodoroEnabled / pomodoroState / pomodoroStartedAt / pomodoroWorkMinutes / pomodoroBreakMinutes` from sync storage, toggles button visibility, updates `#pomodoroStatus` text, and starts / clears a `setInterval` tick that updates `#pomodoroCountdown` every 500 ms. The countdown displays `MM:SS` remaining in the current phase. Applies CSS class `.pomo-work` (green) or `.pomo-break` (blue) to the countdown element.
 - Called once on page load (`initPomodoroUi()` at module level) so the UI is correct whether the user opens the page mid-session or not.
+
+### Lockdown / focus mode (feature #11)
+
+A hard lockdown mode that prevents the user from disabling the extension, modifying rules, or clearing the rule list for a configurable duration. The lock expires automatically; stopping it early requires first passing the PIN / password screen (if configured).
+
+**Storage keys** (in `chrome.storage.sync`, added to `DEFAULTS`):
+- `lockdownUntil` — `number | null`. Unix ms timestamp of when the current lockdown expires. `null` when not active.
+- `lockdownDurationSecs` — `number`, default `3600` (1 hour). Configured duration in seconds (1 s – 86400 s / 24 h).
+
+**background.js**:
+- `_lockdownUntilCache` — module-level `number | null` updated by `initLockdownCache()` and the `chrome.storage.onChanged` listener. Kept current so `isLockedDown()` is synchronous.
+- `isLockedDown()` — returns `true` when `_lockdownUntilCache` is a number in the future. Synchronous; safe to call from the `chrome.commands.onCommand` handler.
+- `initLockdownCache()` — reads `lockdownUntil` from `chrome.storage.sync` and populates the cache. Called in `onInstalled` and `onStartup`.
+- `startLockdown(durationSecs)` / `activateLockdown` — sets `lockdownUntil` = `Date.now() + durationSecs * 1000`, updates the cache, calls `updateRedirectRules()`, returns the `until` timestamp.
+- `stopLockdown()` — clears `lockdownUntil` (sets to `null`), resets cache, calls `updateRedirectRules()`.
+- `updateRedirectRules()` — reads `lockdownUntil`: if active, the `lockdownActive` flag forces `isEnabled = true` so the extension cannot be disabled by flipping `extensionEnabled` to `false`.
+- `chrome.storage.onChanged` — updates `_lockdownUntilCache` whenever `lockdownUntil` changes; also blocks writes of `extensionEnabled: false` during lockdown by immediately restoring `extensionEnabled: true`.
+- `chrome.commands.onCommand` — `toggle-extension` is a no-op when `isLockedDown()` returns `true`.
+- Message actions: `activateLockdown` (options.js canonical), `startLockdown` (alias), `stopLockdown`, `getLockdownState` (returns `{ active, until }`).
+- `LOCKDOWN_MAX_SECS = 86400` — cap applied to user input before starting lockdown.
+
+**options.html / options.js**:
+- `#lockdownSection` — section with `#lockdownActivePanel` (shown when active, contains countdown), `#lockdownSetupPanel` (shown when inactive, contains duration input + Activate button), and `#lockdownConfirmPanel` (confirmation step requiring the user to type `LOCK`).
+- `refreshLockdownUi()` — polls `getLockdownState`, shows/hides panels, starts/clears the countdown tick (`setInterval` at 500 ms), calls `_applyLockdownUiDisabled(locked)`.
+- `_applyLockdownUiDisabled(locked)` — disables/enables the Add Rule button, Clear All, enable toggle, and save-redirect button; adds/removes `.lockdown-active` on `#ruleList` (CSS hides Remove + toggle buttons while the class is present).
+- `refreshLockdownUi()` is called on page load and from `loadData()` so the state is always in sync.
+- Guards in `addRule()`, `removeRule()`, `clearAllRules()`, `bulkSetEnabled()`, and the import handler all read `lockdownUntil` directly and abort with an error message if the lock is active.
+- The lockdown duration input (`#lockdownDurationInput`) saves `lockdownDurationSecs` to `chrome.storage.sync` on change.

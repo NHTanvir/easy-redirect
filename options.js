@@ -489,6 +489,10 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             showStatus('Error loading data: ' + error.message, 'error');
         }
+        // Refresh lockdown UI state each time loadData() completes (feature #11).
+        // This ensures the active panel and countdown reflect the current state after
+        // any action that triggers a loadData() call (e.g. canceling a disable countdown).
+        if (typeof refreshLockdownUi === 'function') refreshLockdownUi();
     }
 
     // ---------------------------------------------------------------------------
@@ -1247,6 +1251,13 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
+        // Lockdown check (feature #11): adding rules is blocked during lockdown.
+        const ldAddChk = await chrome.storage.sync.get(['lockdownUntil']);
+        if (typeof ldAddChk.lockdownUntil === 'number' && ldAddChk.lockdownUntil > Date.now()) {
+            showStatus('Cannot add rules during lockdown.', 'error');
+            return;
+        }
+
         // Access code friction gate (feature #18): if enabled, show the challenge
         // and abort if the user cancels or fails to type the code correctly.
         const acResult = await chrome.storage.sync.get(['accessCode']);
@@ -1281,6 +1292,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function removeRule(ruleId) {
         try {
+            // Lockdown check (feature #11).
+            const ldChk = await chrome.storage.sync.get(['lockdownUntil']);
+            if (typeof ldChk.lockdownUntil === 'number' && ldChk.lockdownUntil > Date.now()) {
+                showStatus('Cannot remove rules during lockdown.', 'error');
+                return;
+            }
             const result = await chrome.storage.sync.get(['rules']);
             const rules = Array.isArray(result.rules) ? result.rules : [];
 
@@ -1361,6 +1378,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function clearAllWebsites() {
+        // Lockdown check (feature #11).
+        const ldChk = await chrome.storage.sync.get(['lockdownUntil']);
+        if (typeof ldChk.lockdownUntil === 'number' && ldChk.lockdownUntil > Date.now()) {
+            showStatus('Cannot clear rules during lockdown.', 'error');
+            return;
+        }
         const result = await chrome.storage.sync.get(['mode']);
         const mode = MODES.includes(result.mode) ? result.mode : 'blocklist';
         const label = mode === 'allowlist' ? 'allowed sites' : 'block rules';
@@ -1378,6 +1401,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function toggleExtension() {
         try {
+            // Check lockdown state (feature #11) before allowing disable.
+            const ldResult = await chrome.storage.sync.get(['lockdownUntil']);
+            const lockdownUntil = ldResult.lockdownUntil;
+            if (typeof lockdownUntil === 'number' && lockdownUntil > Date.now()) {
+                showStatus('Cannot disable during lockdown.', 'error');
+                return;
+            }
+
             const result = await chrome.storage.sync.get(['extensionEnabled']);
             const isEnabled = result.extensionEnabled !== false;
             const newState = !isEnabled;
@@ -1684,6 +1715,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // select panel. Operates on the global rules array so groups not currently
     // shown are NOT affected — only the rules visible in the current group view.
     async function bulkSetEnabled(visibleRules, enable) {
+        // Lockdown check (feature #11).
+        const ldBulkChk = await chrome.storage.sync.get(['lockdownUntil']);
+        if (typeof ldBulkChk.lockdownUntil === 'number' && ldBulkChk.lockdownUntil > Date.now()) {
+            showStatus('Cannot change rules during lockdown.', 'error');
+            return;
+        }
         const checkboxes = websiteListDiv.querySelectorAll('.rule-select-checkbox:checked');
         const selectedIds = new Set([...checkboxes].map(cb => cb.dataset.ruleId));
         if (selectedIds.size === 0) {
@@ -2165,6 +2202,13 @@ document.addEventListener('DOMContentLoaded', function() {
     importFile.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
+        // Lockdown check (feature #11): importing rules is blocked during lockdown.
+        const ldImportChk = await chrome.storage.sync.get(['lockdownUntil']);
+        if (typeof ldImportChk.lockdownUntil === 'number' && ldImportChk.lockdownUntil > Date.now()) {
+            showStatus('Cannot import rules during lockdown.', 'error');
+            importFile.value = '';
+            return;
+        }
         const text = await file.text();
         const mode = document.querySelector('input[name="importMode"]:checked').value;
         if (file.name.endsWith('.json')) {
@@ -2179,4 +2223,146 @@ document.addEventListener('DOMContentLoaded', function() {
     window.removeRule = removeRule;
     window.addException = addException;
     window.removeException = removeException;
+
+    // ---------------------------------------------------------------------------
+    // Lockdown / focus mode (feature #11)
+    // ---------------------------------------------------------------------------
+
+    let _lockdownTickInterval = null;
+
+    // Read current lockdown state from background and update the lockdown UI.
+    function refreshLockdownUi() {
+        chrome.runtime.sendMessage({ action: 'getLockdownState' }, response => {
+            const activePanel = document.getElementById('lockdownActivePanel');
+            const setupPanel = document.getElementById('lockdownSetupPanel');
+            const countdownEl = document.getElementById('lockdownCountdown');
+            const statusEl = document.getElementById('lockdownStatus');
+
+            if (!activePanel || !setupPanel) return;
+
+            if (response && response.active) {
+                activePanel.style.display = '';
+                setupPanel.style.display = 'none';
+                // Start live countdown tick.
+                if (_lockdownTickInterval) clearInterval(_lockdownTickInterval);
+                function tickCountdown() {
+                    const remaining = Math.max(0, Math.ceil((response.until - Date.now()) / 1000));
+                    const h = Math.floor(remaining / 3600);
+                    const m = Math.floor((remaining % 3600) / 60);
+                    const s = remaining % 60;
+                    const display = h > 0
+                        ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+                        : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+                    if (countdownEl) countdownEl.textContent = display;
+                    if (remaining === 0) {
+                        clearInterval(_lockdownTickInterval);
+                        _lockdownTickInterval = null;
+                        setTimeout(refreshLockdownUi, 2000);
+                    }
+                }
+                tickCountdown();
+                _lockdownTickInterval = setInterval(tickCountdown, 500);
+
+                // Also disable mutating UI controls while locked.
+                _applyLockdownUiDisabled(true);
+            } else {
+                activePanel.style.display = 'none';
+                setupPanel.style.display = '';
+                if (_lockdownTickInterval) { clearInterval(_lockdownTickInterval); _lockdownTickInterval = null; }
+                if (countdownEl) countdownEl.textContent = '';
+                _applyLockdownUiDisabled(false);
+            }
+        });
+    }
+
+    // Show/hide the confirm panel based on the lockdown state.
+    function _applyLockdownUiDisabled(locked) {
+        // Disable the main add-rule form, enable/disable toggles, remove buttons.
+        const addRuleBtn = document.getElementById('addRuleBtn');
+        const clearAllBtn = document.getElementById('clearAllBtn');
+        const enableToggleBtn = document.getElementById('enableToggle');
+        const redirectUrlInput = document.getElementById('redirectUrl');
+        const saveRedirectBtn = document.getElementById('saveRedirectBtn');
+
+        [addRuleBtn, clearAllBtn, enableToggleBtn, saveRedirectBtn].forEach(el => {
+            if (el) el.disabled = locked;
+        });
+        if (redirectUrlInput) redirectUrlInput.disabled = locked;
+
+        // Update rule-row buttons (Remove, toggle) — use a class on the list.
+        const ruleList = document.getElementById('ruleList');
+        if (ruleList) {
+            if (locked) ruleList.classList.add('lockdown-active');
+            else ruleList.classList.remove('lockdown-active');
+        }
+    }
+
+    // Wire up the confirm flow.
+    const lockdownActivateBtn = document.getElementById('lockdownActivateBtn');
+    const lockdownConfirmPanel = document.getElementById('lockdownConfirmPanel');
+    const lockdownConfirmInput = document.getElementById('lockdownConfirmInput');
+    const lockdownConfirmBtn = document.getElementById('lockdownConfirmBtn');
+    const lockdownCancelBtn = document.getElementById('lockdownCancelBtn');
+    const lockdownStatusEl = document.getElementById('lockdownStatus');
+
+    if (lockdownActivateBtn) {
+        lockdownActivateBtn.addEventListener('click', () => {
+            if (lockdownConfirmPanel) lockdownConfirmPanel.style.display = '';
+            if (lockdownConfirmInput) { lockdownConfirmInput.value = ''; lockdownConfirmInput.focus(); }
+            if (lockdownConfirmBtn) lockdownConfirmBtn.disabled = true;
+        });
+    }
+    if (lockdownConfirmInput) {
+        lockdownConfirmInput.addEventListener('input', () => {
+            if (lockdownConfirmBtn) {
+                lockdownConfirmBtn.disabled = lockdownConfirmInput.value.trim().toUpperCase() !== 'LOCK';
+            }
+        });
+    }
+    if (lockdownCancelBtn) {
+        lockdownCancelBtn.addEventListener('click', () => {
+            if (lockdownConfirmPanel) lockdownConfirmPanel.style.display = 'none';
+            if (lockdownConfirmInput) lockdownConfirmInput.value = '';
+        });
+    }
+    if (lockdownConfirmBtn) {
+        lockdownConfirmBtn.addEventListener('click', async () => {
+            const durationInput = document.getElementById('lockdownDurationInput');
+            const scopeSelect = document.getElementById('lockdownScopeSelect');
+            const mins = Math.max(1, Math.min(1440, parseInt(durationInput && durationInput.value, 10) || 60));
+            const scope = (scopeSelect && scopeSelect.value) || 'all';
+            if (lockdownConfirmPanel) lockdownConfirmPanel.style.display = 'none';
+            chrome.runtime.sendMessage(
+                { action: 'activateLockdown', durationSecs: mins * 60, scope },
+                response => {
+                    if (response && response.success) {
+                        if (lockdownStatusEl) lockdownStatusEl.textContent = 'Lockdown activated.';
+                        refreshLockdownUi();
+                    } else {
+                        if (lockdownStatusEl) lockdownStatusEl.textContent = 'Error activating lockdown.';
+                    }
+                }
+            );
+        });
+    }
+
+    // Populate the last-used duration from storage on page load.
+    chrome.storage.sync.get(['lockdownDurationSecs', 'lockdownUntil'], result => {
+        const durationInput = document.getElementById('lockdownDurationInput');
+        if (durationInput && typeof result.lockdownDurationSecs === 'number') {
+            durationInput.value = Math.round(result.lockdownDurationSecs / 60);
+        }
+    });
+
+    // Persist the chosen duration whenever it changes so it survives page reloads.
+    const _lockDurInput = document.getElementById('lockdownDurationInput');
+    if (_lockDurInput) {
+        _lockDurInput.addEventListener('change', () => {
+            const mins = Math.max(1, Math.min(1440, parseInt(_lockDurInput.value, 10) || 60));
+            chrome.storage.sync.set({ lockdownDurationSecs: mins * 60 });
+        });
+    }
+
+    // Initialise lockdown UI on page load.
+    refreshLockdownUi();
 });
