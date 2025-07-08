@@ -134,6 +134,26 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('saveRedirectUrl').addEventListener('click', saveRedirectUrl);
     document.getElementById('addWebsite').addEventListener('click', addRule);
     document.getElementById('clearAll').addEventListener('click', clearAllWebsites);
+
+    // Reset all delay allow-windows (feature #12): clear every allowedUntil:* key
+    // from chrome.storage.local so the next visit re-triggers the countdown.
+    const resetAllowWindowsBtn = document.getElementById('resetAllowWindowsBtn');
+    if (resetAllowWindowsBtn) {
+        resetAllowWindowsBtn.addEventListener('click', async () => {
+            try {
+                const all = await chrome.storage.local.get(null);
+                const keys = Object.keys(all).filter(k => k.startsWith('allowedUntil:'));
+                if (keys.length === 0) {
+                    showStatus('No active allow windows to reset.', 'success');
+                    return;
+                }
+                await chrome.storage.local.remove(keys);
+                showStatus(`Reset ${keys.length} delay allow window${keys.length > 1 ? 's' : ''}.`, 'success');
+            } catch (err) {
+                showStatus('Error resetting allow windows: ' + err.message, 'error');
+            }
+        });
+    }
     document.getElementById('toggleBtn').addEventListener('click', toggleExtension);
     modeBlocklistBtn.addEventListener('click', () => switchMode('blocklist'));
     modeAllowlistBtn.addEventListener('click', () => switchMode('allowlist'));
@@ -1041,6 +1061,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 openScheduleModal(group);
             });
             wrapper.appendChild(schedCtrl);
+
+            // Delay indicator and edit button — shown for all groups (feature #12).
+            const delayCtrl = document.createElement('button');
+            const hasDelay = typeof group.delaySeconds === 'number' && group.delaySeconds > 0;
+            delayCtrl.style.cssText =
+                'font-size:10px;padding:2px 5px;margin-top:0;border-radius:10px;' +
+                (hasDelay ? 'background:#6a1b9a;color:#fff;' : 'background:var(--bg-section);color:var(--text-muted);border:1px solid var(--border);');
+            delayCtrl.title = hasDelay
+                ? `Countdown delay: ${group.delaySeconds}s${group.allowWindowSecs > 0 ? `, window: ${group.allowWindowSecs}s` : ''}`
+                : 'Set redirect delay (none)';
+            delayCtrl.textContent = hasDelay ? `${group.delaySeconds}s` : '⏱';
+            delayCtrl.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openDelayModal(group);
+            });
+            wrapper.appendChild(delayCtrl);
 
             // Toggle + delete controls — only for non-default groups.
             if (group.id !== 'default') {
@@ -2041,6 +2077,98 @@ document.addEventListener('DOMContentLoaded', function() {
     if (scheduleModal) {
         scheduleModal.addEventListener('click', (e) => {
             if (e.target === scheduleModal) closeScheduleModal();
+        });
+    }
+
+    // ---------------------------------------------------------------------------
+    // Per-group delay / cool-off editor (feature #12)
+    // ---------------------------------------------------------------------------
+
+    let _delayTargetGroupId = null;
+
+    function openDelayModal(group) {
+        _delayTargetGroupId = group.id;
+        const modal = document.getElementById('delayModal');
+        const nameEl = document.getElementById('delayGroupName');
+        const secsEl = document.getElementById('delaySecsInput');
+        const winEl  = document.getElementById('delayWindowInput');
+        const statusEl = document.getElementById('delayStatus');
+        if (!modal) return;
+        if (nameEl) nameEl.textContent = group.name;
+        if (statusEl) statusEl.textContent = '';
+        if (secsEl) secsEl.value = typeof group.delaySeconds === 'number' ? group.delaySeconds : 0;
+        if (winEl)  winEl.value  = typeof group.allowWindowSecs === 'number' ? group.allowWindowSecs : 0;
+        modal.style.display = 'flex';
+    }
+
+    function closeDelayModal() {
+        const modal = document.getElementById('delayModal');
+        if (modal) modal.style.display = 'none';
+        _delayTargetGroupId = null;
+    }
+
+    const saveDelayBtn = document.getElementById('saveDelayBtn');
+    if (saveDelayBtn) {
+        saveDelayBtn.addEventListener('click', async () => {
+            if (!_delayTargetGroupId) return;
+            const secsEl = document.getElementById('delaySecsInput');
+            const winEl  = document.getElementById('delayWindowInput');
+            const statusEl = document.getElementById('delayStatus');
+            const delaySecs   = Math.max(0, Math.min(3600, parseInt((secsEl && secsEl.value) || '0', 10)));
+            const windowSecs  = Math.max(0, Math.min(86400, parseInt((winEl  && winEl.value)  || '0', 10)));
+            try {
+                const result = await chrome.storage.sync.get(['groups']);
+                const groups = Array.isArray(result.groups) ? result.groups : [];
+                const updated = groups.map(g =>
+                    g.id === _delayTargetGroupId
+                        ? { ...g, delaySeconds: delaySecs, allowWindowSecs: windowSecs }
+                        : g
+                );
+                await chrome.storage.sync.set({ groups: updated });
+                currentGroups = updated;
+                await updateRedirectRules();
+                renderGroupTabs(currentGroups);
+                closeDelayModal();
+                showStatus(delaySecs > 0
+                    ? `Delay set: ${delaySecs}s countdown${windowSecs > 0 ? `, ${windowSecs}s allow window` : ''}.`
+                    : 'Delay disabled (immediate redirect).', 'success');
+            } catch (err) {
+                if (statusEl) { statusEl.textContent = 'Error: ' + err.message; statusEl.style.color = '#c62828'; }
+            }
+        });
+    }
+
+    const clearDelayBtn = document.getElementById('clearDelayBtn');
+    if (clearDelayBtn) {
+        clearDelayBtn.addEventListener('click', async () => {
+            if (!_delayTargetGroupId) return;
+            try {
+                const result = await chrome.storage.sync.get(['groups']);
+                const groups = Array.isArray(result.groups) ? result.groups : [];
+                const updated = groups.map(g =>
+                    g.id === _delayTargetGroupId ? { ...g, delaySeconds: 0, allowWindowSecs: 0 } : g
+                );
+                await chrome.storage.sync.set({ groups: updated });
+                currentGroups = updated;
+                await updateRedirectRules();
+                renderGroupTabs(currentGroups);
+                closeDelayModal();
+                showStatus('Delay cleared — immediate redirect.', 'success');
+            } catch (err) {
+                showStatus('Error clearing delay: ' + err.message, 'error');
+            }
+        });
+    }
+
+    const cancelDelayBtn = document.getElementById('cancelDelayBtn');
+    if (cancelDelayBtn) {
+        cancelDelayBtn.addEventListener('click', closeDelayModal);
+    }
+
+    const delayModal = document.getElementById('delayModal');
+    if (delayModal) {
+        delayModal.addEventListener('click', (e) => {
+            if (e.target === delayModal) closeDelayModal();
         });
     }
 

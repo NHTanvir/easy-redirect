@@ -344,3 +344,37 @@ A hard lockdown mode that prevents the user from disabling the extension, modify
 - `refreshLockdownUi()` is called on page load and from `loadData()` so the state is always in sync.
 - Guards in `addRule()`, `removeRule()`, `clearAllRules()`, `bulkSetEnabled()`, and the import handler all read `lockdownUntil` directly and abort with an error message if the lock is active.
 - The lockdown duration input (`#lockdownDurationInput`) saves `lockdownDurationSecs` to `chrome.storage.sync` on change.
+
+### Delay / cool-off countdown (feature #12)
+
+Per-group redirect delay that shows an interstitial countdown page before completing
+the redirect. Useful as friction / cool-off before letting the redirect fire.
+
+**Group schema additions** (backfilled by `runSchemaMigration()`):
+- `delaySeconds` — `number`, default `0` (immediate). When > 0, redirect goes to countdown page.
+- `allowWindowSecs` — `number`, default `0`. After the countdown completes, the user may visit
+  the site for this many seconds without another countdown. `0` means every visit triggers one.
+
+**background.js**:
+- `createRedirectRules()` — when `group.delaySeconds > 0` in blocklist mode, `finalRedirectUrl`
+  is replaced with `chrome-extension://<id>/countdown.html?to=…&delay=…&window=…&ruleId=…`.
+  The `ruleId` param is the source rule's `id` string (not its DNR integer).
+- Allow-window tracking uses `chrome.storage.local` key `allowedUntil:<ruleId>` (epoch ms).
+  The countdown page writes this key on completion; future redirects check it before starting.
+
+**countdown.html + countdown.js**:
+- Full-page interstitial with an SVG ring countdown timer.
+- `checkAllowWindowThenStart()` reads `allowedUntil:<ruleId>` first; if still valid, navigates
+  immediately to the original URL without showing the countdown.
+- After the countdown, `navigateToFrom()` writes the allow window to local storage and redirects
+  to `fromUrl` (the page the user wanted), not to the blocked-page redirect.
+- "Continue anyway" appears immediately and skips the wait.
+- "Go back" uses `history.back()` or falls back to the redirect target.
+
+**options.html / options.js**:
+- Each group tab shows a delay indicator button (purple when active). Clicking opens a modal
+  with "Countdown (seconds)" and "Allow window (seconds)" number inputs.
+- `openDelayModal(group)` / `closeDelayModal()` manage the `#delayModal` overlay.
+- Save patches `delaySeconds` and `allowWindowSecs` on the group and calls `updateRedirectRules()`.
+- "Reset delay windows" button (Block Rules section footer) clears all `allowedUntil:*` keys
+  from `chrome.storage.local` — resets the allow window for every rule without changing settings.
