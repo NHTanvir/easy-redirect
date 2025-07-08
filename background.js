@@ -265,7 +265,11 @@ function createRule(pattern, type, opts = {}) {
         // Daily quota: maximum redirects allowed per calendar day (UTC). null
         // means no limit. When the day's hit count reaches this value the rule's
         // DNR entries are removed until the midnight alarm resets dailyCounts.
-        quota: opts.quota !== undefined ? opts.quota : null
+        quota: opts.quota !== undefined ? opts.quota : null,
+        // Per-rule redirect URL override (feature #14). When set, this takes
+        // precedence over the group redirect URL and the global redirect URL.
+        // null means "use the group/global default".
+        redirectUrl: opts.redirectUrl || null
     };
     // Every rule type carries an exceptions[] list — URL patterns that should
     // NOT be redirected even though the parent rule would match. Exceptions are
@@ -690,10 +694,18 @@ async function runSchemaMigration() {
     let next = migrateLegacyBlockedWebsites(current);
 
     // Backfill groupId='default' on rules that predate groups (created before #7).
+    // Also backfill redirectUrl: null on rules that predate feature #14.
     const existingRules = Array.isArray(next.rules) ? next.rules : [];
     const rulesNeedGroupId = existingRules.some(r => !r.groupId);
-    const backfilledRules = rulesNeedGroupId
-        ? existingRules.map(r => r.groupId ? r : { ...r, groupId: 'default' })
+    const rulesNeedRedirectUrl = existingRules.some(r => !('redirectUrl' in r));
+    const needsRuleBackfill = rulesNeedGroupId || rulesNeedRedirectUrl;
+    const backfilledRules = needsRuleBackfill
+        ? existingRules.map(r => {
+            let out = r;
+            if (!r.groupId) out = { ...out, groupId: 'default' };
+            if (!('redirectUrl' in r)) out = { ...out, redirectUrl: null };
+            return out;
+        })
         : existingRules;
 
     // Ensure groups[] always has the Default group. If the key is missing or
@@ -715,7 +727,7 @@ async function runSchemaMigration() {
         groups = groups.map(g => ('delaySeconds' in g) ? g : { ...g, delaySeconds: 0, allowWindowSecs: 0 });
     }
 
-    const changed = next !== current || rulesNeedGroupId || !hasDefault || groupsNeedSchedule || groupsNeedDelay;
+    const changed = next !== current || needsRuleBackfill || !hasDefault || groupsNeedSchedule || groupsNeedDelay;
     if (!changed) {
         return;
     }
@@ -1227,8 +1239,16 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
             }
 
             // Redirect URL precedence: rule.redirectUrl > group.redirectUrl > global.
-            const effectiveRedirectUrl = (rule.redirectUrl) ||
-                (group && group.redirectUrl) ||
+            // Per-rule and per-group URLs are validated by the UI before storage, but
+            // we double-check here: if a stored URL is not a valid absolute URL we
+            // fall through to the next level rather than emitting a broken redirect.
+            function isValidUrl(url) {
+                if (!url || typeof url !== 'string') return false;
+                try { new URL(url); return true; } catch (_) { return false; }
+            }
+            const effectiveRedirectUrl =
+                (isValidUrl(rule.redirectUrl)          ? rule.redirectUrl          : null) ||
+                (isValidUrl(group && group.redirectUrl) ? group.redirectUrl         : null) ||
                 redirectUrl;
 
             // Delay / cool-off countdown (feature #12). When the group has a

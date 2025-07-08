@@ -1721,6 +1721,21 @@ document.addEventListener('DOMContentLoaded', function() {
             ).join('');
             const toggleClass = isEnabled ? 'rule-toggle-btn' : 'rule-toggle-btn rule-disabled-btn';
             const quotaVal = (rule.quota !== null && rule.quota !== undefined) ? rule.quota : '';
+            // Compute effective redirect URL for this rule so the UI can show
+            // which URL will actually be used (precedence: rule > group > global).
+            const ruleGroup = currentGroups.find(g => g.id === (rule.groupId || 'default')) || null;
+            function _isValidUrl(u) { if (!u || typeof u !== 'string') return false; try { new URL(u); return true; } catch (_) { return false; } }
+            const effectiveRedirectUrl =
+                (_isValidUrl(rule.redirectUrl) ? rule.redirectUrl : null) ||
+                (_isValidUrl(ruleGroup && ruleGroup.redirectUrl) ? ruleGroup.redirectUrl : null) ||
+                (redirectUrlInput ? redirectUrlInput.value.trim() : 'https://www.google.com') ||
+                'https://www.google.com';
+            const effectiveSource = rule.redirectUrl ? 'rule' : (ruleGroup && ruleGroup.redirectUrl ? 'group' : 'global');
+            const effectiveLabel = effectiveSource === 'rule' ? '' : ` <span style="font-size:10px;opacity:0.7;">(from ${effectiveSource})</span>`;
+            // Detect an invalid stored per-rule URL so the UI can warn the user.
+            // background.js falls back gracefully when the URL is malformed, but the
+            // user should know to fix or clear it so the override actually takes effect.
+            const hasInvalidRuleUrl = rule.redirectUrl && !_isValidUrl(rule.redirectUrl);
             return `
                 <div class="website-item${isEnabled ? '' : ' rule-disabled'}" data-rule-id="${escapeHtml(rule.id)}">
                     <div class="rule-main-row">
@@ -1748,6 +1763,21 @@ document.addEventListener('DOMContentLoaded', function() {
                             title="Max redirects per day (leave blank for no limit)"
                             style="width:64px;padding:2px 6px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
                         <span class="rule-today-count" data-rule-id="${escapeHtml(rule.id)}" style="color:var(--text-muted);"></span>
+                    </div>
+                    <div class="rule-redirect-row" style="display:flex;flex-direction:column;gap:3px;margin-top:4px;font-size:12px;color:var(--text-muted);">
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <label style="white-space:nowrap;" title="Override the redirect URL for this rule only">Redirect to:</label>
+                            <input type="url" class="rule-redirect-input" data-rule-id="${escapeHtml(rule.id)}"
+                                value="${escapeHtml(rule.redirectUrl || '')}"
+                                placeholder="(use group / global default)"
+                                title="Per-rule redirect URL override. Leave blank to use group or global default."
+                                style="flex:1;min-width:180px;padding:2px 6px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
+                            ${rule.redirectUrl ? `<span style="font-size:11px;padding:1px 6px;border-radius:8px;background:#4a148c;color:#fff;white-space:nowrap;" title="This rule has its own redirect URL">custom</span>` : ''}
+                            ${hasInvalidRuleUrl ? `<span style="font-size:11px;padding:1px 6px;border-radius:8px;background:#c62828;color:#fff;white-space:nowrap;" title="The stored redirect URL is invalid and will be ignored — clear or fix it">invalid URL</span>` : ''}
+                        </div>
+                        <div style="font-size:11px;opacity:0.75;padding-left:72px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="Effective redirect URL for this rule">
+                            &#8618; ${escapeHtml(effectiveRedirectUrl)}${effectiveLabel}
+                        </div>
                     </div>
                     ${exceptions.length > 0 ? `<div class="exception-list">${exceptionItems}</div>` : ''}
                 </div>
@@ -1806,6 +1836,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 const next = allRules.map(r => r.id === ruleId ? { ...r, quota: newQuota } : r);
                 await chrome.storage.sync.set({ rules: next });
                 await updateRedirectRules();
+            });
+        });
+        // Per-rule redirect URL input — save on change (feature #14).
+        websiteListDiv.querySelectorAll('.rule-redirect-input').forEach(input => {
+            input.addEventListener('change', async () => {
+                const ruleId = input.dataset.ruleId;
+                const raw = input.value.trim();
+                // Validate — empty string clears the override; non-empty must be absolute URL.
+                let newRedirectUrl = null;
+                if (raw !== '') {
+                    try {
+                        new URL(raw); // throws if invalid
+                        newRedirectUrl = raw;
+                    } catch (_) {
+                        showStatus('Invalid redirect URL — must start with https:// or similar.', 'error');
+                        return;
+                    }
+                }
+                const result = await chrome.storage.sync.get(['rules']);
+                const allRules = Array.isArray(result.rules) ? result.rules : [];
+                const next = allRules.map(r => r.id === ruleId ? { ...r, redirectUrl: newRedirectUrl } : r);
+                await chrome.storage.sync.set({ rules: next });
+                await updateRedirectRules();
+                displayRules(next); // re-render to show/hide the 'custom' badge
             });
         });
 
@@ -1989,8 +2043,17 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('saveGroupRedirect').addEventListener('click', async () => {
             const raw = (document.getElementById('groupRedirectInput').value || '').trim();
             let url = raw;
-            if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
+            // Auto-prepend https:// if the user omitted the scheme.
+            if (url && !url.startsWith('http://') && !url.startsWith('https://') &&
+                !url.startsWith('chrome-extension://')) {
                 url = 'https://' + url;
+            }
+            // Validate — must be empty (clear) or a parseable absolute URL.
+            if (url) {
+                try { new URL(url); } catch (_) {
+                    showStatus('Invalid URL — must start with https:// or similar.', 'error');
+                    return;
+                }
             }
             try {
                 const result = await chrome.storage.sync.get(['groups']);
@@ -2001,8 +2064,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 await chrome.storage.sync.set({ groups: updated });
                 currentGroups = updated;
                 await updateRedirectRules();
+                renderGroupTabs(currentGroups);
                 showStatus(
-                    url ? `Redirect URL for "${group.name}" set to ${url}.` : `Redirect URL for "${group.name}" cleared.`,
+                    url ? `Redirect URL for "${group.name}" set to ${url}.` : `Redirect URL for "${group.name}" cleared (uses global).`,
                     'success'
                 );
             } catch (error) {
