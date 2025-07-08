@@ -2022,8 +2022,17 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('saveGroupRedirect').addEventListener('click', async () => {
             const raw = (document.getElementById('groupRedirectInput').value || '').trim();
             let url = raw;
-            if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
+            // Auto-prepend https:// if the user omitted the scheme.
+            if (url && !url.startsWith('http://') && !url.startsWith('https://') &&
+                !url.startsWith('chrome-extension://')) {
                 url = 'https://' + url;
+            }
+            // Validate — must be empty (clear) or a parseable absolute URL.
+            if (url) {
+                try { new URL(url); } catch (_) {
+                    showStatus('Invalid URL — must start with https:// or similar.', 'error');
+                    return;
+                }
             }
             try {
                 const result = await chrome.storage.sync.get(['groups']);
@@ -2034,8 +2043,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 await chrome.storage.sync.set({ groups: updated });
                 currentGroups = updated;
                 await updateRedirectRules();
+                renderGroupTabs(currentGroups);
                 showStatus(
-                    url ? `Redirect URL for "${group.name}" set to ${url}.` : `Redirect URL for "${group.name}" cleared.`,
+                    url ? `Redirect URL for "${group.name}" set to ${url}.` : `Redirect URL for "${group.name}" cleared (uses global).`,
                     'success'
                 );
             } catch (error) {
