@@ -2179,4 +2179,137 @@ document.addEventListener('DOMContentLoaded', function() {
     window.removeRule = removeRule;
     window.addException = addException;
     window.removeException = removeException;
+
+    // ---------------------------------------------------------------------------
+    // Lockdown / focus mode (feature #11)
+    // ---------------------------------------------------------------------------
+
+    let _lockdownTickInterval = null;
+
+    // Read current lockdown state from background and update the lockdown UI.
+    function refreshLockdownUi() {
+        chrome.runtime.sendMessage({ action: 'getLockdownState' }, response => {
+            const activePanel = document.getElementById('lockdownActivePanel');
+            const setupPanel = document.getElementById('lockdownSetupPanel');
+            const countdownEl = document.getElementById('lockdownCountdown');
+            const statusEl = document.getElementById('lockdownStatus');
+
+            if (!activePanel || !setupPanel) return;
+
+            if (response && response.active) {
+                activePanel.style.display = '';
+                setupPanel.style.display = 'none';
+                // Start live countdown tick.
+                if (_lockdownTickInterval) clearInterval(_lockdownTickInterval);
+                function tickCountdown() {
+                    const remaining = Math.max(0, Math.ceil((response.until - Date.now()) / 1000));
+                    const h = Math.floor(remaining / 3600);
+                    const m = Math.floor((remaining % 3600) / 60);
+                    const s = remaining % 60;
+                    const display = h > 0
+                        ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+                        : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+                    if (countdownEl) countdownEl.textContent = display;
+                    if (remaining === 0) {
+                        clearInterval(_lockdownTickInterval);
+                        _lockdownTickInterval = null;
+                        setTimeout(refreshLockdownUi, 2000);
+                    }
+                }
+                tickCountdown();
+                _lockdownTickInterval = setInterval(tickCountdown, 500);
+
+                // Also disable mutating UI controls while locked.
+                _applyLockdownUiDisabled(true);
+            } else {
+                activePanel.style.display = 'none';
+                setupPanel.style.display = '';
+                if (_lockdownTickInterval) { clearInterval(_lockdownTickInterval); _lockdownTickInterval = null; }
+                if (countdownEl) countdownEl.textContent = '';
+                _applyLockdownUiDisabled(false);
+            }
+        });
+    }
+
+    // Show/hide the confirm panel based on the lockdown state.
+    function _applyLockdownUiDisabled(locked) {
+        // Disable the main add-rule form, enable/disable toggles, remove buttons.
+        const addRuleBtn = document.getElementById('addRuleBtn');
+        const clearAllBtn = document.getElementById('clearAllBtn');
+        const enableToggleBtn = document.getElementById('enableToggle');
+        const redirectUrlInput = document.getElementById('redirectUrl');
+        const saveRedirectBtn = document.getElementById('saveRedirectBtn');
+
+        [addRuleBtn, clearAllBtn, enableToggleBtn, saveRedirectBtn].forEach(el => {
+            if (el) el.disabled = locked;
+        });
+        if (redirectUrlInput) redirectUrlInput.disabled = locked;
+
+        // Update rule-row buttons (Remove, toggle) — use a class on the list.
+        const ruleList = document.getElementById('ruleList');
+        if (ruleList) {
+            if (locked) ruleList.classList.add('lockdown-active');
+            else ruleList.classList.remove('lockdown-active');
+        }
+    }
+
+    // Wire up the confirm flow.
+    const lockdownActivateBtn = document.getElementById('lockdownActivateBtn');
+    const lockdownConfirmPanel = document.getElementById('lockdownConfirmPanel');
+    const lockdownConfirmInput = document.getElementById('lockdownConfirmInput');
+    const lockdownConfirmBtn = document.getElementById('lockdownConfirmBtn');
+    const lockdownCancelBtn = document.getElementById('lockdownCancelBtn');
+    const lockdownStatusEl = document.getElementById('lockdownStatus');
+
+    if (lockdownActivateBtn) {
+        lockdownActivateBtn.addEventListener('click', () => {
+            if (lockdownConfirmPanel) lockdownConfirmPanel.style.display = '';
+            if (lockdownConfirmInput) { lockdownConfirmInput.value = ''; lockdownConfirmInput.focus(); }
+            if (lockdownConfirmBtn) lockdownConfirmBtn.disabled = true;
+        });
+    }
+    if (lockdownConfirmInput) {
+        lockdownConfirmInput.addEventListener('input', () => {
+            if (lockdownConfirmBtn) {
+                lockdownConfirmBtn.disabled = lockdownConfirmInput.value.trim().toUpperCase() !== 'LOCK';
+            }
+        });
+    }
+    if (lockdownCancelBtn) {
+        lockdownCancelBtn.addEventListener('click', () => {
+            if (lockdownConfirmPanel) lockdownConfirmPanel.style.display = 'none';
+            if (lockdownConfirmInput) lockdownConfirmInput.value = '';
+        });
+    }
+    if (lockdownConfirmBtn) {
+        lockdownConfirmBtn.addEventListener('click', async () => {
+            const durationInput = document.getElementById('lockdownDurationInput');
+            const scopeSelect = document.getElementById('lockdownScopeSelect');
+            const mins = Math.max(1, Math.min(1440, parseInt(durationInput && durationInput.value, 10) || 60));
+            const scope = (scopeSelect && scopeSelect.value) || 'all';
+            if (lockdownConfirmPanel) lockdownConfirmPanel.style.display = 'none';
+            chrome.runtime.sendMessage(
+                { action: 'activateLockdown', durationSecs: mins * 60, scope },
+                response => {
+                    if (response && response.success) {
+                        if (lockdownStatusEl) lockdownStatusEl.textContent = 'Lockdown activated.';
+                        refreshLockdownUi();
+                    } else {
+                        if (lockdownStatusEl) lockdownStatusEl.textContent = 'Error activating lockdown.';
+                    }
+                }
+            );
+        });
+    }
+
+    // Populate the last-used duration from storage on page load.
+    chrome.storage.sync.get(['lockdownDurationSecs', 'lockdownUntil'], result => {
+        const durationInput = document.getElementById('lockdownDurationInput');
+        if (durationInput && typeof result.lockdownDurationSecs === 'number') {
+            durationInput.value = Math.round(result.lockdownDurationSecs / 60);
+        }
+    });
+
+    // Initialise lockdown UI on page load.
+    refreshLockdownUi();
 });

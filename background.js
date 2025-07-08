@@ -801,6 +801,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
         return true;
     }
+    // Start a lockdown session (feature #11). Sets lockdownUntil to now + duration
+    // and updates the cache so isLockedDown() is immediately accurate.
+    if (request.action === 'startLockdown') {
+        startLockdown(request.durationSecs)
+            .then(endsAt => sendResponse({ success: true, endsAt }))
+            .catch(err => sendResponse({ success: false, error: String(err && err.message || err) }));
+        return true;
+    }
+    // Stop an active lockdown session (feature #11). This is an emergency escape
+    // hatch that requires the user to have passed the PIN/password lock screen
+    // first (options.js enforces this before sending the message).
+    if (request.action === 'stopLockdown') {
+        stopLockdown()
+            .then(() => sendResponse({ success: true }))
+            .catch(err => sendResponse({ success: false, error: String(err && err.message || err) }));
+        return true;
+    }
+    // Query whether lockdown is currently active. Returns endsAt (ms epoch) or null.
+    if (request.action === 'getLockdownState') {
+        chrome.storage.sync.get(['lockdownUntil'], result => {
+            const endsAt = result.lockdownUntil;
+            const active = typeof endsAt === 'number' && Date.now() < endsAt;
+            sendResponse({ active, endsAt: active ? endsAt : null });
+        });
+        return true;
+    }
 });
 
 async function handleKeywordHit(sender, request) {
@@ -809,6 +835,35 @@ async function handleKeywordHit(sender, request) {
     if (settings.extensionEnabled === false) return;
     const target = settings.redirectUrl || 'https://www.google.com';
     await chrome.tabs.update(sender.tab.id, { url: target });
+}
+
+// Maximum lockdown duration in seconds (24 hours). User values above this cap
+// are clamped before the session starts.
+const LOCKDOWN_MAX_SECS = 86400;
+
+// Start a lockdown session of `durationSecs` seconds (defaults to
+// lockdownDurationSecs from storage). Updates the cache immediately so
+// isLockedDown() reflects the new state without a round-trip.
+async function startLockdown(durationSecs) {
+    const result = await chrome.storage.sync.get(['lockdownDurationSecs']);
+    const raw = typeof durationSecs === 'number' ? durationSecs
+        : (typeof result.lockdownDurationSecs === 'number' ? result.lockdownDurationSecs : 3600);
+    const secs = Math.max(1, Math.min(LOCKDOWN_MAX_SECS, raw));
+    const endsAt = Date.now() + secs * 1000;
+    await persist({ lockdownUntil: endsAt });
+    _lockdownUntilCache = endsAt;
+    await updateRedirectRules(); // ensure rules are active for the lockdown period
+    console.log(`[lockdown] Started — active until ${new Date(endsAt).toISOString()}.`);
+    return endsAt;
+}
+
+// Emergency stop: clear the lockdown. Only called when the user has already
+// authenticated (options.js verifies PIN/password before sending stopLockdown).
+async function stopLockdown() {
+    await persist({ lockdownUntil: null });
+    _lockdownUntilCache = null;
+    await updateRedirectRules();
+    console.log('[lockdown] Stopped.');
 }
 
 async function updateRedirectRules() {
