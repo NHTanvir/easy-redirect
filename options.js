@@ -969,6 +969,62 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Image upload — read file as data URL and store in chrome.storage.local.
+    // Data URLs can be several hundred KB; we cap at ~1 MB to avoid filling
+    // local storage. The image is intentionally NOT stored in sync (sync per-item
+    // limit is 8 KB, nowhere near enough for even a small image).
+    const blockedImageUpload = document.getElementById('blockedImageUpload');
+    if (blockedImageUpload) {
+        blockedImageUpload.addEventListener('change', () => {
+            const file = blockedImageUpload.files && blockedImageUpload.files[0];
+            if (!file) return;
+            const MAX_BYTES = 1024 * 1024; // 1 MB
+            if (file.size > MAX_BYTES) {
+                if (blockedPageStatusEl) {
+                    blockedPageStatusEl.textContent = 'Image too large (max 1 MB).';
+                    blockedPageStatusEl.style.color = '#c62828';
+                }
+                blockedImageUpload.value = '';
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const dataUrl = e.target.result;
+                chrome.storage.local.set({ blockedImageDataUrl: dataUrl }, () => {
+                    const previewDiv = document.getElementById('blockedImagePreview');
+                    const previewImg = document.getElementById('blockedImagePreviewImg');
+                    if (previewDiv) previewDiv.style.display = '';
+                    if (previewImg) previewImg.src = dataUrl;
+                    if (blockedPageStatusEl) {
+                        blockedPageStatusEl.textContent = 'Image saved locally.';
+                        blockedPageStatusEl.style.color = '#2e7d32';
+                        setTimeout(() => { if (blockedPageStatusEl) blockedPageStatusEl.textContent = ''; }, 2000);
+                    }
+                });
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // Remove image button.
+    const clearBlockedImageBtn = document.getElementById('clearBlockedImageBtn');
+    if (clearBlockedImageBtn) {
+        clearBlockedImageBtn.addEventListener('click', () => {
+            chrome.storage.local.remove('blockedImageDataUrl', () => {
+                const previewDiv = document.getElementById('blockedImagePreview');
+                const previewImg = document.getElementById('blockedImagePreviewImg');
+                if (previewDiv) previewDiv.style.display = 'none';
+                if (previewImg) previewImg.src = '';
+                if (blockedImageUpload) blockedImageUpload.value = '';
+                if (blockedPageStatusEl) {
+                    blockedPageStatusEl.textContent = 'Image removed.';
+                    blockedPageStatusEl.style.color = '#2e7d32';
+                    setTimeout(() => { if (blockedPageStatusEl) blockedPageStatusEl.textContent = ''; }, 2000);
+                }
+            });
+        });
+    }
+
     // ---------------------------------------------------------------------------
     // Access code challenge helpers (feature #18, commit 5)
     // ---------------------------------------------------------------------------
