@@ -600,6 +600,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 
     await ensureKeywordContentScriptRegistered();
     await ensureScheduleAlarm();
+    await initLockdownCache(); // warm cache so isLockedDown() is accurate immediately
     updateRedirectRules();
     registerContextMenus();
     scheduleMidnightAlarm();
@@ -737,6 +738,7 @@ chrome.runtime.onStartup.addListener(async () => {
     await ensureKeywordContentScriptRegistered();
     await ensureScheduleAlarm();
     await resumeCountdownIfPending(); // Resume any countdown that was running before worker shutdown.
+    await initLockdownCache(); // warm cache so isLockedDown() is accurate immediately
     updateRedirectRules();
     registerContextMenus();
     scheduleMidnightAlarm();
