@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Easy Redirect — Redirecting…</title>
+    <style>
+        :root {
+            --bg: #fafafa;
+            --bg-card: #fff;
+            --text: #222;
+            --text-muted: #666;
+            --border: #ddd;
+            --accent: #e53935;
+            --accent-muted: #fdecea;
+            --btn-allow: #4caf50;
+            --btn-allow-hover: #388e3c;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #121212;
+                --bg-card: #1e1e1e;
+                --text: #e0e0e0;
+                --text-muted: #9e9e9e;
+                --border: #333;
+                --accent: #ef5350;
+                --accent-muted: #3a1010;
+                --btn-allow: #388e3c;
+                --btn-allow-hover: #2e7d32;
+            }
+        }
+        body {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: var(--bg);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+            color: var(--text);
+        }
+        .card {
+            max-width: 420px;
+            width: 90%;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 36px 32px;
+            text-align: center;
+            box-shadow: 0 2px 12px rgba(0,0,0,.08);
+        }
+        .card h1 {
+            margin: 0 0 8px;
+            font-size: 22px;
+            color: var(--accent);
+        }
+        .card .subtitle {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 28px;
+            word-break: break-all;
+        }
+        .countdown-ring {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 24px;
+            position: relative;
+        }
+        .countdown-ring svg {
+            transform: rotate(-90deg);
+        }
+        .countdown-ring .track {
+            fill: none;
+            stroke: var(--border);
+            stroke-width: 8;
+        }
+        .countdown-ring .progress {
+            fill: none;
+            stroke: var(--accent);
+            stroke-width: 8;
+            stroke-linecap: round;
+            transition: stroke-dashoffset .5s linear;
+        }
+        .countdown-number {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 36px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            color: var(--text);
+        }
+        .status-text {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+        }
+        .btn-allow {
+            display: inline-block;
+            padding: 10px 28px;
+            border-radius: 6px;
+            background: var(--btn-allow);
+            color: #fff;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .3s, background .2s;
+        }
+        .btn-allow.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .btn-allow:hover {
+            background: var(--btn-allow-hover);
+        }
+        .go-back {
+            display: block;
+            margin-top: 16px;
+            font-size: 13px;
+            color: var(--text-muted);
+            cursor: pointer;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+        .go-back:hover { color: var(--text); }
+        .warning {
+            margin-top: 20px;
+            padding: 10px 14px;
+            background: var(--accent-muted);
+            border-left: 3px solid var(--accent);
+            border-radius: 4px;
+            font-size: 13px;
+            color: var(--text-muted);
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1>Blocked Site</h1>
+    <div class="subtitle" id="targetDisplay"></div>
+
+    <div class="countdown-ring" id="countdownRing">
+        <svg width="120" height="120" viewBox="0 0 120 120">
+            <circle class="track" cx="60" cy="60" r="52"/>
+            <circle class="progress" id="progressArc" cx="60" cy="60" r="52"
+                    stroke-dasharray="326.73"
+                    stroke-dashoffset="0"/>
+        </svg>
+        <div class="countdown-number" id="countdownNumber">—</div>
+    </div>
+
+    <div class="status-text" id="statusText">Redirecting in <span id="statusSecs"></span>…</div>
+
+    <button class="btn-allow" id="allowBtn">Continue anyway</button>
+
+    <span class="go-back" id="goBackBtn">Go back</span>
+
+    <div class="warning" id="warningBox" style="display:none;">
+        You will be allowed through for <span id="windowDisplay"></span>.
+        After that, the countdown will reset.
+    </div>
+</div>
+<script src="countdown.js"></script>
+</body>
+</html>
