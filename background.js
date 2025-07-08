@@ -37,6 +37,11 @@ const MODES = ['blocklist', 'allowlist'];
 // is clamped to DISABLE_DELAY_MAX before the countdown starts.
 const DISABLE_DELAY_MAX = 300;
 
+// Alarm name for the 1-minute schedule checker (feature #8). A single periodic
+// alarm fires every minute; the handler checks each group's schedule and
+// rebuilds DNR rules if any group's active state has changed.
+const SCHEDULE_ALARM_NAME = 'checkGroupSchedules';
+
 const DEFAULTS = {
     redirectUrl: 'https://www.google.com',
     blockedWebsites: [],
@@ -52,7 +57,11 @@ const DEFAULTS = {
     // entry (the 'default' group) so rules with groupId='default' always have
     // a home. Participates in persist() and restoreFromLocalIfSyncEmpty() like
     // every other key in DEFAULTS.
-    groups: [{ id: 'default', name: 'Default', color: '#2196F3', enabled: true, redirectUrl: null }],
+    // Default group — always present, never deletable. The `schedule` field is
+    // null for groups that are always active; a non-null schedule object
+    // (feature #8) carries `days` (0-indexed Sun=0..Sat=6 bitmask or array)
+    // and `startTime` / `endTime` in "HH:MM" 24-h format.
+    groups: [{ id: 'default', name: 'Default', color: '#2196F3', enabled: true, redirectUrl: null, schedule: null }],
     // User theme preference: 'auto' defers to prefers-color-scheme, 'light' forces
     // light regardless of OS setting, 'dark' forces dark regardless of OS setting.
     theme: 'auto',
@@ -357,6 +366,59 @@ async function registerContextMenus() {
 }
 
 // ---------------------------------------------------------------------------
+// Per-group scheduling (feature #8)
+// ---------------------------------------------------------------------------
+
+// A Group's `schedule` field is either null (always active) or an object:
+//   { days: number[], startTime: "HH:MM", endTime: "HH:MM" }
+// `days` is an array of integers 0..6 (Sun=0, Mon=1, … Sat=6).
+// startTime and endTime are inclusive; if endTime < startTime the window wraps
+// midnight (e.g. 22:00–06:00 covers 10 pm to 6 am).
+
+// Return true if a group's schedule allows it to be active right now.
+// Groups without a schedule (schedule === null) are always considered active.
+function isGroupScheduleActive(group) {
+    const sched = group && group.schedule;
+    if (!sched || !Array.isArray(sched.days) || sched.days.length === 0) return true;
+    const now = new Date();
+    const todayDay = now.getDay(); // 0 = Sunday
+    if (!sched.days.includes(todayDay)) return false;
+    // Parse HH:MM strings into minutes-since-midnight.
+    function toMins(hhmm) {
+        if (typeof hhmm !== 'string') return null;
+        const parts = hhmm.split(':');
+        if (parts.length !== 2) return null;
+        const h = parseInt(parts[0], 10), m = parseInt(parts[1], 10);
+        if (isNaN(h) || isNaN(m)) return null;
+        return h * 60 + m;
+    }
+    const start = toMins(sched.startTime);
+    const end = toMins(sched.endTime);
+    if (start === null || end === null) return true; // malformed — treat as always active
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+    if (start <= end) {
+        return nowMins >= start && nowMins < end;
+    } else {
+        // Wraps midnight: active from start→midnight and midnight→end.
+        return nowMins >= start || nowMins < end;
+    }
+}
+
+// Ensure the 1-minute periodic alarm exists (idempotent). Called on install and
+// startup. If no group has a non-null schedule, we still keep the alarm running
+// (cheap) so newly-added schedules take effect within one minute without needing
+// to reload the extension.
+async function ensureScheduleAlarm() {
+    if (!chrome.alarms) return; // API not available (non-standard environments)
+    const existing = await chrome.alarms.get(SCHEDULE_ALARM_NAME);
+    if (!existing) {
+        // Period of 1 minute; first fire after 1 minute.
+        chrome.alarms.create(SCHEDULE_ALARM_NAME, { periodInMinutes: 1 });
+        console.log('[schedule] Created periodic alarm:', SCHEDULE_ALARM_NAME);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Disable-delay countdown (feature #20)
 // ---------------------------------------------------------------------------
 // When the user turns the extension off and disableDelaySecs > 0, we do not
@@ -469,6 +531,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     await initializeMissingDefaults();
 
     await ensureKeywordContentScriptRegistered();
+    await ensureScheduleAlarm();
     updateRedirectRules();
     registerContextMenus();
     scheduleMidnightAlarm();
@@ -533,10 +596,16 @@ async function runSchemaMigration() {
     // the Default entry was somehow removed, re-insert it at position 0.
     const existingGroups = Array.isArray(next.groups) ? next.groups : [];
     const hasDefault = existingGroups.some(g => g.id === 'default');
-    const groups = hasDefault ? existingGroups
+    let groups = hasDefault ? existingGroups
         : [createGroup('Default', { id: 'default', color: '#2196F3' }), ...existingGroups];
 
-    const changed = next !== current || rulesNeedGroupId || !hasDefault;
+    // Backfill `schedule: null` on any group that predates feature #8.
+    const groupsNeedSchedule = groups.some(g => !('schedule' in g));
+    if (groupsNeedSchedule) {
+        groups = groups.map(g => ('schedule' in g) ? g : { ...g, schedule: null });
+    }
+
+    const changed = next !== current || rulesNeedGroupId || !hasDefault || groupsNeedSchedule;
     if (!changed) {
         return;
     }
@@ -598,6 +667,7 @@ chrome.runtime.onStartup.addListener(async () => {
     await restoreFromLocalIfSyncEmpty();
     await runSchemaMigration();
     await ensureKeywordContentScriptRegistered();
+    await ensureScheduleAlarm();
     await resumeCountdownIfPending(); // Resume any countdown that was running before worker shutdown.
     updateRedirectRules();
     registerContextMenus();
@@ -943,6 +1013,11 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
             if (group && group.enabled === false) {
                 return;
             }
+            // Skip rules whose group has a schedule that is not currently active
+            // (feature #8). A null schedule means always active.
+            if (group && !isGroupScheduleActive(group)) {
+                return;
+            }
 
             // Redirect URL precedence: rule.redirectUrl > group.redirectUrl > global.
             const effectiveRedirectUrl = (rule.redirectUrl) ||
@@ -1166,6 +1241,17 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 
     updateRedirectRules();
 });
+
+// Schedule alarm handler (feature #8): fired every minute by the periodic alarm
+// created in ensureScheduleAlarm(). Rebuilds DNR rules so that groups whose
+// schedule has just become active or inactive take effect within ~1 minute.
+if (chrome.alarms) {
+    chrome.alarms.onAlarm.addListener((alarm) => {
+        if (alarm.name === SCHEDULE_ALARM_NAME) {
+            updateRedirectRules();
+        }
+    });
+}
 
 // Clicking the toolbar icon opens the settings page in a new tab. We intentionally
 // do not declare `default_popup` in the manifest — without that, Chrome fires this
