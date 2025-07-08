@@ -644,6 +644,48 @@
         </div>
     </div>
 
+    <!-- Custom blocked page section (feature #13) -->
+    <div class="section" id="blockedPageSection">
+        <h3>Blocked Page</h3>
+        <div class="help-text" style="margin-bottom:12px;">
+            When enabled, blocked sites redirect to a built-in page instead of your configured
+            redirect URL. Existing per-rule and per-group redirect overrides still take precedence.
+        </div>
+        <label style="display:flex;align-items:center;gap:10px;margin-bottom:14px;cursor:pointer;">
+            <input type="checkbox" id="blockedPageEnabled" style="width:16px;height:16px;">
+            <span style="font-size:14px;">Use built-in blocked page</span>
+        </label>
+        <div id="blockedPageOptions" style="display:none;">
+            <div style="margin-bottom:12px;">
+                <label style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:4px;">Page title</label>
+                <input type="text" id="blockedPageTitle" placeholder="Site Blocked"
+                       style="width:100%;box-sizing:border-box;" maxlength="80">
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:4px;">Message</label>
+                <textarea id="blockedMessage" rows="3" maxlength="500"
+                          placeholder="This site has been blocked by Easy Redirect to help you stay focused."
+                          style="width:100%;box-sizing:border-box;resize:vertical;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);font-size:13px;font-family:inherit;"></textarea>
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:4px;">Custom image (optional)</label>
+                <input type="file" id="blockedImageUpload" accept="image/*" style="font-size:13px;">
+                <div class="help-text" style="margin-top:4px;">Stored locally on this device (not synced). Max ~1 MB.</div>
+                <div id="blockedImagePreview" style="margin-top:8px;display:none;">
+                    <img id="blockedImagePreviewImg" src="" alt="Preview"
+                         style="max-width:120px;max-height:120px;border-radius:6px;border:1px solid var(--border);object-fit:contain;">
+                    <button id="clearBlockedImageBtn" style="margin-top:4px;background:transparent;color:#c62828;border:1px solid #c62828;font-size:12px;padding:3px 10px;display:block;">Remove image</button>
+                </div>
+            </div>
+            <div style="margin-bottom:12px;">
+                <button id="previewBlockedPageBtn" style="background:#6a1b9a;margin-top:0;">Preview blocked page</button>
+                <div class="help-text" style="margin-top:4px;">Opens blocked.html in a new tab with current settings applied.</div>
+            </div>
+        </div>
+        <button id="saveBlockedPageBtn">Save blocked page settings</button>
+        <div id="blockedPageStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
+    </div>
+
     <div class="section">
         <h3 id="rulesHeading">Block Rules</h3>
         <div id="groupTabs" class="group-tabs"></div>

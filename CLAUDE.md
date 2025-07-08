@@ -378,3 +378,36 @@ the redirect. Useful as friction / cool-off before letting the redirect fire.
 - Save patches `delaySeconds` and `allowWindowSecs` on the group and calls `updateRedirectRules()`.
 - "Reset delay windows" button (Block Rules section footer) clears all `allowedUntil:*` keys
   from `chrome.storage.local` — resets the allow window for every rule without changing settings.
+
+### Custom blocked page (feature #13)
+
+An opt-in built-in extension page (`blocked.html`) that replaces the redirect URL when enabled.
+Existing per-rule and per-group redirect URL overrides still take precedence.
+
+**Storage keys**:
+- `blockedPageEnabled` (`boolean`, default `false`) — when `true`, `updateRedirectRules()` uses
+  `chrome-extension://<id>/blocked.html` as the effective redirect URL instead of the user's URL.
+- `blockedPageTitle` (`string`, default `''`) — title shown on the blocked page (falls back to "Site Blocked").
+- `blockedMessage` (`string`, default `''`) — body text (falls back to a built-in default).
+- `blockedImageDataUrl` — in `chrome.storage.local` (not sync; too large for sync quota). A data URL
+  for an optional custom image displayed at the top of the card.
+
+**background.js**:
+- `updateRedirectRules()` reads `blockedPageEnabled` and computes `blockedPageUrl`.
+  `redirectUrl` is replaced with `blockedPageUrl` when the feature is on; per-rule and per-group
+  `redirectUrl` overrides in `createRedirectRules()` still take precedence.
+
+**blocked.html + blocked.js**:
+- `blocked.js` reads `blockedPageTitle`, `blockedMessage`, `motivationEnabled`, `motivationQuotes`
+  from sync storage; `blockedImageDataUrl` from local storage.
+- `?from=` URL param shows the blocked domain; falls back to `document.referrer` when DNR cannot
+  inject the matched URL (which is always when the redirect is direct, not through the countdown).
+- "Go back" calls `history.back()` or `window.close()` if there is no history.
+- Settings link is fixed up to use `chrome.runtime.id` at load time (replacing the PLACEHOLDER).
+
+**options.html / options.js**:
+- `#blockedPageSection` — section with enable checkbox, title input, message textarea,
+  image file picker with preview, and Save / Preview buttons.
+- `_loadBlockedPageSettings(result)` — called from `loadData()`; populates all fields.
+- Image upload: `FileReader` → data URL → `chrome.storage.local.set`. Max 1 MB.
+- Preview button saves current settings first, then opens `blocked.html?from=https://example.com`.

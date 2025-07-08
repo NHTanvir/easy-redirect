@@ -413,7 +413,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await chrome.storage.sync.get([
                 'redirectUrl', 'rules', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups', 'theme',
                 'accessCode', 'uninstallUrl', 'disableDelaySecs',
-                'pomodoroWorkMinutes', 'pomodoroBreakMinutes'
+                'pomodoroWorkMinutes', 'pomodoroBreakMinutes',
+                'blockedPageEnabled', 'blockedPageTitle', 'blockedMessage'
             ]);
 
             redirectUrlInput.value = result.redirectUrl || 'https://www.google.com';
@@ -506,6 +507,8 @@ document.addEventListener('DOMContentLoaded', function() {
             pomodoroBreakInput.value = typeof result.pomodoroBreakMinutes === 'number'
                 ? result.pomodoroBreakMinutes : 5;
         }
+        // Populate blocked page settings (feature #13).
+        _loadBlockedPageSettings(result);
         } catch (error) {
             showStatus('Error loading data: ' + error.message, 'error');
         }
@@ -893,6 +896,144 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initialize on page load.
     initPomodoroUi();
+
+    // ---------------------------------------------------------------------------
+    // Custom blocked page settings (feature #13)
+    // ---------------------------------------------------------------------------
+
+    const blockedPageEnabledCb = document.getElementById('blockedPageEnabled');
+    const blockedPageOptions   = document.getElementById('blockedPageOptions');
+    const blockedPageTitleEl   = document.getElementById('blockedPageTitle');
+    const blockedMessageEl     = document.getElementById('blockedMessage');
+    const blockedPageStatusEl  = document.getElementById('blockedPageStatus');
+
+    // Show/hide the options panel based on the checkbox state.
+    if (blockedPageEnabledCb) {
+        blockedPageEnabledCb.addEventListener('change', () => {
+            if (blockedPageOptions) {
+                blockedPageOptions.style.display = blockedPageEnabledCb.checked ? '' : 'none';
+            }
+        });
+    }
+
+    // Populate UI from stored values — called from loadData().
+    function _loadBlockedPageSettings(result) {
+        if (blockedPageEnabledCb) {
+            blockedPageEnabledCb.checked = result.blockedPageEnabled === true;
+            if (blockedPageOptions) {
+                blockedPageOptions.style.display = blockedPageEnabledCb.checked ? '' : 'none';
+            }
+        }
+        if (blockedPageTitleEl) blockedPageTitleEl.value = result.blockedPageTitle || '';
+        if (blockedMessageEl)   blockedMessageEl.value   = result.blockedMessage   || '';
+        // Load stored image preview from local storage.
+        chrome.storage.local.get(['blockedImageDataUrl'], localResult => {
+            const previewDiv = document.getElementById('blockedImagePreview');
+            const previewImg = document.getElementById('blockedImagePreviewImg');
+            if (localResult.blockedImageDataUrl && previewDiv && previewImg) {
+                previewImg.src = localResult.blockedImageDataUrl;
+                previewDiv.style.display = '';
+            }
+        });
+    }
+
+    // Save blocked page settings.
+    const saveBlockedPageBtn = document.getElementById('saveBlockedPageBtn');
+    if (saveBlockedPageBtn) {
+        saveBlockedPageBtn.addEventListener('click', async () => {
+            const enabled = blockedPageEnabledCb ? blockedPageEnabledCb.checked : false;
+            const title   = (blockedPageTitleEl  && blockedPageTitleEl.value.trim())  || '';
+            const message = (blockedMessageEl    && blockedMessageEl.value.trim())    || '';
+            try {
+                await chrome.storage.sync.set({ blockedPageEnabled: enabled, blockedPageTitle: title, blockedMessage: message });
+                await updateRedirectRules();
+                if (blockedPageStatusEl) {
+                    blockedPageStatusEl.textContent = 'Saved.';
+                    blockedPageStatusEl.style.color = '#2e7d32';
+                    setTimeout(() => { if (blockedPageStatusEl) blockedPageStatusEl.textContent = ''; }, 2000);
+                }
+            } catch (err) {
+                if (blockedPageStatusEl) {
+                    blockedPageStatusEl.textContent = 'Error: ' + err.message;
+                    blockedPageStatusEl.style.color = '#c62828';
+                }
+            }
+        });
+    }
+
+    // Preview button — save current settings then open blocked.html in a new tab.
+    // Passing ?preview=1 to blocked.html tells it we are previewing (no referrer
+    // URL, no 'go back' in history). The from= param is faked for display.
+    const previewBlockedPageBtn = document.getElementById('previewBlockedPageBtn');
+    if (previewBlockedPageBtn) {
+        previewBlockedPageBtn.addEventListener('click', async () => {
+            // Save any unsaved changes first so the preview reflects the latest input.
+            const title   = (blockedPageTitleEl  && blockedPageTitleEl.value.trim())  || '';
+            const message = (blockedMessageEl    && blockedMessageEl.value.trim())    || '';
+            const enabled = blockedPageEnabledCb ? blockedPageEnabledCb.checked : false;
+            try {
+                await chrome.storage.sync.set({ blockedPageEnabled: enabled, blockedPageTitle: title, blockedMessage: message });
+            } catch (_) { /* ignore — preview still works with stale storage */ }
+            const qp = new URLSearchParams({ from: 'https://example.com', preview: '1' });
+            chrome.tabs.create({ url: `${chrome.runtime.getURL('blocked.html')}?${qp}` });
+        });
+    }
+
+    // Image upload — read file as data URL and store in chrome.storage.local.
+    // Data URLs can be several hundred KB; we cap at ~1 MB to avoid filling
+    // local storage. The image is intentionally NOT stored in sync (sync per-item
+    // limit is 8 KB, nowhere near enough for even a small image).
+    const blockedImageUpload = document.getElementById('blockedImageUpload');
+    if (blockedImageUpload) {
+        blockedImageUpload.addEventListener('change', () => {
+            const file = blockedImageUpload.files && blockedImageUpload.files[0];
+            if (!file) return;
+            const MAX_BYTES = 1024 * 1024; // 1 MB
+            if (file.size > MAX_BYTES) {
+                if (blockedPageStatusEl) {
+                    blockedPageStatusEl.textContent = 'Image too large (max 1 MB).';
+                    blockedPageStatusEl.style.color = '#c62828';
+                }
+                blockedImageUpload.value = '';
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const dataUrl = e.target.result;
+                chrome.storage.local.set({ blockedImageDataUrl: dataUrl }, () => {
+                    const previewDiv = document.getElementById('blockedImagePreview');
+                    const previewImg = document.getElementById('blockedImagePreviewImg');
+                    if (previewDiv) previewDiv.style.display = '';
+                    if (previewImg) previewImg.src = dataUrl;
+                    if (blockedPageStatusEl) {
+                        blockedPageStatusEl.textContent = 'Image saved locally.';
+                        blockedPageStatusEl.style.color = '#2e7d32';
+                        setTimeout(() => { if (blockedPageStatusEl) blockedPageStatusEl.textContent = ''; }, 2000);
+                    }
+                });
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // Remove image button.
+    const clearBlockedImageBtn = document.getElementById('clearBlockedImageBtn');
+    if (clearBlockedImageBtn) {
+        clearBlockedImageBtn.addEventListener('click', () => {
+            chrome.storage.local.remove('blockedImageDataUrl', () => {
+                const previewDiv = document.getElementById('blockedImagePreview');
+                const previewImg = document.getElementById('blockedImagePreviewImg');
+                if (previewDiv) previewDiv.style.display = 'none';
+                if (previewImg) previewImg.src = '';
+                if (blockedImageUpload) blockedImageUpload.value = '';
+                if (blockedPageStatusEl) {
+                    blockedPageStatusEl.textContent = 'Image removed.';
+                    blockedPageStatusEl.style.color = '#2e7d32';
+                    setTimeout(() => { if (blockedPageStatusEl) blockedPageStatusEl.textContent = ''; }, 2000);
+                }
+            });
+        });
+    }
 
     // ---------------------------------------------------------------------------
     // Access code challenge helpers (feature #18, commit 5)
