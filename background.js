@@ -811,6 +811,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             .catch(err => sendResponse({ success: false, error: String(err && err.message || err) }));
         return true;
     }
+    // Start a lockdown session — 'activateLockdown' is the canonical action name
+    // used by options.js. Accepts { durationSecs, scope } where scope is currently
+    // unused ('all' is always applied — scoped lockdown is reserved for later).
+    if (request.action === 'activateLockdown') {
+        startLockdown(request.durationSecs)
+            .then(until => sendResponse({ success: true, until }))
+            .catch(err => sendResponse({ success: false, error: String(err && err.message || err) }));
+        return true;
+    }
     // Stop an active lockdown session (feature #11). This is an emergency escape
     // hatch that requires the user to have passed the PIN/password lock screen
     // first (options.js enforces this before sending the message).
@@ -823,9 +832,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Query whether lockdown is currently active. Returns endsAt (ms epoch) or null.
     if (request.action === 'getLockdownState') {
         chrome.storage.sync.get(['lockdownUntil'], result => {
-            const endsAt = result.lockdownUntil;
-            const active = typeof endsAt === 'number' && Date.now() < endsAt;
-            sendResponse({ active, endsAt: active ? endsAt : null });
+            const until = result.lockdownUntil;
+            const active = typeof until === 'number' && Date.now() < until;
+            sendResponse({ active, until: active ? until : null });
         });
         return true;
     }
@@ -851,12 +860,12 @@ async function startLockdown(durationSecs) {
     const raw = typeof durationSecs === 'number' ? durationSecs
         : (typeof result.lockdownDurationSecs === 'number' ? result.lockdownDurationSecs : 3600);
     const secs = Math.max(1, Math.min(LOCKDOWN_MAX_SECS, raw));
-    const endsAt = Date.now() + secs * 1000;
-    await persist({ lockdownUntil: endsAt });
-    _lockdownUntilCache = endsAt;
+    const until = Date.now() + secs * 1000;
+    await persist({ lockdownUntil: until });
+    _lockdownUntilCache = until;
     await updateRedirectRules(); // ensure rules are active for the lockdown period
-    console.log(`[lockdown] Started — active until ${new Date(endsAt).toISOString()}.`);
-    return endsAt;
+    console.log(`[lockdown] Started — active until ${new Date(until).toISOString()}.`);
+    return until;
 }
 
 // Emergency stop: clear the lockdown. Only called when the user has already
