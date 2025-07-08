@@ -942,10 +942,17 @@ async function updateRedirectRules() {
     try {
         const result = await chrome.storage.sync.get([
             'rules', 'redirectUrl', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups',
-            'disableDelaySecs', 'lockdownUntil'
+            'disableDelaySecs', 'lockdownUntil', 'blockedPageEnabled'
         ]);
         const rules = Array.isArray(result.rules) ? result.rules : [];
-        const redirectUrl = result.redirectUrl || 'https://www.google.com';
+        // Effective redirect URL: if blockedPageEnabled, use the built-in blocked.html
+        // page (feature #13) instead of the user's configured redirect URL. The per-rule
+        // and per-group redirect URL overrides still work on top of this — they are
+        // applied in createRedirectRules() and override both the global URL and blocked.html.
+        const blockedPageEnabled = result.blockedPageEnabled === true;
+        const rawRedirectUrl = result.redirectUrl || 'https://www.google.com';
+        const blockedPageUrl = `chrome-extension://${chrome.runtime.id}/blocked.html`;
+        const redirectUrl = blockedPageEnabled ? blockedPageUrl : rawRedirectUrl;
 
         // During lockdown, treat the extension as always enabled regardless of the
         // extensionEnabled toggle. This prevents the user from disabling blocking
