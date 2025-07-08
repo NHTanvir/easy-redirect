@@ -116,7 +116,14 @@ const DEFAULTS = {
     // data URL (too large for sync quota) under the key 'blockedImageDataUrl'.
     blockedPageEnabled: false,
     blockedPageTitle: '',
-    blockedMessage: ''
+    blockedMessage: '',
+    // Motivational quotes on the blocked page (feature #15). When enabled,
+    // blocked.js picks a random quote from motivationQuotes (or falls back to
+    // built-in quotes when the array is empty) and displays it in the blockquote
+    // element on blocked.html. Both keys live in chrome.storage.sync so the
+    // setting and custom quotes follow the user across devices.
+    motivationEnabled: false,
+    motivationQuotes: []
 };
 
 // Daily quota counts. Stored in chrome.storage.local (not sync) because they
