@@ -1231,8 +1231,16 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
             }
 
             // Redirect URL precedence: rule.redirectUrl > group.redirectUrl > global.
-            const effectiveRedirectUrl = (rule.redirectUrl) ||
-                (group && group.redirectUrl) ||
+            // Per-rule and per-group URLs are validated by the UI before storage, but
+            // we double-check here: if a stored URL is not a valid absolute URL we
+            // fall through to the next level rather than emitting a broken redirect.
+            function isValidUrl(url) {
+                if (!url || typeof url !== 'string') return false;
+                try { new URL(url); return true; } catch (_) { return false; }
+            }
+            const effectiveRedirectUrl =
+                (isValidUrl(rule.redirectUrl)          ? rule.redirectUrl          : null) ||
+                (isValidUrl(group && group.redirectUrl) ? group.redirectUrl         : null) ||
                 redirectUrl;
 
             // Delay / cool-off countdown (feature #12). When the group has a
