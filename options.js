@@ -1732,6 +1732,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 'https://www.google.com';
             const effectiveSource = rule.redirectUrl ? 'rule' : (ruleGroup && ruleGroup.redirectUrl ? 'group' : 'global');
             const effectiveLabel = effectiveSource === 'rule' ? '' : ` <span style="font-size:10px;opacity:0.7;">(from ${effectiveSource})</span>`;
+            // Detect an invalid stored per-rule URL so the UI can warn the user.
+            // background.js falls back gracefully when the URL is malformed, but the
+            // user should know to fix or clear it so the override actually takes effect.
+            const hasInvalidRuleUrl = rule.redirectUrl && !_isValidUrl(rule.redirectUrl);
             return `
                 <div class="website-item${isEnabled ? '' : ' rule-disabled'}" data-rule-id="${escapeHtml(rule.id)}">
                     <div class="rule-main-row">
@@ -1769,6 +1773,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 title="Per-rule redirect URL override. Leave blank to use group or global default."
                                 style="flex:1;min-width:180px;padding:2px 6px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
                             ${rule.redirectUrl ? `<span style="font-size:11px;padding:1px 6px;border-radius:8px;background:#4a148c;color:#fff;white-space:nowrap;" title="This rule has its own redirect URL">custom</span>` : ''}
+                            ${hasInvalidRuleUrl ? `<span style="font-size:11px;padding:1px 6px;border-radius:8px;background:#c62828;color:#fff;white-space:nowrap;" title="The stored redirect URL is invalid and will be ignored — clear or fix it">invalid URL</span>` : ''}
                         </div>
                         <div style="font-size:11px;opacity:0.75;padding-left:72px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="Effective redirect URL for this rule">
                             &#8618; ${escapeHtml(effectiveRedirectUrl)}${effectiveLabel}
