@@ -904,6 +904,47 @@
         </div>
     </div>
 
+    <!-- Per-group delay / cool-off editor modal (feature #12) -->
+    <div id="delayModal" role="dialog" aria-modal="true" aria-labelledby="delayModalTitle"
+         style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);
+                z-index:1000;align-items:center;justify-content:center;flex-direction:column;">
+        <div id="delayBox" style="background:var(--bg-section);border:1px solid var(--border);
+                border-radius:10px;padding:28px 28px 22px;max-width:420px;width:90%;box-shadow:0 4px 24px rgba(0,0,0,.2);">
+            <h3 id="delayModalTitle" style="margin:0 0 10px;font-size:16px;">Delay for <span id="delayGroupName"></span></h3>
+            <div class="help-text" style="margin-bottom:16px;">
+                When delay is &gt; 0, visiting a blocked site shows an interstitial countdown
+                page before completing the redirect. The optional allow window lets the user
+                pass through for N seconds after the countdown without triggering another one.
+            </div>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;">
+                <div style="flex:1;min-width:140px;">
+                    <label style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:4px;">
+                        Countdown (seconds)
+                    </label>
+                    <input type="number" id="delaySecsInput" min="0" max="3600" step="1" value="0"
+                           style="width:100%;padding:7px 10px;border:1px solid var(--border);
+                                  border-radius:5px;background:var(--input-bg);color:var(--text);font-size:14px;">
+                    <div class="help-text" style="margin-top:4px;">0 = disabled (immediate redirect)</div>
+                </div>
+                <div style="flex:1;min-width:140px;">
+                    <label style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:4px;">
+                        Allow window (seconds)
+                    </label>
+                    <input type="number" id="delayWindowInput" min="0" max="86400" step="60" value="0"
+                           style="width:100%;padding:7px 10px;border:1px solid var(--border);
+                                  border-radius:5px;background:var(--input-bg);color:var(--text);font-size:14px;">
+                    <div class="help-text" style="margin-top:4px;">0 = no window (every visit triggers countdown)</div>
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button id="saveDelayBtn" style="background:#1565C0;">Save</button>
+                <button id="clearDelayBtn" style="background:#9e9e9e;">Disable delay</button>
+                <button id="cancelDelayBtn" style="background:transparent;color:var(--text);border:1px solid var(--border);">Cancel</button>
+            </div>
+            <div id="delayStatus" style="min-height:16px;font-size:12px;margin-top:8px;color:var(--text-muted);"></div>
+        </div>
+    </div>
+
     <script src="categories.js"></script>
     <script src="options.js"></script>
 </body>
