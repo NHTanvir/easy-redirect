@@ -8,7 +8,11 @@
     'use strict';
 
     const params = new URLSearchParams(location.search);
-    const fromUrl = params.get('from') || '';
+    // ?from= is set by the countdown interstitial when it chains to blocked.html.
+    // When blocked.html is the direct DNR redirect target, DNR cannot inject the
+    // matched URL into the redirect, so we fall back to document.referrer (the
+    // last page the browser visited before this one).
+    const fromUrl = params.get('from') || document.referrer || '';
 
     // Fix up the settings link — replace the PLACEHOLDER extension ID with the real one.
     const settingsBtn = document.getElementById('settingsBtn');
