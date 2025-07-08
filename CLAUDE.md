@@ -66,7 +66,11 @@ A `Group` is:
   enabled: boolean,             // false means all rules in this group are skipped at DNR emit
   redirectUrl: string | null,   // per-group redirect URL override (null = use global)
   createdAt: number,            // ms epoch
-  schedule: null                // reserved for #8 (scheduled activation); always null for now
+  schedule: {                   // null = always active; non-null enables time-gating (#8)
+    days: number[],             // 0..6 (Sun=0..Sat=6); empty array means no-op
+    startTime: string,          // "HH:MM" 24-hour format (inclusive)
+    endTime: string             // "HH:MM" 24-hour format (exclusive); < startTime wraps midnight
+  } | null
 }
 ```
 
@@ -74,9 +78,10 @@ Redirect URL precedence: `rule.redirectUrl` > `group.redirectUrl` > global `redi
 
 The `groups` key lives in `DEFAULTS` so it participates in `persist()` and
 `restoreFromLocalIfSyncEmpty()` from the start. `runSchemaMigration()` ensures the
-Default group entry always exists and backfills `groupId='default'` on any rules
-that predate #7. The 'default' group can never be deleted; all other groups can, and
-their rules migrate to 'default' automatically.
+Default group entry always exists, backfills `groupId='default'` on any rules that
+predate #7, and backfills `schedule: null` on any groups that predate #8. The 'default'
+group can never be deleted; all other groups can, and their rules migrate to 'default'
+automatically.
 
 ### Allowlist mode
 
@@ -249,3 +254,25 @@ The `disableDelaySecs` key in `DEFAULTS` / `chrome.storage.sync` holds a number 
 - `#disableDelaySection` — numeric input (0–300) and Save button that writes `disableDelaySecs` to `chrome.storage.sync`.
 - `#disableCountdownBanner` — orange banner (hidden unless active) with a live `#disableCountdownSecs` counter and a `#cancelDisableBtn`. The banner polls `getDisableCountdown` once on load via `_checkCountdown()` and listens for the `disableCountdownFired` runtime message to hide itself and reload the toggle state.
 - `chrome.runtime.onMessage` listener for `disableCountdownFired` reloads `loadData()` to update the toggle button.
+
+### Per-group scheduling (feature #8)
+
+Groups can be time-gated so their rules are only active on certain days and during a specified time window.
+
+**Storage** — the `schedule` field on each Group (see Group type above) is `null` (always active) or `{ days, startTime, endTime }`. `days` is an array of integers `0..6` (Sun=0, Sat=6). `startTime` / `endTime` are `"HH:MM"` 24-hour strings. If `endTime < startTime` the window wraps midnight.
+
+**background.js**:
+- `isGroupScheduleActive(group)` — returns `true` if the group's schedule permits activity right now. A `null` schedule always returns `true`. Checks local device time (not UTC) using `new Date()`.
+- `ensureScheduleAlarm()` — creates a `periodInMinutes: 1` alarm named `'checkGroupSchedules'` (idempotent). Called on `onInstalled` and `onStartup`.
+- `chrome.alarms.onAlarm` — when the alarm fires, calls `updateRedirectRules()` so schedule changes take effect within ~1 minute.
+- `createRedirectRules()` — skips rules whose group's schedule is not currently active (in addition to the existing `enabled === false` check).
+- `runSchemaMigration()` — backfills `schedule: null` on groups that predate #8.
+- manifest.json — `"alarms"` permission added.
+
+**options.js**:
+- Schedule indicator button (`⏰` / `—`) on each group tab shows whether a schedule is set; click opens `openScheduleModal(group)`.
+- `#scheduleModal` — modal dialog with day-of-week checkboxes, start/end time pickers, Save / Clear / Cancel buttons.
+- `openScheduleModal(group)` — populates the modal with the group's current schedule and shows it.
+- Save writes `{ ...group, schedule }` to storage and calls `updateRedirectRules()`.
+- Clear writes `{ ...group, schedule: null }` (removes scheduling).
+- Group redirect-URL field shows a schedule summary with an inline Edit link.
