@@ -2202,6 +2202,13 @@ document.addEventListener('DOMContentLoaded', function() {
     importFile.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
+        // Lockdown check (feature #11): importing rules is blocked during lockdown.
+        const ldImportChk = await chrome.storage.sync.get(['lockdownUntil']);
+        if (typeof ldImportChk.lockdownUntil === 'number' && ldImportChk.lockdownUntil > Date.now()) {
+            showStatus('Cannot import rules during lockdown.', 'error');
+            importFile.value = '';
+            return;
+        }
         const text = await file.text();
         const mode = document.querySelector('input[name="importMode"]:checked').value;
         if (file.name.endsWith('.json')) {
