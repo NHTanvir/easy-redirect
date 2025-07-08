@@ -101,8 +101,11 @@ const DEFAULTS = {
     // passed. lockdownUntil is a Unix ms timestamp (Date.now() + duration).
     // null means lockdown is not active. lockdownDurationSecs is the configured
     // duration in seconds (default 3600 = 1 hour, max 86400 = 24 hours).
+    // lockdownScope controls which rules are enforced ('all' = all rules,
+    // 'groups' = current group only, 'allowlist-exempt' = all but always-allowed).
     lockdownUntil: null,
-    lockdownDurationSecs: 3600
+    lockdownDurationSecs: 3600,
+    lockdownScope: 'all'
 };
 
 // Daily quota counts. Stored in chrome.storage.local (not sync) because they
@@ -159,6 +162,21 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
         console.log('[daily-quota] Daily counts reset for', fresh.date);
         await updateRedirectRules();
         await scheduleMidnightAlarm();
+        return;
+    }
+
+    // Lockdown expiry (feature #11): auto-end the lockdown when the timer runs out.
+    if (alarm.name === 'lockdownExpiry') {
+        await persist({ lockdownUntil: null });
+        _lockdownUntilCache = null;
+        chrome.action.setBadgeText({ text: '' }); // clear LOCK badge
+        await updateRedirectRules();
+        chrome.notifications.create(`lockdown-end-${Date.now()}`, {
+            type: 'basic', iconUrl: 'icons/icon-48.png',
+            title: 'Easy Redirect — Lockdown ended',
+            message: 'Focus lockdown has expired. You can now modify your rules.'
+        });
+        console.log('[lockdown] Expired automatically.');
         return;
     }
 
@@ -811,15 +829,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             .catch(err => sendResponse({ success: false, error: String(err && err.message || err) }));
         return true;
     }
-    // Start a lockdown session — 'activateLockdown' is the canonical action name
-    // used by options.js. Accepts { durationSecs, scope } where scope is currently
-    // unused ('all' is always applied — scoped lockdown is reserved for later).
-    if (request.action === 'activateLockdown') {
-        startLockdown(request.durationSecs)
-            .then(until => sendResponse({ success: true, until }))
-            .catch(err => sendResponse({ success: false, error: String(err && err.message || err) }));
-        return true;
-    }
     // Stop an active lockdown session (feature #11). This is an emergency escape
     // hatch that requires the user to have passed the PIN/password lock screen
     // first (options.js enforces this before sending the message).
@@ -829,13 +838,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             .catch(err => sendResponse({ success: false, error: String(err && err.message || err) }));
         return true;
     }
-    // Query whether lockdown is currently active. Returns endsAt (ms epoch) or null.
+    // Query whether lockdown is currently active. Returns both 'until' and
+    // 'endsAt' (same value) for backwards compatibility with old callers.
     if (request.action === 'getLockdownState') {
         chrome.storage.sync.get(['lockdownUntil'], result => {
             const until = result.lockdownUntil;
             const active = typeof until === 'number' && Date.now() < until;
-            sendResponse({ active, until: active ? until : null });
+            const ts = active ? until : null;
+            sendResponse({ active, until: ts, endsAt: ts });
         });
+        return true;
+    }
+    // Alias: 'activateLockdown' is the canonical action used by options.js.
+    // It routes to startLockdown() and also accepts a 'scope' argument.
+    if (request.action === 'activateLockdown') {
+        startLockdown(request.durationSecs, request.scope)
+            .then(until => sendResponse({ success: true, until }))
+            .catch(err => sendResponse({ success: false, error: String(err && err.message || err) }));
+        return true;
+    }
+    // Alias: 'deactivateLockdown' routes to stopLockdown().
+    if (request.action === 'deactivateLockdown') {
+        stopLockdown()
+            .then(() => sendResponse({ success: true }))
+            .catch(err => sendResponse({ success: false, error: String(err && err.message || err) }));
         return true;
     }
 });
@@ -855,24 +881,36 @@ const LOCKDOWN_MAX_SECS = 86400;
 // Start a lockdown session of `durationSecs` seconds (defaults to
 // lockdownDurationSecs from storage). Updates the cache immediately so
 // isLockedDown() reflects the new state without a round-trip.
-async function startLockdown(durationSecs) {
+async function startLockdown(durationSecs, scope) {
     const result = await chrome.storage.sync.get(['lockdownDurationSecs']);
     const raw = typeof durationSecs === 'number' ? durationSecs
         : (typeof result.lockdownDurationSecs === 'number' ? result.lockdownDurationSecs : 3600);
     const secs = Math.max(1, Math.min(LOCKDOWN_MAX_SECS, raw));
-    const until = Date.now() + secs * 1000;
-    await persist({ lockdownUntil: until });
-    _lockdownUntilCache = until;
+    const endsAt = Date.now() + secs * 1000;
+    await persist({
+        lockdownUntil: endsAt,
+        lockdownDurationSecs: secs,
+        lockdownScope: scope || 'all'
+    });
+    _lockdownUntilCache = endsAt;
+    // Create an expiry alarm so the lockdown auto-ends even if the options page
+    // is closed. The alarm also fires the lockdownExpiry handler below.
+    chrome.alarms.create('lockdownExpiry', { when: endsAt });
+    // Show LOCK badge on toolbar icon for visibility.
+    chrome.action.setBadgeText({ text: 'LOCK' });
+    chrome.action.setBadgeBackgroundColor({ color: '#b71c1c' }); // deep red
     await updateRedirectRules(); // ensure rules are active for the lockdown period
-    console.log(`[lockdown] Started — active until ${new Date(until).toISOString()}.`);
-    return until;
+    console.log(`[lockdown] Started — active until ${new Date(endsAt).toISOString()}.`);
+    return endsAt;
 }
 
 // Emergency stop: clear the lockdown. Only called when the user has already
 // authenticated (options.js verifies PIN/password before sending stopLockdown).
 async function stopLockdown() {
+    await chrome.alarms.clear('lockdownExpiry');
     await persist({ lockdownUntil: null });
     _lockdownUntilCache = null;
+    chrome.action.setBadgeText({ text: '' }); // clear LOCK badge
     await updateRedirectRules();
     console.log('[lockdown] Stopped.');
 }
@@ -1427,9 +1465,24 @@ function isLockedDown() {
 
 // Warm the lockdown cache from storage. Called on onInstalled, onStartup, and
 // from the startLockdown / stopLockdown helpers to keep the cache consistent.
+// On startup, also re-creates the lockdownExpiry alarm and badge if lockdown
+// is still active (both are lost when the service worker restarts).
 async function initLockdownCache() {
     const result = await chrome.storage.sync.get(['lockdownUntil']);
-    _lockdownUntilCache = typeof result.lockdownUntil === 'number' ? result.lockdownUntil : null;
+    const until = typeof result.lockdownUntil === 'number' ? result.lockdownUntil : null;
+    const active = until !== null && Date.now() < until;
+    _lockdownUntilCache = until;
+    if (active) {
+        // Re-arm expiry alarm and badge after worker restart.
+        chrome.alarms.create('lockdownExpiry', { when: until });
+        chrome.action.setBadgeText({ text: 'LOCK' });
+        chrome.action.setBadgeBackgroundColor({ color: '#b71c1c' });
+    } else if (until !== null) {
+        // Stale lockdown that expired while worker was down — clear it.
+        await persist({ lockdownUntil: null });
+        _lockdownUntilCache = null;
+        chrome.action.setBadgeText({ text: '' });
+    }
 }
 
 chrome.commands.onCommand.addListener(async (command) => {
