@@ -61,7 +61,10 @@ const DEFAULTS = {
     // null for groups that are always active; a non-null schedule object
     // (feature #8) carries `days` (0-indexed Sun=0..Sat=6 bitmask or array)
     // and `startTime` / `endTime` in "HH:MM" 24-h format.
-    groups: [{ id: 'default', name: 'Default', color: '#2196F3', enabled: true, redirectUrl: null, schedule: null }],
+    // `delaySeconds` (feature #12) is 0 for immediate redirect; a positive value
+    // shows an interstitial countdown page before completing the redirect. After
+    // the countdown, the user is allowed through for `allowWindowSecs` seconds.
+    groups: [{ id: 'default', name: 'Default', color: '#2196F3', enabled: true, redirectUrl: null, schedule: null, delaySeconds: 0, allowWindowSecs: 0 }],
     // User theme preference: 'auto' defers to prefers-color-scheme, 'light' forces
     // light regardless of OS setting, 'dark' forces dark regardless of OS setting.
     theme: 'auto',
@@ -282,7 +285,13 @@ function createGroup(name, opts = {}) {
         enabled: opts.enabled !== undefined ? opts.enabled : true,
         redirectUrl: opts.redirectUrl || null,
         createdAt: opts.createdAt || Date.now(),
-        schedule: opts.schedule || null
+        schedule: opts.schedule || null,
+        // Per-group redirect delay (feature #12). 0 = immediate (legacy behaviour).
+        // A positive value redirects to the countdown interstitial instead of the
+        // final URL; `allowWindowSecs` controls how long the user is let through
+        // after the countdown before the next visit triggers a new countdown.
+        delaySeconds: typeof opts.delaySeconds === 'number' ? opts.delaySeconds : 0,
+        allowWindowSecs: typeof opts.allowWindowSecs === 'number' ? opts.allowWindowSecs : 0
     };
 }
 
@@ -692,7 +701,13 @@ async function runSchemaMigration() {
         groups = groups.map(g => ('schedule' in g) ? g : { ...g, schedule: null });
     }
 
-    const changed = next !== current || rulesNeedGroupId || !hasDefault || groupsNeedSchedule;
+    // Backfill `delaySeconds: 0` and `allowWindowSecs: 0` on groups predating feature #12.
+    const groupsNeedDelay = groups.some(g => !('delaySeconds' in g));
+    if (groupsNeedDelay) {
+        groups = groups.map(g => ('delaySeconds' in g) ? g : { ...g, delaySeconds: 0, allowWindowSecs: 0 });
+    }
+
+    const changed = next !== current || rulesNeedGroupId || !hasDefault || groupsNeedSchedule || groupsNeedDelay;
     if (!changed) {
         return;
     }
