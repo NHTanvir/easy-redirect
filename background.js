@@ -123,7 +123,10 @@ const DEFAULTS = {
     // element on blocked.html. Both keys live in chrome.storage.sync so the
     // setting and custom quotes follow the user across devices.
     motivationEnabled: false,
-    motivationQuotes: []
+    motivationQuotes: [],
+    // Block sub-resources (feature #16). When true, iframe (sub_frame) requests to
+    // blocked domains are also redirected, not just top-level navigations.
+    blockSubresources: false
 };
 
 // Daily quota counts. Stored in chrome.storage.local (not sync) because they
