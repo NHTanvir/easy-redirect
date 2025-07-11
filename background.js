@@ -988,6 +988,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             .catch(err => sendResponse({ success: false, error: String(err && err.message || err) }));
         return true;
     }
+    // Temporary override actions (issue #36). Allow the options page to grant
+    // a time-bounded reprieve for a specific rule, query active overrides for
+    // UI countdown rendering, or revoke an override early.
+    if (request.action === 'addTemporaryOverride') {
+        addTemporaryOverride(request.ruleId, request.minutes || 5).then(() => sendResponse({ ok: true }));
+        return true;
+    }
+    if (request.action === 'clearTemporaryOverride') {
+        clearTemporaryOverride(request.ruleId).then(() => sendResponse({ ok: true }));
+        return true;
+    }
+    if (request.action === 'getTemporaryOverrides') {
+        getTemporaryOverrides().then(o => sendResponse({ overrides: o }));
+        return true;
+    }
 });
 
 async function handleKeywordHit(sender, request) {
