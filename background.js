@@ -734,6 +734,10 @@ async function runSchemaMigration() {
         groups = groups.map(g => ('delaySeconds' in g) ? g : { ...g, delaySeconds: 0, allowWindowSecs: 0 });
     }
 
+    // motivationEnabled and motivationQuotes (feature #15) are top-level sync keys
+    // with scalar / array defaults. No per-rule or per-group backfill is needed —
+    // initializeMissingDefaults() fills them in automatically on first run after upgrade.
+
     const changed = next !== current || needsRuleBackfill || !hasDefault || groupsNeedSchedule || groupsNeedDelay;
     if (!changed) {
         return;
