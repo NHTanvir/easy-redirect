@@ -415,7 +415,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 'accessCode', 'uninstallUrl', 'disableDelaySecs',
                 'pomodoroWorkMinutes', 'pomodoroBreakMinutes',
                 'blockedPageEnabled', 'blockedPageTitle', 'blockedMessage',
-                'motivationEnabled', 'motivationQuotes'
+                'motivationEnabled', 'motivationQuotes',
+                'blockSubresources'
             ]);
 
             redirectUrlInput.value = result.redirectUrl || 'https://www.google.com';
@@ -510,6 +511,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         // Populate blocked page settings (feature #13).
         _loadBlockedPageSettings(result);
+        // Populate sub-resource blocking setting (feature #16).
+        const blockSubresourcesCb = document.getElementById('blockSubresources');
+        if (blockSubresourcesCb) {
+            blockSubresourcesCb.checked = result.blockSubresources === true;
+        }
         } catch (error) {
             showStatus('Error loading data: ' + error.message, 'error');
         }
@@ -990,6 +996,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (blockedPageStatusEl) {
                     blockedPageStatusEl.textContent = 'Error: ' + err.message;
                     blockedPageStatusEl.style.color = '#c62828';
+                }
+            }
+        });
+    }
+
+    // Sub-resource blocking save handler (feature #16).
+    const saveSubresourcesBtn = document.getElementById('saveSubresourcesBtn');
+    if (saveSubresourcesBtn) {
+        saveSubresourcesBtn.addEventListener('click', async () => {
+            const subresourcesStatusEl = document.getElementById('subresourcesStatus');
+            const blockSubresourcesCb = document.getElementById('blockSubresources');
+            const enabled = blockSubresourcesCb ? blockSubresourcesCb.checked : false;
+            try {
+                await chrome.storage.sync.set({ blockSubresources: enabled });
+                await updateRedirectRules();
+                if (subresourcesStatusEl) {
+                    subresourcesStatusEl.textContent = 'Saved.';
+                    subresourcesStatusEl.style.color = '#2e7d32';
+                    setTimeout(() => { if (subresourcesStatusEl) subresourcesStatusEl.textContent = ''; }, 2000);
+                }
+            } catch (err) {
+                if (subresourcesStatusEl) {
+                    subresourcesStatusEl.textContent = 'Error: ' + err.message;
+                    subresourcesStatusEl.style.color = '#c62828';
                 }
             }
         });
