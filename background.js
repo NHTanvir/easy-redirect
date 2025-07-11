@@ -1861,3 +1861,15 @@ if (chrome.declarativeNetRequest.onRuleMatchedDebug) {
         showRedirectNotification(info.request.url, rule?.pattern);
     });
 }
+
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+    if (!tab.incognito || changeInfo.status !== 'loading') return;
+    const r = await chrome.storage.sync.get(['incognitoMode', 'redirectUrl', 'extensionEnabled', 'blockedPageEnabled']);
+    if (!r.extensionEnabled || r.incognitoMode !== 'allow') return;
+    const activeUrl = r.blockedPageEnabled
+        ? `chrome-extension://${chrome.runtime.id}/blocked.html`
+        : (r.redirectUrl || 'https://www.google.com');
+    if (changeInfo.url && changeInfo.url.startsWith(activeUrl.split('?')[0])) {
+        chrome.tabs.goBack(tabId).catch(() => {});
+    }
+});
