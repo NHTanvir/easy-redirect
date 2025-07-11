@@ -154,6 +154,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+    // Wire the Reset hit counts button (feature #27).
+    const resetHitCountsBtn = document.getElementById('resetHitCountsBtn');
+    if (resetHitCountsBtn) {
+        resetHitCountsBtn.addEventListener('click', resetHitCounts);
+    }
     document.getElementById('toggleBtn').addEventListener('click', toggleExtension);
     modeBlocklistBtn.addEventListener('click', () => switchMode('blocklist'));
     modeAllowlistBtn.addEventListener('click', () => switchMode('allowlist'));
