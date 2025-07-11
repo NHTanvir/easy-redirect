@@ -64,6 +64,30 @@ async function getTemporaryOverrides() {
     return overrides;
 }
 
+// Add a temporary override for a specific rule lasting `minutes` minutes. The
+// override is persisted to chrome.storage.local and an alarm is scheduled to
+// fire at expiry so it clears itself automatically. Rules with an active
+// override are skipped at DNR emit time (see createRedirectRules).
+async function addTemporaryOverride(ruleId, minutes) {
+    const overrides = await getTemporaryOverrides();
+    const expiresAt = Date.now() + minutes * 60 * 1000;
+    overrides[ruleId] = expiresAt;
+    await chrome.storage.local.set({ temporaryOverrides: overrides });
+    await chrome.alarms.create(TEMP_OVERRIDE_ALARM_PREFIX + ruleId, { when: expiresAt });
+    await updateRedirectRules();
+}
+
+// Clear an existing temporary override for a rule. Removes the entry from
+// storage, cancels its alarm, and re-emits DNR rules so the rule starts
+// blocking again immediately.
+async function clearTemporaryOverride(ruleId) {
+    const overrides = await getTemporaryOverrides();
+    delete overrides[ruleId];
+    await chrome.storage.local.set({ temporaryOverrides: overrides });
+    await chrome.alarms.clear(TEMP_OVERRIDE_ALARM_PREFIX + ruleId);
+    await updateRedirectRules();
+}
+
 const DEFAULTS = {
     redirectUrl: 'https://www.google.com',
     blockedWebsites: [],
