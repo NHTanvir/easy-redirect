@@ -827,6 +827,12 @@ chrome.runtime.onStartup.addListener(async () => {
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'getProfileInfo') {
+        chrome.storage.sync.get(['profileName'], r => {
+            sendResponse({ extensionId: chrome.runtime.id, profileName: r.profileName || '' });
+        });
+        return true;
+    }
     if (request.action === 'updateRules') {
         // Defense-in-depth: if protection is active the request must carry a
         // verified token. The options page sets request.protectionOk = true after
