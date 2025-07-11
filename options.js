@@ -1874,6 +1874,16 @@ document.addEventListener('DOMContentLoaded', function() {
                             <button class="${toggleClass}" data-rule-id="${escapeHtml(rule.id)}" title="${isEnabled ? 'Disable this rule' : 'Enable this rule'}">${isEnabled ? 'On' : 'Off'}</button>
                             <select class="rule-group-select" data-rule-id="${escapeHtml(rule.id)}" title="Move to group">${groupOptions}</select>
                             <button class="add-exception-btn" data-rule-id="${escapeHtml(rule.id)}" title="Add exception">+ except</button>
+                            <span class="override-wrap" style="position:relative;display:inline-block;margin-left:4px;">
+                                <button class="override-btn" data-rule-id="${escapeHtml(rule.id)}" title="Temporarily allow this site"
+                                        style="background:#e65100;font-size:12px;padding:5px 10px;">&#9208; Allow</button>
+                                <div class="override-menu" data-rule-id="${escapeHtml(rule.id)}"
+                                     style="display:none;position:absolute;right:0;top:100%;background:var(--bg-card);border:1px solid var(--border);border-radius:4px;z-index:100;min-width:120px;">
+                                    <div class="override-duration" data-rule-id="${escapeHtml(rule.id)}" data-minutes="5" style="padding:8px 12px;cursor:pointer;font-size:13px;">5 minutes</div>
+                                    <div class="override-duration" data-rule-id="${escapeHtml(rule.id)}" data-minutes="15" style="padding:8px 12px;cursor:pointer;font-size:13px;">15 minutes</div>
+                                    <div class="override-duration" data-rule-id="${escapeHtml(rule.id)}" data-minutes="60" style="padding:8px 12px;cursor:pointer;font-size:13px;">1 hour</div>
+                                </div>
+                            </span>
                             <button class="remove-btn" data-rule-id="${escapeHtml(rule.id)}">Remove</button>
                         </span>
                     </div>
