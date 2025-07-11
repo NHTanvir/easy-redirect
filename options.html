@@ -677,6 +677,21 @@
                     <button id="clearBlockedImageBtn" style="margin-top:4px;background:transparent;color:#c62828;border:1px solid #c62828;font-size:12px;padding:3px 10px;display:block;">Remove image</button>
                 </div>
             </div>
+            <div style="margin-bottom:12px;" id="motivationSection">
+                <label style="display:flex;align-items:center;gap:10px;margin-bottom:8px;cursor:pointer;">
+                    <input type="checkbox" id="motivationEnabled" style="width:16px;height:16px;">
+                    <span style="font-size:14px;">Show motivational quote</span>
+                </label>
+                <div id="motivationOptions" style="display:none;">
+                    <label style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:4px;">
+                        Quotes (one per line, leave empty for built-in quotes)
+                    </label>
+                    <textarea id="motivationQuotes" rows="4" maxlength="2000"
+                        placeholder="Stay focused. Every blocked visit is a small win.&#10;Your future self will thank you."
+                        style="width:100%;box-sizing:border-box;resize:vertical;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);font-size:13px;font-family:inherit;"></textarea>
+                    <div class="help-text" style="margin-top:4px;">Leave empty to use the built-in quote collection.</div>
+                </div>
+            </div>
             <div style="margin-bottom:12px;">
                 <button id="previewBlockedPageBtn" style="background:#6a1b9a;margin-top:0;">Preview blocked page</button>
                 <div class="help-text" style="margin-top:4px;">Opens blocked.html in a new tab with current settings applied.</div>
