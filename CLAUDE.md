@@ -443,3 +443,21 @@ rule.redirectUrl  >  group.redirectUrl  >  global redirectUrl
   input whenever `rule.redirectUrl` is non-null — visual confirmation that an override is active.
   The badge is removed when the field is cleared.
 - `displayRules()` is called after every per-rule redirect save to re-render the badge immediately.
+
+### Blocked-page motivation (feature #15)
+
+An optional motivational quote displayed at the bottom of the custom blocked page (`blocked.html`).
+
+**Storage keys** (in `chrome.storage.sync`, added to `DEFAULTS`):
+- `motivationEnabled` — `boolean`, `false` by default. When `true`, `blocked.js` picks a random quote from `motivationQuotes` (or falls back to the built-in collection when the array is empty) and renders it in `<blockquote id="motivationQuote">`.
+- `motivationQuotes` — `string[]`, empty by default. User-supplied quotes (one per line in the options textarea). An empty array means the built-in quote collection is used.
+
+**blocked.js** — already reads both keys from `chrome.storage.sync` and inserts the quote text into `#motivationQuote` on the blocked page. No changes to `blocked.js` were required by this feature — the infrastructure was already present; only the storage defaults and the options UI were missing.
+
+**initializeMissingDefaults()** in `background.js` fills in `motivationEnabled` and `motivationQuotes` automatically on first run after upgrade (no explicit per-rule or per-group backfill needed). A comment in `runSchemaMigration()` documents this.
+
+**Options UI** — inside `#blockedPageOptions` in `options.html` (visible only when the custom blocked page is enabled):
+- A `<div id="motivationSection">` wraps a checkbox (`#motivationEnabled`) and a collapsible `<div id="motivationOptions">` containing a textarea (`#motivationQuotes`, one quote per line, max 2000 chars).
+- `_loadBlockedPageSettings(result)` in `options.js` populates the checkbox and textarea from storage and shows/hides `#motivationOptions` on page load.
+- A `change` listener on `#motivationEnabled` toggles `#motivationOptions` visibility immediately.
+- The **Save blocked page settings** button handler and the **Preview** button handler both collect the motivation fields and include them in the `chrome.storage.sync.set` call so saves are always atomic across all blocked-page settings.

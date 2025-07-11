@@ -414,7 +414,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 'redirectUrl', 'rules', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups', 'theme',
                 'accessCode', 'uninstallUrl', 'disableDelaySecs',
                 'pomodoroWorkMinutes', 'pomodoroBreakMinutes',
-                'blockedPageEnabled', 'blockedPageTitle', 'blockedMessage'
+                'blockedPageEnabled', 'blockedPageTitle', 'blockedMessage',
+                'motivationEnabled', 'motivationQuotes'
             ]);
 
             redirectUrlInput.value = result.redirectUrl || 'https://www.google.com';
@@ -916,6 +917,15 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Toggle motivationOptions visibility when the motivation checkbox changes.
+    const motEnabledCb = document.getElementById('motivationEnabled');
+    if (motEnabledCb) {
+        motEnabledCb.addEventListener('change', () => {
+            const motOptions = document.getElementById('motivationOptions');
+            if (motOptions) motOptions.style.display = motEnabledCb.checked ? '' : 'none';
+        });
+    }
+
     // Populate UI from stored values — called from loadData().
     function _loadBlockedPageSettings(result) {
         if (blockedPageEnabledCb) {
@@ -926,6 +936,19 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if (blockedPageTitleEl) blockedPageTitleEl.value = result.blockedPageTitle || '';
         if (blockedMessageEl)   blockedMessageEl.value   = result.blockedMessage   || '';
+        // Load motivation settings (feature #15).
+        const motEnabled = result.motivationEnabled || false;
+        const motQuotes  = Array.isArray(result.motivationQuotes) ? result.motivationQuotes : [];
+        const motEnabledEl = document.getElementById('motivationEnabled');
+        if (motEnabledEl) {
+            motEnabledEl.checked = motEnabled;
+            const motOptions = document.getElementById('motivationOptions');
+            if (motOptions) motOptions.style.display = motEnabled ? '' : 'none';
+        }
+        const motQuotesEl = document.getElementById('motivationQuotes');
+        if (motQuotesEl) {
+            motQuotesEl.value = motQuotes.join('\n');
+        }
         // Load stored image preview from local storage.
         chrome.storage.local.get(['blockedImageDataUrl'], localResult => {
             const previewDiv = document.getElementById('blockedImagePreview');
@@ -944,8 +967,19 @@ document.addEventListener('DOMContentLoaded', function() {
             const enabled = blockedPageEnabledCb ? blockedPageEnabledCb.checked : false;
             const title   = (blockedPageTitleEl  && blockedPageTitleEl.value.trim())  || '';
             const message = (blockedMessageEl    && blockedMessageEl.value.trim())    || '';
+            const motEnabled  = document.getElementById('motivationEnabled')?.checked || false;
+            const motQuotesEl = document.getElementById('motivationQuotes');
+            const motQuotes   = motQuotesEl
+                ? motQuotesEl.value.split('\n').map(s => s.trim()).filter(Boolean)
+                : [];
             try {
-                await chrome.storage.sync.set({ blockedPageEnabled: enabled, blockedPageTitle: title, blockedMessage: message });
+                await chrome.storage.sync.set({
+                    blockedPageEnabled: enabled,
+                    blockedPageTitle: title,
+                    blockedMessage: message,
+                    motivationEnabled: motEnabled,
+                    motivationQuotes: motQuotes
+                });
                 await updateRedirectRules();
                 if (blockedPageStatusEl) {
                     blockedPageStatusEl.textContent = 'Saved.';
@@ -971,8 +1005,19 @@ document.addEventListener('DOMContentLoaded', function() {
             const title   = (blockedPageTitleEl  && blockedPageTitleEl.value.trim())  || '';
             const message = (blockedMessageEl    && blockedMessageEl.value.trim())    || '';
             const enabled = blockedPageEnabledCb ? blockedPageEnabledCb.checked : false;
+            const motEnabled  = document.getElementById('motivationEnabled')?.checked || false;
+            const motQuotesEl = document.getElementById('motivationQuotes');
+            const motQuotes   = motQuotesEl
+                ? motQuotesEl.value.split('\n').map(s => s.trim()).filter(Boolean)
+                : [];
             try {
-                await chrome.storage.sync.set({ blockedPageEnabled: enabled, blockedPageTitle: title, blockedMessage: message });
+                await chrome.storage.sync.set({
+                    blockedPageEnabled: enabled,
+                    blockedPageTitle: title,
+                    blockedMessage: message,
+                    motivationEnabled: motEnabled,
+                    motivationQuotes: motQuotes
+                });
             } catch (_) { /* ignore — preview still works with stale storage */ }
             const qp = new URLSearchParams({ from: 'https://example.com', preview: '1' });
             chrome.tabs.create({ url: `${chrome.runtime.getURL('blocked.html')}?${qp}` });
