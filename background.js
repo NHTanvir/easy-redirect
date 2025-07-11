@@ -705,15 +705,20 @@ async function runSchemaMigration() {
 
     // Backfill groupId='default' on rules that predate groups (created before #7).
     // Also backfill redirectUrl: null on rules that predate feature #14.
+    // Also backfill hitCount: 0 and lastHitAt: null on rules that predate feature #27.
     const existingRules = Array.isArray(next.rules) ? next.rules : [];
     const rulesNeedGroupId = existingRules.some(r => !r.groupId);
     const rulesNeedRedirectUrl = existingRules.some(r => !('redirectUrl' in r));
-    const needsRuleBackfill = rulesNeedGroupId || rulesNeedRedirectUrl;
+    const rulesNeedHitCount = existingRules.some(r => typeof r.hitCount !== 'number');
+    const rulesNeedLastHitAt = existingRules.some(r => !('lastHitAt' in r));
+    const needsRuleBackfill = rulesNeedGroupId || rulesNeedRedirectUrl || rulesNeedHitCount || rulesNeedLastHitAt;
     const backfilledRules = needsRuleBackfill
         ? existingRules.map(r => {
             let out = r;
             if (!r.groupId) out = { ...out, groupId: 'default' };
             if (!('redirectUrl' in r)) out = { ...out, redirectUrl: null };
+            if (typeof r.hitCount !== 'number') out = { ...out, hitCount: 0 };
+            if (!('lastHitAt' in r)) out = { ...out, lastHitAt: null };
             return out;
         })
         : existingRules;
