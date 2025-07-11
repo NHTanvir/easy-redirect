@@ -1,0 +1,10 @@
+{
+  "extensionName": {
+    "message": "Easy Redirect",
+    "description": "Extension name"
+  },
+  "extensionDescription": {
+    "message": "Redirect blocked websites to a specific page",
+    "description": "Extension description in chrome://extensions"
+  }
+}
