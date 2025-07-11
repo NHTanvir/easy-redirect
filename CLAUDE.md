@@ -540,3 +540,16 @@ pop-up (5 min / 15 min / 1 hour). Active overrides render an orange
 
 Message actions: `addTemporaryOverride`, `clearTemporaryOverride`,
 `getTemporaryOverrides`.
+
+### Incognito support (issue #34)
+
+`incognitoMode` in DEFAULTS / `chrome.storage.sync` is `'block'` (default) or `'allow'`.
+
+- `'block'` — rules apply in incognito tabs **provided** the user also enables
+  "Allow in incognito" for the extension in `chrome://extensions`.
+- `'allow'` — a `chrome.tabs.onUpdated` listener watches incognito tabs and,
+  when they navigate to the active redirect URL, calls `chrome.tabs.goBack()`.
+  Best-effort: it briefly flashes the redirect target before reversing.
+
+Options UI exposes the two modes as radio buttons plus a link to
+`chrome://extensions/?id=<id>` to streamline the second-half setup.

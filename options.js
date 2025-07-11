@@ -2862,13 +2862,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const s = document.getElementById('notifyStatus'); if (s) { s.textContent = 'Saved.'; setTimeout(()=>s.textContent='', 2000); }
     });
 
-<<<<<<< HEAD
     document.getElementById('saveProfileBtn')?.addEventListener('click', async () => {
         const name = document.getElementById('profileName')?.value.trim() || '';
         await chrome.storage.sync.set({ profileName: name });
         const s = document.getElementById('profileStatus'); if (s) { s.textContent = 'Label saved.'; setTimeout(()=>s.textContent='', 2000); }
         document.title = name ? `Easy Redirect — ${name}` : 'Easy Redirect';
-=======
+    });
+
     document.getElementById('openExtensionsPageLink')?.addEventListener('click', e => {
         e.preventDefault();
         chrome.tabs.create({ url: 'chrome://extensions/?id=' + chrome.runtime.id });
@@ -2878,7 +2878,6 @@ document.addEventListener('DOMContentLoaded', function() {
         await chrome.storage.sync.set({ incognitoMode: mode });
         try { await chrome.runtime.sendMessage({ action: 'updateRules' }); } catch (_) {}
         const s = document.getElementById('incognitoStatus'); if (s) { s.textContent = 'Saved.'; setTimeout(()=>s.textContent='', 2000); }
->>>>>>> 4e30c38 (Wire incognito save button and extensions link in options.js)
     });
 
     // Temporary override (issue #36): delegated handlers on the rule list so
