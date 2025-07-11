@@ -42,6 +42,52 @@ const DISABLE_DELAY_MAX = 300;
 // rebuilds DNR rules if any group's active state has changed.
 const SCHEDULE_ALARM_NAME = 'checkGroupSchedules';
 
+// Temporary override (issue #36): per-rule alarm name prefix. When a user
+// temporarily allows a blocked site for N minutes the override is stored in
+// chrome.storage.local under `temporaryOverrides[ruleId] = expiresAt` and an
+// alarm named `tempOverride:<ruleId>` is scheduled to fire at that time so the
+// override can auto-expire even if the options page is closed.
+const TEMP_OVERRIDE_ALARM_PREFIX = 'tempOverride:';
+
+// Read the current temporaryOverrides map from chrome.storage.local. Any entries
+// whose expiresAt has already passed are pruned in-place — this keeps the map
+// honest in case an alarm failed to fire (e.g. browser was closed at the time).
+async function getTemporaryOverrides() {
+    const r = await chrome.storage.local.get(['temporaryOverrides']);
+    const overrides = r.temporaryOverrides || {};
+    const now = Date.now();
+    let changed = false;
+    for (const [rid, exp] of Object.entries(overrides)) {
+        if (exp <= now) { delete overrides[rid]; changed = true; }
+    }
+    if (changed) await chrome.storage.local.set({ temporaryOverrides: overrides });
+    return overrides;
+}
+
+// Add a temporary override for a specific rule lasting `minutes` minutes. The
+// override is persisted to chrome.storage.local and an alarm is scheduled to
+// fire at expiry so it clears itself automatically. Rules with an active
+// override are skipped at DNR emit time (see createRedirectRules).
+async function addTemporaryOverride(ruleId, minutes) {
+    const overrides = await getTemporaryOverrides();
+    const expiresAt = Date.now() + minutes * 60 * 1000;
+    overrides[ruleId] = expiresAt;
+    await chrome.storage.local.set({ temporaryOverrides: overrides });
+    await chrome.alarms.create(TEMP_OVERRIDE_ALARM_PREFIX + ruleId, { when: expiresAt });
+    await updateRedirectRules();
+}
+
+// Clear an existing temporary override for a rule. Removes the entry from
+// storage, cancels its alarm, and re-emits DNR rules so the rule starts
+// blocking again immediately.
+async function clearTemporaryOverride(ruleId) {
+    const overrides = await getTemporaryOverrides();
+    delete overrides[ruleId];
+    await chrome.storage.local.set({ temporaryOverrides: overrides });
+    await chrome.alarms.clear(TEMP_OVERRIDE_ALARM_PREFIX + ruleId);
+    await updateRedirectRules();
+}
+
 const DEFAULTS = {
     redirectUrl: 'https://www.google.com',
     blockedWebsites: [],
@@ -184,6 +230,15 @@ async function scheduleMidnightAlarm() {
 // rules (which re-enables any rules that were suspended mid-day), and schedule
 // the next midnight alarm.
 chrome.alarms.onAlarm.addListener(async (alarm) => {
+    // Temporary override expiry (issue #36): a `tempOverride:<ruleId>` alarm
+    // fires when the user's "Allow for N minutes" window runs out. Clearing
+    // the override re-emits DNR rules so blocking resumes for that rule.
+    if (alarm.name.startsWith(TEMP_OVERRIDE_ALARM_PREFIX)) {
+        const ruleId = alarm.name.slice(TEMP_OVERRIDE_ALARM_PREFIX.length);
+        await clearTemporaryOverride(ruleId);
+        return;
+    }
+
     if (alarm.name === 'resetDailyQuota') {
         const fresh = { date: todayUTC(), counts: {} };
         await saveDailyCounts(fresh);
@@ -933,6 +988,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             .catch(err => sendResponse({ success: false, error: String(err && err.message || err) }));
         return true;
     }
+    // Temporary override actions (issue #36). Allow the options page to grant
+    // a time-bounded reprieve for a specific rule, query active overrides for
+    // UI countdown rendering, or revoke an override early.
+    if (request.action === 'addTemporaryOverride') {
+        addTemporaryOverride(request.ruleId, request.minutes || 5).then(() => sendResponse({ ok: true }));
+        return true;
+    }
+    if (request.action === 'clearTemporaryOverride') {
+        clearTemporaryOverride(request.ruleId).then(() => sendResponse({ ok: true }));
+        return true;
+    }
+    if (request.action === 'getTemporaryOverrides') {
+        getTemporaryOverrides().then(o => sendResponse({ overrides: o }));
+        return true;
+    }
 });
 
 async function handleKeywordHit(sender, request) {
@@ -1230,6 +1300,11 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
         // alarm fires and getDailyCounts() returns a fresh zero object.
         const dailyCounts = await getDailyCounts();
 
+        // Temporary overrides (issue #36): rules with an active override are
+        // skipped at emit time so the user can browse the site freely until the
+        // override's alarm fires and clearTemporaryOverride re-emits DNR rules.
+        const tempOverrides = await getTemporaryOverrides();
+
         // Build DNR rules. Disabled source rules are skipped here, not deleted —
         // toggling enabled back to true must restore behaviour without touching
         // storage. Unknown types log a warning so future contributors see they
@@ -1250,6 +1325,13 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
         rules.forEach((rule, index) => {
             // Disabled rules are intentionally skipped here, not deleted — re-enabling restores them without a storage write.
             if (!rule || rule.enabled === false) {
+                return;
+            }
+
+            // Skip rules with an active temporary override (issue #36). The
+            // override expiry alarm will call clearTemporaryOverride which
+            // re-emits DNR rules, so blocking transparently resumes at expiry.
+            if (tempOverrides[rule.id]) {
                 return;
             }
 

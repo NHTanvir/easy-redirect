@@ -1787,7 +1787,15 @@ document.addEventListener('DOMContentLoaded', function() {
         return arr;
     }
 
-    function displayRules(allRules) {
+    async function displayRules(allRules) {
+        // Fetch active temporary overrides (issue #36) so we can render a
+        // countdown badge on rules that are currently allowed-through.
+        let tempOverrides = {};
+        try {
+            const ovResp = await chrome.runtime.sendMessage({ action: 'getTemporaryOverrides' });
+            tempOverrides = (ovResp && ovResp.overrides) || {};
+        } catch (_) { /* background may not be ready; default to empty */ }
+
         // Filter to only the rules belonging to the active group.
         let rules = (allRules || []).filter(r => {
             const gid = r.groupId || 'default';
@@ -1869,11 +1877,22 @@ document.addEventListener('DOMContentLoaded', function() {
                             <span class="${badgeClass}">${badgeLabel}</span>
                             <span class="rule-pattern">${highlightMatch(rule.pattern, searchQuery)}</span>
                             ${(rule.hitCount > 0) ? `<span style="font-size:11px;padding:1px 6px;border-radius:8px;background:#546e7a;color:#fff;white-space:nowrap;" title="${rule.hitCount} redirect${rule.hitCount === 1 ? '' : 's'} triggered by this rule${rule.lastHitAt ? ' (last: ' + new Date(rule.lastHitAt).toLocaleString() + ')' : ''}">${formatHitCount(rule.hitCount)} blocked</span>` : ''}
+                            ${tempOverrides[rule.id] ? `<span style="background:#e65100;color:#fff;font-size:11px;padding:2px 6px;border-radius:3px;margin-left:6px;" title="Temporary override active until ${new Date(tempOverrides[rule.id]).toLocaleString()}">Allowed for ${Math.max(0, Math.ceil((tempOverrides[rule.id] - Date.now()) / 60000))}m</span>` : ''}
                         </span>
                         <span class="rule-actions">
                             <button class="${toggleClass}" data-rule-id="${escapeHtml(rule.id)}" title="${isEnabled ? 'Disable this rule' : 'Enable this rule'}">${isEnabled ? 'On' : 'Off'}</button>
                             <select class="rule-group-select" data-rule-id="${escapeHtml(rule.id)}" title="Move to group">${groupOptions}</select>
                             <button class="add-exception-btn" data-rule-id="${escapeHtml(rule.id)}" title="Add exception">+ except</button>
+                            <span class="override-wrap" style="position:relative;display:inline-block;margin-left:4px;">
+                                <button class="override-btn" data-rule-id="${escapeHtml(rule.id)}" title="Temporarily allow this site"
+                                        style="background:#e65100;font-size:12px;padding:5px 10px;">&#9208; Allow</button>
+                                <div class="override-menu" data-rule-id="${escapeHtml(rule.id)}"
+                                     style="display:none;position:absolute;right:0;top:100%;background:var(--bg-card);border:1px solid var(--border);border-radius:4px;z-index:100;min-width:120px;">
+                                    <div class="override-duration" data-rule-id="${escapeHtml(rule.id)}" data-minutes="5" style="padding:8px 12px;cursor:pointer;font-size:13px;">5 minutes</div>
+                                    <div class="override-duration" data-rule-id="${escapeHtml(rule.id)}" data-minutes="15" style="padding:8px 12px;cursor:pointer;font-size:13px;">15 minutes</div>
+                                    <div class="override-duration" data-rule-id="${escapeHtml(rule.id)}" data-minutes="60" style="padding:8px 12px;cursor:pointer;font-size:13px;">1 hour</div>
+                                </div>
+                            </span>
                             <button class="remove-btn" data-rule-id="${escapeHtml(rule.id)}">Remove</button>
                         </span>
                     </div>
@@ -2841,5 +2860,30 @@ document.addEventListener('DOMContentLoaded', function() {
         await chrome.storage.sync.set({ profileName: name });
         const s = document.getElementById('profileStatus'); if (s) { s.textContent = 'Label saved.'; setTimeout(()=>s.textContent='', 2000); }
         document.title = name ? `Easy Redirect — ${name}` : 'Easy Redirect';
+    });
+
+    // Temporary override (issue #36): delegated handlers on the rule list so
+    // newly-rendered rows pick up the click behaviour without re-binding.
+    // Clicking the "Allow" button toggles the duration menu; clicking a
+    // duration entry sends addTemporaryOverride and re-renders the list.
+    document.getElementById('websiteList')?.addEventListener('click', async e => {
+        const ovBtn = e.target.closest('.override-btn');
+        if (ovBtn) {
+            const m = document.querySelector(`.override-menu[data-rule-id="${ovBtn.dataset.ruleId}"]`);
+            if (m) m.style.display = m.style.display === 'none' ? '' : 'none';
+            return;
+        }
+        const dur = e.target.closest('.override-duration');
+        if (dur) {
+            const m = document.querySelector(`.override-menu[data-rule-id="${dur.dataset.ruleId}"]`);
+            if (m) m.style.display = 'none';
+            await chrome.runtime.sendMessage({
+                action: 'addTemporaryOverride',
+                ruleId: dur.dataset.ruleId,
+                minutes: parseInt(dur.dataset.minutes, 10)
+            });
+            const result = await chrome.storage.sync.get(['rules']);
+            await displayRules(Array.isArray(result.rules) ? result.rules : []);
+        }
     });
 });

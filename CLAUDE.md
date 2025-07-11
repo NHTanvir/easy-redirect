@@ -521,3 +521,22 @@ profile. This feature surfaces that with an optional display label.
 - JSON export filename includes the sanitised label suffix (e.g.
   `easy-redirect-backup-Work.json`) so backups from multiple profiles don't
   collide on disk.
+
+### Temporary override (issue #36)
+
+Lets users temporarily disable a specific rule for 5, 15, or 60 minutes.
+
+- Override state lives in `chrome.storage.local` under
+  `temporaryOverrides: { [ruleId]: expiresAt }`.
+- `addTemporaryOverride(ruleId, minutes)` writes the override, schedules a
+  named alarm `'tempOverride:<ruleId>'`, and calls `updateRedirectRules()`.
+- `createRedirectRules()` skips any rule with an active override at DNR emit
+  time, so blocking transparently resumes when the alarm fires.
+- Alarm handler clears the override (`clearTemporaryOverride`) and re-emits.
+
+**Options UI** — each rule row gets a "⏸ Allow" button with a duration
+pop-up (5 min / 15 min / 1 hour). Active overrides render an orange
+"Allowed for Nm" badge that counts down each time the list refreshes.
+
+Message actions: `addTemporaryOverride`, `clearTemporaryOverride`,
+`getTemporaryOverrides`.
