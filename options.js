@@ -421,9 +421,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 'pomodoroWorkMinutes', 'pomodoroBreakMinutes',
                 'blockedPageEnabled', 'blockedPageTitle', 'blockedMessage',
                 'motivationEnabled', 'motivationQuotes',
-                'blockSubresources',
+                'blockSubresources', 'profileName',
                 'notifyOnRedirect', 'notifyThrottleMs'
             ]);
+
+            const profEl = document.getElementById('profileExtId');
+            if (profEl) profEl.textContent = chrome.runtime.id;
+            const profNameEl = document.getElementById('profileName');
+            if (profNameEl) profNameEl.value = result.profileName || '';
+            if (result.profileName) document.title = `Easy Redirect — ${result.profileName}`;
 
             redirectUrlInput.value = result.redirectUrl || 'https://www.google.com';
 
@@ -2635,7 +2641,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const exportData = { version: 1, exportedAt: new Date().toISOString(), ...data };
         const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
-        const a = Object.assign(document.createElement('a'), { href: url, download: `easy-redirect-${Date.now()}.json` });
+        const profR = await chrome.storage.sync.get(['profileName']);
+        const profName = (profR.profileName || '').trim();
+        const profSuffix = profName ? `-${profName.replace(/[^a-z0-9]/gi, '_')}` : '';
+        const filename = `easy-redirect-backup${profSuffix}.json`;
+        const a = Object.assign(document.createElement('a'), { href: url, download: filename });
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         URL.revokeObjectURL(url);
         showStatus('Exported successfully.', 'success');
@@ -2824,5 +2834,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const secs = parseInt(document.getElementById('notifyThrottleSecs')?.value, 10) || 5;
         await chrome.storage.sync.set({ notifyOnRedirect: en, notifyThrottleMs: Math.max(1, secs) * 1000 });
         const s = document.getElementById('notifyStatus'); if (s) { s.textContent = 'Saved.'; setTimeout(()=>s.textContent='', 2000); }
+    });
+
+    document.getElementById('saveProfileBtn')?.addEventListener('click', async () => {
+        const name = document.getElementById('profileName')?.value.trim() || '';
+        await chrome.storage.sync.set({ profileName: name });
+        const s = document.getElementById('profileStatus'); if (s) { s.textContent = 'Label saved.'; setTimeout(()=>s.textContent='', 2000); }
+        document.title = name ? `Easy Redirect — ${name}` : 'Easy Redirect';
     });
 });

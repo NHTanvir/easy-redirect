@@ -507,3 +507,17 @@ rapid redirects do not flood the notification tray.
 
 The `notifications` permission is already declared in the manifest. Options UI
 has an enable checkbox plus a throttle-seconds number input.
+
+### Per-profile support (issue #35)
+
+Chrome's per-profile storage isolation means rules are naturally separate per
+profile. This feature surfaces that with an optional display label.
+
+- `profileName` (`string`, default `''`) in DEFAULTS / `chrome.storage.sync`.
+- `getProfileInfo` message returns `{ extensionId, profileName }`.
+- Options page has a "Profile" section with the label input and a copyable
+  display of the extension ID. The page title becomes `Easy Redirect — <label>`
+  when set.
+- JSON export filename includes the sanitised label suffix (e.g.
+  `easy-redirect-backup-Work.json`) so backups from multiple profiles don't
+  collide on disk.

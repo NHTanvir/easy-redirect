@@ -129,7 +129,11 @@ const DEFAULTS = {
     blockSubresources: false,
     // Desktop notification on redirect (issue #33). Throttled to avoid spam.
     notifyOnRedirect: false,
-    notifyThrottleMs: 5000
+    notifyThrottleMs: 5000,
+    // Per-profile label (issue #35). Each Chrome profile has its own isolated
+    // storage, so rules are per-profile by default. This optional display name
+    // helps users distinguish profiles when sharing exported settings.
+    profileName: ''
 };
 
 // Daily quota counts. Stored in chrome.storage.local (not sync) because they
@@ -823,6 +827,12 @@ chrome.runtime.onStartup.addListener(async () => {
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'getProfileInfo') {
+        chrome.storage.sync.get(['profileName'], r => {
+            sendResponse({ extensionId: chrome.runtime.id, profileName: r.profileName || '' });
+        });
+        return true;
+    }
     if (request.action === 'updateRules') {
         // Defense-in-depth: if protection is active the request must carry a
         // verified token. The options page sets request.protectionOk = true after
