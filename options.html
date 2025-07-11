@@ -596,6 +596,24 @@
         </div>
     </div>
 
+    <div class="section" id="profileSection">
+        <h3>Profile</h3>
+        <div class="help-text" style="margin-bottom:12px;">
+            Each Chrome profile has its own isolated rule set. Use the label below to identify this profile, and use Import/Export to share or back up rules across profiles.
+        </div>
+        <div style="margin-bottom:12px;">
+            <label style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:4px;">Profile label (optional)</label>
+            <input type="text" id="profileName" placeholder="e.g. Work, Personal, Study"
+                   maxlength="50"
+                   style="width:100%;max-width:320px;box-sizing:border-box;">
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">
+            Extension ID: <code id="profileExtId" style="font-family:monospace;user-select:all;">—</code>
+        </div>
+        <button id="saveProfileBtn">Save label</button>
+        <div id="profileStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
+    </div>
+
     <div class="section">
         <h3>Redirect URL</h3>
         <input type="text" id="redirectUrl" placeholder="https://example.com/blocked-page">
