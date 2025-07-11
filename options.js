@@ -421,7 +421,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 'pomodoroWorkMinutes', 'pomodoroBreakMinutes',
                 'blockedPageEnabled', 'blockedPageTitle', 'blockedMessage',
                 'motivationEnabled', 'motivationQuotes',
-                'blockSubresources'
+                'blockSubresources',
+                'notifyOnRedirect', 'notifyThrottleMs'
             ]);
 
             redirectUrlInput.value = result.redirectUrl || 'https://www.google.com';
@@ -521,6 +522,15 @@ document.addEventListener('DOMContentLoaded', function() {
         if (blockSubresourcesCb) {
             blockSubresourcesCb.checked = result.blockSubresources === true;
         }
+        // Populate redirect notification settings (issue #33).
+        const notifyEl = document.getElementById('notifyOnRedirect');
+        if (notifyEl) {
+            notifyEl.checked = result.notifyOnRedirect || false;
+            const o = document.getElementById('notifyOptions');
+            if (o) o.style.display = notifyEl.checked ? '' : 'none';
+        }
+        const tEl = document.getElementById('notifyThrottleSecs');
+        if (tEl) tEl.value = Math.round((result.notifyThrottleMs ?? 5000) / 1000);
         } catch (error) {
             showStatus('Error loading data: ' + error.message, 'error');
         }
@@ -2803,4 +2813,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initialise lockdown UI on page load.
     refreshLockdownUi();
+
+    // Redirect notification settings handlers (issue #33).
+    document.getElementById('notifyOnRedirect')?.addEventListener('change', e => {
+        const o = document.getElementById('notifyOptions');
+        if (o) o.style.display = e.target.checked ? '' : 'none';
+    });
+    document.getElementById('saveNotifyBtn')?.addEventListener('click', async () => {
+        const en = document.getElementById('notifyOnRedirect')?.checked || false;
+        const secs = parseInt(document.getElementById('notifyThrottleSecs')?.value, 10) || 5;
+        await chrome.storage.sync.set({ notifyOnRedirect: en, notifyThrottleMs: Math.max(1, secs) * 1000 });
+        const s = document.getElementById('notifyStatus'); if (s) { s.textContent = 'Saved.'; setTimeout(()=>s.textContent='', 2000); }
+    });
 });

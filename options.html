@@ -602,6 +602,23 @@
         <button id="saveRedirectUrl">Save Redirect URL</button>
     </div>
 
+    <div class="section" id="notificationSection">
+        <h3>Redirect Notifications</h3>
+        <div class="help-text" style="margin-bottom:12px;">Show a desktop notification each time a site is redirected.</div>
+        <label style="display:flex;align-items:center;gap:10px;margin-bottom:10px;cursor:pointer;">
+            <input type="checkbox" id="notifyOnRedirect" style="width:16px;height:16px;">
+            <span style="font-size:14px;">Show notification on redirect</span>
+        </label>
+        <div id="notifyOptions" style="display:none;margin-bottom:10px;">
+            <label style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:4px;">Minimum seconds between notifications</label>
+            <input type="number" id="notifyThrottleSecs" min="1" max="60" value="5"
+                   style="width:80px;padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
+            <span style="font-size:13px;color:var(--text-muted);margin-left:6px;">seconds</span>
+        </div>
+        <button id="saveNotifyBtn">Save</button>
+        <div id="notifyStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
+    </div>
+
     <div class="section">
         <h3>Add Block Rule</h3>
         <input type="text" id="newWebsite" placeholder="example.com  or  reddit.com/r/funny  or  *.site.com/*  or  r/regex.*">

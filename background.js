@@ -126,7 +126,10 @@ const DEFAULTS = {
     motivationQuotes: [],
     // Block sub-resources (feature #16). When true, iframe (sub_frame) requests to
     // blocked domains are also redirected, not just top-level navigations.
-    blockSubresources: false
+    blockSubresources: false,
+    // Desktop notification on redirect (issue #33). Throttled to avoid spam.
+    notifyOnRedirect: false,
+    notifyThrottleMs: 5000
 };
 
 // Daily quota counts. Stored in chrome.storage.local (not sync) because they
@@ -1712,6 +1715,28 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     }
 });
 
+// Redirect notification (issue #33): show a Chrome desktop notification when a
+// redirect fires. Module-level _lastNotifyTime enforces the configured throttle
+// window (notifyThrottleMs) so rapid redirects do not flood the notification tray.
+let _lastNotifyTime = 0;
+async function showRedirectNotification(url, pattern) {
+    const r = await chrome.storage.sync.get(['notifyOnRedirect', 'notifyThrottleMs']);
+    if (!r.notifyOnRedirect) return;
+    const throttle = r.notifyThrottleMs ?? 5000;
+    const now = Date.now();
+    if (now - _lastNotifyTime < throttle) return;
+    _lastNotifyTime = now;
+    let hostname = url; try { hostname = new URL(url).hostname; } catch (_) {}
+    chrome.notifications.create('redirect-' + now, {
+        type: 'basic',
+        iconUrl: 'icons/icon-48.png',
+        title: 'Easy Redirect',
+        message: `Redirected: ${hostname}`,
+        contextMessage: pattern ? `Rule: ${pattern}` : '',
+        silent: true
+    });
+}
+
 // Hit counter (feature #27): increment rule.hitCount and record rule.lastHitAt
 // whenever a DNR rule fires. Requires the declarativeNetRequestFeedback permission.
 // The DNR ID formula is: dnrId = (sourceIndex + 1) * DNR_ID_STRIDE + typeOffset + variantOffset
@@ -1736,5 +1761,7 @@ if (chrome.declarativeNetRequest.onRuleMatchedDebug) {
         rule.lastHitAt = Date.now();
         rules[sourceIndex] = rule;
         await chrome.storage.sync.set({ rules });
+
+        showRedirectNotification(info.request.url, rule?.pattern);
     });
 }
