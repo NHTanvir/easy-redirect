@@ -2641,7 +2641,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const exportData = { version: 1, exportedAt: new Date().toISOString(), ...data };
         const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
-        const a = Object.assign(document.createElement('a'), { href: url, download: `easy-redirect-${Date.now()}.json` });
+        const profR = await chrome.storage.sync.get(['profileName']);
+        const profName = (profR.profileName || '').trim();
+        const profSuffix = profName ? `-${profName.replace(/[^a-z0-9]/gi, '_')}` : '';
+        const filename = `easy-redirect-backup${profSuffix}.json`;
+        const a = Object.assign(document.createElement('a'), { href: url, download: filename });
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         URL.revokeObjectURL(url);
         showStatus('Exported successfully.', 'success');
