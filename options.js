@@ -1651,6 +1651,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Reset all per-rule hit counters to zero (feature #27). Does not affect
+    // any other rule fields. Writes are mirrored to local storage via the
+    // chrome.storage.onChanged listener in background.js.
+    async function resetHitCounts() {
+        try {
+            const result = await chrome.storage.sync.get(['rules']);
+            const rules = (result.rules || []).map(r => ({ ...r, hitCount: 0, lastHitAt: null }));
+            await chrome.storage.sync.set({ rules });
+            displayRules(rules);
+            showStatus('Hit counters reset.', 'success');
+        } catch (err) {
+            showStatus('Error resetting hit counts: ' + err.message, 'error');
+        }
+    }
+
     async function toggleExtension() {
         try {
             // Check lockdown state (feature #11) before allowing disable.
