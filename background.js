@@ -1709,3 +1709,30 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         } catch (e) {}
     }
 });
+
+// Hit counter (feature #27): increment rule.hitCount and record rule.lastHitAt
+// whenever a DNR rule fires. Requires the declarativeNetRequestFeedback permission.
+// The DNR ID formula is: dnrId = (sourceIndex + 1) * DNR_ID_STRIDE + typeOffset + variantOffset
+// so we reverse it: sourceIndex = Math.floor(dnrId / DNR_ID_STRIDE) - 1.
+// IDs below DNR_ID_STRIDE (e.g. the allowlist catch-all at ID 1) have sourceIndex < 0
+// and are skipped.
+if (chrome.declarativeNetRequest.onRuleMatchedDebug) {
+    chrome.declarativeNetRequest.onRuleMatchedDebug.addListener(async (info) => {
+        if (info.rule.rulesetId !== '_dynamic') return;
+        const dnrId = info.rule.ruleId;
+        const sourceIndex = Math.floor(dnrId / DNR_ID_STRIDE) - 1;
+        if (sourceIndex < 0) return; // catch-all or alwaysAllowed rules
+
+        const result = await chrome.storage.sync.get(['rules']);
+        const rules = Array.isArray(result.rules) ? result.rules : [];
+        if (sourceIndex >= rules.length) return;
+
+        const rule = rules[sourceIndex];
+        if (!rule) return;
+
+        rule.hitCount = (typeof rule.hitCount === 'number' ? rule.hitCount : 0) + 1;
+        rule.lastHitAt = Date.now();
+        rules[sourceIndex] = rule;
+        await chrome.storage.sync.set({ rules });
+    });
+}
