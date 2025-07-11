@@ -422,7 +422,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 'blockedPageEnabled', 'blockedPageTitle', 'blockedMessage',
                 'motivationEnabled', 'motivationQuotes',
                 'blockSubresources', 'profileName',
-                'notifyOnRedirect', 'notifyThrottleMs'
+                'notifyOnRedirect', 'notifyThrottleMs',
+                'incognitoMode'
             ]);
 
             const profEl = document.getElementById('profileExtId');
@@ -432,6 +433,12 @@ document.addEventListener('DOMContentLoaded', function() {
             if (result.profileName) document.title = `Easy Redirect — ${result.profileName}`;
 
             redirectUrlInput.value = result.redirectUrl || 'https://www.google.com';
+
+            const incMode = result.incognitoMode || 'block';
+            const ib = document.getElementById('incognitoBlock');
+            const ia = document.getElementById('incognitoAllow');
+            if (ib) ib.checked = incMode === 'block';
+            if (ia) ia.checked = incMode === 'allow';
 
             const rules = Array.isArray(result.rules) ? result.rules : [];
 
