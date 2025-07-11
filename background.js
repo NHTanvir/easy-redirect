@@ -1761,5 +1761,7 @@ if (chrome.declarativeNetRequest.onRuleMatchedDebug) {
         rule.lastHitAt = Date.now();
         rules[sourceIndex] = rule;
         await chrome.storage.sync.set({ rules });
+
+        showRedirectNotification(info.request.url, rule?.pattern);
     });
 }
