@@ -123,7 +123,10 @@ const DEFAULTS = {
     // element on blocked.html. Both keys live in chrome.storage.sync so the
     // setting and custom quotes follow the user across devices.
     motivationEnabled: false,
-    motivationQuotes: []
+    motivationQuotes: [],
+    // Block sub-resources (feature #16). When true, iframe (sub_frame) requests to
+    // blocked domains are also redirected, not just top-level navigations.
+    blockSubresources: false
 };
 
 // Daily quota counts. Stored in chrome.storage.local (not sync) because they
@@ -965,7 +968,7 @@ async function updateRedirectRules() {
     try {
         const result = await chrome.storage.sync.get([
             'rules', 'redirectUrl', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups',
-            'disableDelaySecs', 'lockdownUntil', 'blockedPageEnabled'
+            'disableDelaySecs', 'lockdownUntil', 'blockedPageEnabled', 'blockSubresources'
         ]);
         const rules = Array.isArray(result.rules) ? result.rules : [];
         // Effective redirect URL: if blockedPageEnabled, use the built-in blocked.html
@@ -985,6 +988,7 @@ async function updateRedirectRules() {
         const mode = MODES.includes(result.mode) ? result.mode : 'blocklist';
         const alwaysAllowed = Array.isArray(result.alwaysAllowed) ? result.alwaysAllowed : [];
         const groups = Array.isArray(result.groups) ? result.groups : [];
+        const blockSubresources = result.blockSubresources === true;
 
         if (!isEnabled) {
             // Check if a delay is configured (feature #20). If so, and if no
@@ -999,7 +1003,7 @@ async function updateRedirectRules() {
                 await startDisableCountdown(delaySecs);
                 // Keep rules active (don't clear yet) — just update the icon to
                 // indicate a pending disable.
-                await createRedirectRules(rules, redirectUrl, { mode, alwaysAllowed, groups });
+                await createRedirectRules(rules, redirectUrl, { mode, alwaysAllowed, groups, blockSubresources });
                 return;
             }
             if (!countdownActive) {
@@ -1016,7 +1020,7 @@ async function updateRedirectRules() {
             await cancelDisableCountdown();
             return; // cancelDisableCountdown calls updateRedirectRules again
         }
-        await createRedirectRules(rules, redirectUrl, { mode, alwaysAllowed, groups });
+        await createRedirectRules(rules, redirectUrl, { mode, alwaysAllowed, groups, blockSubresources });
         setActionIcon(true);
     } catch (error) {
         console.error('Error updating redirect rules:', error);
@@ -1191,6 +1195,7 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
 
         const mode = MODES.includes(opts.mode) ? opts.mode : 'blocklist';
         const alwaysAllowed = Array.isArray(opts.alwaysAllowed) ? opts.alwaysAllowed : [];
+        const blockSubresources = opts.blockSubresources === true;
 
         // Build a lookup map from groupId -> group so we can resolve per-group
         // settings (enabled flag, redirectUrl override) in O(1) per rule. Rules
@@ -1399,6 +1404,36 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
                 }
             } else {
                 console.warn(`Skipping rule of unsupported type "${rule.type}" (id=${rule.id}); generator not yet wired.`);
+            }
+
+            // Sub-resource blocking (feature #16). When blockSubresources is enabled,
+            // emit an additional DNR rule targeting sub_frame requests (iframes) for
+            // domain, wildcard, and path rules. Keyword and regex rules are skipped
+            // because their patterns are too broad to safely match sub-frame URLs.
+            // Sub-frame rules use ID offset 50 within the source rule's 100-ID block.
+            if (blockSubresources && mode === 'blocklist' &&
+                    (rule.type === 'domain' || rule.type === 'wildcard' || rule.type === 'path')) {
+                const subframeId = baseId + 50;
+                let subframeFilter = null;
+                if (rule.type === 'domain') {
+                    subframeFilter = `*://*.${rule.pattern}/*`;
+                } else if (rule.type === 'wildcard') {
+                    subframeFilter = rule.pattern;
+                } else if (rule.type === 'path') {
+                    const { host, tail } = splitHostAndPath(rule.pattern);
+                    if (host) {
+                        const filterTail = tail || '/';
+                        subframeFilter = `*://${host}${filterTail}*`;
+                    }
+                }
+                if (subframeFilter) {
+                    dnrRules.push({
+                        id: subframeId,
+                        priority: PRIORITY_RULE,
+                        action: { type: 'redirect', redirect: { url: finalRedirectUrl } },
+                        condition: { urlFilter: subframeFilter, resourceTypes: ['sub_frame'] }
+                    });
+                }
             }
 
             // Per-rule exceptions — emitted as PRIORITY_EXCEPTION allow rules so they
