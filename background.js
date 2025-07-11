@@ -129,7 +129,11 @@ const DEFAULTS = {
     blockSubresources: false,
     // Desktop notification on redirect (issue #33). Throttled to avoid spam.
     notifyOnRedirect: false,
-    notifyThrottleMs: 5000
+    notifyThrottleMs: 5000,
+    // Per-profile label (issue #35). Each Chrome profile has its own isolated
+    // storage, so rules are per-profile by default. This optional display name
+    // helps users distinguish profiles when sharing exported settings.
+    profileName: ''
 };
 
 // Daily quota counts. Stored in chrome.storage.local (not sync) because they
