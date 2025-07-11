@@ -421,9 +421,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 'pomodoroWorkMinutes', 'pomodoroBreakMinutes',
                 'blockedPageEnabled', 'blockedPageTitle', 'blockedMessage',
                 'motivationEnabled', 'motivationQuotes',
-                'blockSubresources',
+                'blockSubresources', 'profileName',
                 'notifyOnRedirect', 'notifyThrottleMs'
             ]);
+
+            const profEl = document.getElementById('profileExtId');
+            if (profEl) profEl.textContent = chrome.runtime.id;
+            const profNameEl = document.getElementById('profileName');
+            if (profNameEl) profNameEl.value = result.profileName || '';
+            if (result.profileName) document.title = `Easy Redirect — ${result.profileName}`;
 
             redirectUrlInput.value = result.redirectUrl || 'https://www.google.com';
 
