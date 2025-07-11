@@ -230,6 +230,15 @@ async function scheduleMidnightAlarm() {
 // rules (which re-enables any rules that were suspended mid-day), and schedule
 // the next midnight alarm.
 chrome.alarms.onAlarm.addListener(async (alarm) => {
+    // Temporary override expiry (issue #36): a `tempOverride:<ruleId>` alarm
+    // fires when the user's "Allow for N minutes" window runs out. Clearing
+    // the override re-emits DNR rules so blocking resumes for that rule.
+    if (alarm.name.startsWith(TEMP_OVERRIDE_ALARM_PREFIX)) {
+        const ruleId = alarm.name.slice(TEMP_OVERRIDE_ALARM_PREFIX.length);
+        await clearTemporaryOverride(ruleId);
+        return;
+    }
+
     if (alarm.name === 'resetDailyQuota') {
         const fresh = { date: todayUTC(), counts: {} };
         await saveDailyCounts(fresh);
