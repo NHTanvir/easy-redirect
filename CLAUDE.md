@@ -496,3 +496,14 @@ of the last hit). The counter wiring lives in `background.js`:
 **Options UI** — `displayRules()` shows a `"<n> blocked"` badge (or `K`/`M`-suffixed
 when large) next to rules with `hitCount > 0`. A "Reset hit counts" button in the
 Block Rules footer clears every rule's counter after a confirm dialog.
+
+### Redirect notification (issue #33)
+
+`notifyOnRedirect` (bool) and `notifyThrottleMs` (ms) in DEFAULTS. When enabled,
+the existing `onRuleMatchedDebug` listener calls `showRedirectNotification(url,
+pattern)`, which uses `chrome.notifications.create()` to display a basic toast.
+A module-level `_lastNotifyTime` enforces the configured throttle window so
+rapid redirects do not flood the notification tray.
+
+The `notifications` permission is already declared in the manifest. Options UI
+has an enable checkbox plus a throttle-seconds number input.
