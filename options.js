@@ -2831,4 +2831,11 @@ document.addEventListener('DOMContentLoaded', function() {
         await chrome.storage.sync.set({ notifyOnRedirect: en, notifyThrottleMs: Math.max(1, secs) * 1000 });
         const s = document.getElementById('notifyStatus'); if (s) { s.textContent = 'Saved.'; setTimeout(()=>s.textContent='', 2000); }
     });
+
+    document.getElementById('saveProfileBtn')?.addEventListener('click', async () => {
+        const name = document.getElementById('profileName')?.value.trim() || '';
+        await chrome.storage.sync.set({ profileName: name });
+        const s = document.getElementById('profileStatus'); if (s) { s.textContent = 'Label saved.'; setTimeout(()=>s.textContent='', 2000); }
+        document.title = name ? `Easy Redirect — ${name}` : 'Easy Redirect';
+    });
 });
