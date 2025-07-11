@@ -1715,6 +1715,28 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     }
 });
 
+// Redirect notification (issue #33): show a Chrome desktop notification when a
+// redirect fires. Module-level _lastNotifyTime enforces the configured throttle
+// window (notifyThrottleMs) so rapid redirects do not flood the notification tray.
+let _lastNotifyTime = 0;
+async function showRedirectNotification(url, pattern) {
+    const r = await chrome.storage.sync.get(['notifyOnRedirect', 'notifyThrottleMs']);
+    if (!r.notifyOnRedirect) return;
+    const throttle = r.notifyThrottleMs ?? 5000;
+    const now = Date.now();
+    if (now - _lastNotifyTime < throttle) return;
+    _lastNotifyTime = now;
+    let hostname = url; try { hostname = new URL(url).hostname; } catch (_) {}
+    chrome.notifications.create('redirect-' + now, {
+        type: 'basic',
+        iconUrl: 'icons/icon-48.png',
+        title: 'Easy Redirect',
+        message: `Redirected: ${hostname}`,
+        contextMessage: pattern ? `Rule: ${pattern}` : '',
+        silent: true
+    });
+}
+
 // Hit counter (feature #27): increment rule.hitCount and record rule.lastHitAt
 // whenever a DNR rule fires. Requires the declarativeNetRequestFeedback permission.
 // The DNR ID formula is: dnrId = (sourceIndex + 1) * DNR_ID_STRIDE + typeOffset + variantOffset
