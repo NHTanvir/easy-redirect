@@ -1276,6 +1276,11 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
         // alarm fires and getDailyCounts() returns a fresh zero object.
         const dailyCounts = await getDailyCounts();
 
+        // Temporary overrides (issue #36): rules with an active override are
+        // skipped at emit time so the user can browse the site freely until the
+        // override's alarm fires and clearTemporaryOverride re-emits DNR rules.
+        const tempOverrides = await getTemporaryOverrides();
+
         // Build DNR rules. Disabled source rules are skipped here, not deleted —
         // toggling enabled back to true must restore behaviour without touching
         // storage. Unknown types log a warning so future contributors see they
@@ -1296,6 +1301,13 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
         rules.forEach((rule, index) => {
             // Disabled rules are intentionally skipped here, not deleted — re-enabling restores them without a storage write.
             if (!rule || rule.enabled === false) {
+                return;
+            }
+
+            // Skip rules with an active temporary override (issue #36). The
+            // override expiry alarm will call clearTemporaryOverride which
+            // re-emits DNR rules, so blocking transparently resumes at expiry.
+            if (tempOverrides[rule.id]) {
                 return;
             }
 
