@@ -179,7 +179,11 @@ const DEFAULTS = {
     // Per-profile label (issue #35). Each Chrome profile has its own isolated
     // storage, so rules are per-profile by default. This optional display name
     // helps users distinguish profiles when sharing exported settings.
-    profileName: ''
+    profileName: '',
+    // Incognito mode (issue #34). 'block' = apply rules in incognito tabs
+    // (also requires "Allow in incognito" in chrome://extensions).
+    // 'allow' = a tabs.onUpdated listener reverses the redirect for incognito tabs.
+    incognitoMode: 'block'
 };
 
 // Daily quota counts. Stored in chrome.storage.local (not sync) because they
