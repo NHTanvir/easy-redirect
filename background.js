@@ -42,6 +42,28 @@ const DISABLE_DELAY_MAX = 300;
 // rebuilds DNR rules if any group's active state has changed.
 const SCHEDULE_ALARM_NAME = 'checkGroupSchedules';
 
+// Temporary override (issue #36): per-rule alarm name prefix. When a user
+// temporarily allows a blocked site for N minutes the override is stored in
+// chrome.storage.local under `temporaryOverrides[ruleId] = expiresAt` and an
+// alarm named `tempOverride:<ruleId>` is scheduled to fire at that time so the
+// override can auto-expire even if the options page is closed.
+const TEMP_OVERRIDE_ALARM_PREFIX = 'tempOverride:';
+
+// Read the current temporaryOverrides map from chrome.storage.local. Any entries
+// whose expiresAt has already passed are pruned in-place — this keeps the map
+// honest in case an alarm failed to fire (e.g. browser was closed at the time).
+async function getTemporaryOverrides() {
+    const r = await chrome.storage.local.get(['temporaryOverrides']);
+    const overrides = r.temporaryOverrides || {};
+    const now = Date.now();
+    let changed = false;
+    for (const [rid, exp] of Object.entries(overrides)) {
+        if (exp <= now) { delete overrides[rid]; changed = true; }
+    }
+    if (changed) await chrome.storage.local.set({ temporaryOverrides: overrides });
+    return overrides;
+}
+
 const DEFAULTS = {
     redirectUrl: 'https://www.google.com',
     blockedWebsites: [],
