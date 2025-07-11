@@ -461,3 +461,21 @@ An optional motivational quote displayed at the bottom of the custom blocked pag
 - `_loadBlockedPageSettings(result)` in `options.js` populates the checkbox and textarea from storage and shows/hides `#motivationOptions` on page load.
 - A `change` listener on `#motivationEnabled` toggles `#motivationOptions` visibility immediately.
 - The **Save blocked page settings** button handler and the **Preview** button handler both collect the motivation fields and include them in the `chrome.storage.sync.set` call so saves are always atomic across all blocked-page settings.
+
+### Sub-resource blocking (feature #16)
+
+Extends the extension to intercept `sub_frame` (iframe) loads targeting blocked domains in addition to the existing `main_frame` redirect behaviour.
+
+**Storage key** (in `chrome.storage.sync`, added to `DEFAULTS`):
+- `blockSubresources` — `boolean`, `false` by default. When `true`, `createRedirectRules()` emits an additional DNR rule for each domain, wildcard, and path rule targeting `sub_frame` resource type. Keyword and regex rules are excluded because their patterns are too broad for safe sub-frame matching.
+
+**background.js**:
+- `updateRedirectRules()` reads `blockSubresources` from `chrome.storage.sync` and passes it to `createRedirectRules()` via the `opts` object.
+- `createRedirectRules()` reads `opts.blockSubresources`. For each domain/wildcard/path rule in blocklist mode, it emits an extra DNR rule at ID offset `+50` within the rule's 100-ID block (i.e. `(sourceIndex + 1) * 100 + 50`), with `resourceTypes: ['sub_frame']` and the same redirect action as the main rule. Domain rules use `*://*.DOMAIN/*` as the urlFilter for the sub-frame entry.
+
+**DNR ID offset 50** is reserved for sub-frame rules within each rule's 100-ID block. This leaves offsets 0–49 (main-frame rules by type) and 51–89 available for future variants, with 90–99 still used for per-rule exceptions.
+
+**Options UI** — `#subresourceSection` in `options.html` (between the Redirect URL section and the Blocked Page section):
+- A checkbox (`#blockSubresources`) and a **Save** button (`#saveSubresourcesBtn`).
+- `loadData()` in `options.js` reads `blockSubresources` from storage and sets the checkbox state.
+- The Save handler writes `{ blockSubresources: enabled }` to `chrome.storage.sync` and calls `updateRedirectRules()`.
