@@ -270,8 +270,10 @@ function createRule(pattern, type, opts = {}) {
         enabled: opts.enabled !== undefined ? opts.enabled : true,
         groupId: opts.groupId || 'default',
         createdAt: opts.createdAt || Date.now(),
-        hitCount: opts.hitCount || 0,
-        lastHitAt: opts.lastHitAt || null,
+        // Hit counter (feature #27): starts at 0 and null; incremented by the
+        // onRuleMatchedDebug listener in background.js each time a DNR rule fires.
+        hitCount: typeof opts.hitCount === 'number' ? opts.hitCount : 0,
+        lastHitAt: opts.lastHitAt !== undefined ? opts.lastHitAt : null,
         // Daily quota: maximum redirects allowed per calendar day (UTC). null
         // means no limit. When the day's hit count reaches this value the rule's
         // DNR entries are removed until the midnight alarm resets dailyCounts.
@@ -705,15 +707,20 @@ async function runSchemaMigration() {
 
     // Backfill groupId='default' on rules that predate groups (created before #7).
     // Also backfill redirectUrl: null on rules that predate feature #14.
+    // Also backfill hitCount: 0 and lastHitAt: null on rules that predate feature #27.
     const existingRules = Array.isArray(next.rules) ? next.rules : [];
     const rulesNeedGroupId = existingRules.some(r => !r.groupId);
     const rulesNeedRedirectUrl = existingRules.some(r => !('redirectUrl' in r));
-    const needsRuleBackfill = rulesNeedGroupId || rulesNeedRedirectUrl;
+    const rulesNeedHitCount = existingRules.some(r => typeof r.hitCount !== 'number');
+    const rulesNeedLastHitAt = existingRules.some(r => !('lastHitAt' in r));
+    const needsRuleBackfill = rulesNeedGroupId || rulesNeedRedirectUrl || rulesNeedHitCount || rulesNeedLastHitAt;
     const backfilledRules = needsRuleBackfill
         ? existingRules.map(r => {
             let out = r;
             if (!r.groupId) out = { ...out, groupId: 'default' };
             if (!('redirectUrl' in r)) out = { ...out, redirectUrl: null };
+            if (typeof r.hitCount !== 'number') out = { ...out, hitCount: 0 };
+            if (!('lastHitAt' in r)) out = { ...out, lastHitAt: null };
             return out;
         })
         : existingRules;
@@ -1704,3 +1711,30 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         } catch (e) {}
     }
 });
+
+// Hit counter (feature #27): increment rule.hitCount and record rule.lastHitAt
+// whenever a DNR rule fires. Requires the declarativeNetRequestFeedback permission.
+// The DNR ID formula is: dnrId = (sourceIndex + 1) * DNR_ID_STRIDE + typeOffset + variantOffset
+// so we reverse it: sourceIndex = Math.floor(dnrId / DNR_ID_STRIDE) - 1.
+// IDs below DNR_ID_STRIDE (e.g. the allowlist catch-all at ID 1) have sourceIndex < 0
+// and are skipped.
+if (chrome.declarativeNetRequest.onRuleMatchedDebug) {
+    chrome.declarativeNetRequest.onRuleMatchedDebug.addListener(async (info) => {
+        if (info.rule.rulesetId !== '_dynamic') return;
+        const dnrId = info.rule.ruleId;
+        const sourceIndex = Math.floor(dnrId / DNR_ID_STRIDE) - 1;
+        if (sourceIndex < 0) return; // catch-all or alwaysAllowed rules
+
+        const result = await chrome.storage.sync.get(['rules']);
+        const rules = Array.isArray(result.rules) ? result.rules : [];
+        if (sourceIndex >= rules.length) return;
+
+        const rule = rules[sourceIndex];
+        if (!rule) return;
+
+        rule.hitCount = (typeof rule.hitCount === 'number' ? rule.hitCount : 0) + 1;
+        rule.lastHitAt = Date.now();
+        rules[sourceIndex] = rule;
+        await chrome.storage.sync.set({ rules });
+    });
+}

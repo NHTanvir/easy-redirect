@@ -12,6 +12,7 @@
   "permissions": [
     "storage",
     "declarativeNetRequest",
+    "declarativeNetRequestFeedback",
     "activeTab",
     "scripting",
     "tabs",

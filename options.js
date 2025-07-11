@@ -154,6 +154,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+    // Wire the Reset hit counts button (feature #27).
+    const resetHitCountsBtn = document.getElementById('resetHitCountsBtn');
+    if (resetHitCountsBtn) {
+        resetHitCountsBtn.addEventListener('click', resetHitCounts);
+    }
     document.getElementById('toggleBtn').addEventListener('click', toggleExtension);
     modeBlocklistBtn.addEventListener('click', () => switchMode('blocklist'));
     modeAllowlistBtn.addEventListener('click', () => switchMode('allowlist'));
@@ -1651,6 +1656,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Reset all per-rule hit counters to zero (feature #27). Does not affect
+    // any other rule fields. Writes are mirrored to local storage via the
+    // chrome.storage.onChanged listener in background.js.
+    async function resetHitCounts() {
+        try {
+            const result = await chrome.storage.sync.get(['rules']);
+            const rules = (result.rules || []).map(r => ({ ...r, hitCount: 0, lastHitAt: null }));
+            await chrome.storage.sync.set({ rules });
+            displayRules(rules);
+            showStatus('Hit counters reset.', 'success');
+        } catch (err) {
+            showStatus('Error resetting hit counts: ' + err.message, 'error');
+        }
+    }
+
     async function toggleExtension() {
         try {
             // Check lockdown state (feature #11) before allowing disable.
@@ -1711,6 +1731,15 @@ document.addEventListener('DOMContentLoaded', function() {
             '</mark>' +
             escapeHtml(text.slice(idx + query.length))
         );
+    }
+
+    // Format a hit count number for compact display in the rule row badge.
+    // Numbers below 1000 are shown as-is; 1000+ are formatted as e.g. "1.2K"
+    // or "3M" to keep the badge short. Used by displayRules() (feature #27).
+    function formatHitCount(n) {
+        if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+        if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+        return String(n);
     }
 
     // Sort order applied to the rule list. Persisted to chrome.storage.local so it
@@ -1823,6 +1852,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <input type="checkbox" class="rule-select-checkbox" data-rule-id="${escapeHtml(rule.id)}" style="margin:0 4px 0 0;cursor:pointer;" title="Select this rule">
                             <span class="${badgeClass}">${badgeLabel}</span>
                             <span class="rule-pattern">${highlightMatch(rule.pattern, searchQuery)}</span>
+                            ${(rule.hitCount > 0) ? `<span style="font-size:11px;padding:1px 6px;border-radius:8px;background:#546e7a;color:#fff;white-space:nowrap;" title="${rule.hitCount} redirect${rule.hitCount === 1 ? '' : 's'} triggered by this rule${rule.lastHitAt ? ' (last: ' + new Date(rule.lastHitAt).toLocaleString() + ')' : ''}">${formatHitCount(rule.hitCount)} blocked</span>` : ''}
                         </span>
                         <span class="rule-actions">
                             <button class="${toggleClass}" data-rule-id="${escapeHtml(rule.id)}" title="${isEnabled ? 'Disable this rule' : 'Enable this rule'}">${isEnabled ? 'On' : 'Off'}</button>

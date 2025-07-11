@@ -479,3 +479,20 @@ Extends the extension to intercept `sub_frame` (iframe) loads targeting blocked 
 - A checkbox (`#blockSubresources`) and a **Save** button (`#saveSubresourcesBtn`).
 - `loadData()` in `options.js` reads `blockSubresources` from storage and sets the checkbox state.
 - The Save handler writes `{ blockSubresources: enabled }` to `chrome.storage.sync` and calls `updateRedirectRules()`.
+
+### Per-rule hit counter (issue #31)
+
+Each Rule carries `hitCount` (incremented per DNR match) and `lastHitAt` (ms epoch
+of the last hit). The counter wiring lives in `background.js`:
+
+- `manifest.json` adds the `declarativeNetRequestFeedback` permission so
+  `chrome.declarativeNetRequest.onRuleMatchedDebug` is available.
+- The listener reverses `dnrId` to the source rule index via
+  `Math.floor(dnrId / 100) - 1` (matching the `(sourceIndex + 1) * 100` formula
+  used at emit time), increments `rule.hitCount`, sets `rule.lastHitAt`, and
+  writes back to sync storage.
+- `runSchemaMigration()` backfills both fields on rules predating this feature.
+
+**Options UI** — `displayRules()` shows a `"<n> blocked"` badge (or `K`/`M`-suffixed
+when large) next to rules with `hitCount > 0`. A "Reset hit counts" button in the
+Block Rules footer clears every rule's counter after a confirm dialog.
