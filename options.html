@@ -637,6 +637,27 @@
         <div id="notifyStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
     </div>
 
+    <div class="section" id="incognitoSection">
+        <h3>Incognito Mode</h3>
+        <div class="help-text" style="margin-bottom:12px;">
+            Controls whether Easy Redirect rules apply in incognito (private) browsing windows.
+            To enable incognito blocking, also enable <strong>"Allow in incognito"</strong> for this extension in
+            <a href="#" id="openExtensionsPageLink" style="color:var(--accent);">chrome://extensions</a>.
+        </div>
+        <div style="margin-bottom:12px;">
+            <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer;">
+                <input type="radio" name="incognitoMode" value="block" id="incognitoBlock">
+                <span style="font-size:14px;">Block — apply redirect rules in incognito tabs</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                <input type="radio" name="incognitoMode" value="allow" id="incognitoAllow">
+                <span style="font-size:14px;">Allow — skip redirect rules in incognito tabs</span>
+            </label>
+        </div>
+        <button id="saveIncognitoBtn">Save</button>
+        <div id="incognitoStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
+    </div>
+
     <div class="section">
         <h3>Add Block Rule</h3>
         <input type="text" id="newWebsite" placeholder="example.com  or  reddit.com/r/funny  or  *.site.com/*  or  r/regex.*">

@@ -179,7 +179,11 @@ const DEFAULTS = {
     // Per-profile label (issue #35). Each Chrome profile has its own isolated
     // storage, so rules are per-profile by default. This optional display name
     // helps users distinguish profiles when sharing exported settings.
-    profileName: ''
+    profileName: '',
+    // Incognito mode (issue #34). 'block' = apply rules in incognito tabs
+    // (also requires "Allow in incognito" in chrome://extensions).
+    // 'allow' = a tabs.onUpdated listener reverses the redirect for incognito tabs.
+    incognitoMode: 'block'
 };
 
 // Daily quota counts. Stored in chrome.storage.local (not sync) because they
@@ -886,6 +890,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         chrome.storage.sync.get(['profileName'], r => {
             sendResponse({ extensionId: chrome.runtime.id, profileName: r.profileName || '' });
         });
+        return true;
+    }
+    if (request.action === 'getIncognitoMode') {
+        chrome.storage.sync.get(['incognitoMode'], r => sendResponse({ incognitoMode: r.incognitoMode || 'block' }));
         return true;
     }
     if (request.action === 'updateRules') {
@@ -1857,3 +1865,15 @@ if (chrome.declarativeNetRequest.onRuleMatchedDebug) {
         showRedirectNotification(info.request.url, rule?.pattern);
     });
 }
+
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+    if (!tab.incognito || changeInfo.status !== 'loading') return;
+    const r = await chrome.storage.sync.get(['incognitoMode', 'redirectUrl', 'extensionEnabled', 'blockedPageEnabled']);
+    if (!r.extensionEnabled || r.incognitoMode !== 'allow') return;
+    const activeUrl = r.blockedPageEnabled
+        ? `chrome-extension://${chrome.runtime.id}/blocked.html`
+        : (r.redirectUrl || 'https://www.google.com');
+    if (changeInfo.url && changeInfo.url.startsWith(activeUrl.split('?')[0])) {
+        chrome.tabs.goBack(tabId).catch(() => {});
+    }
+});
