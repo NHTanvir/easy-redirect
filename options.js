@@ -1787,7 +1787,15 @@ document.addEventListener('DOMContentLoaded', function() {
         return arr;
     }
 
-    function displayRules(allRules) {
+    async function displayRules(allRules) {
+        // Fetch active temporary overrides (issue #36) so we can render a
+        // countdown badge on rules that are currently allowed-through.
+        let tempOverrides = {};
+        try {
+            const ovResp = await chrome.runtime.sendMessage({ action: 'getTemporaryOverrides' });
+            tempOverrides = (ovResp && ovResp.overrides) || {};
+        } catch (_) { /* background may not be ready; default to empty */ }
+
         // Filter to only the rules belonging to the active group.
         let rules = (allRules || []).filter(r => {
             const gid = r.groupId || 'default';
@@ -1869,6 +1877,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <span class="${badgeClass}">${badgeLabel}</span>
                             <span class="rule-pattern">${highlightMatch(rule.pattern, searchQuery)}</span>
                             ${(rule.hitCount > 0) ? `<span style="font-size:11px;padding:1px 6px;border-radius:8px;background:#546e7a;color:#fff;white-space:nowrap;" title="${rule.hitCount} redirect${rule.hitCount === 1 ? '' : 's'} triggered by this rule${rule.lastHitAt ? ' (last: ' + new Date(rule.lastHitAt).toLocaleString() + ')' : ''}">${formatHitCount(rule.hitCount)} blocked</span>` : ''}
+                            ${tempOverrides[rule.id] ? `<span style="background:#e65100;color:#fff;font-size:11px;padding:2px 6px;border-radius:3px;margin-left:6px;" title="Temporary override active until ${new Date(tempOverrides[rule.id]).toLocaleString()}">Allowed for ${Math.max(0, Math.ceil((tempOverrides[rule.id] - Date.now()) / 60000))}m</span>` : ''}
                         </span>
                         <span class="rule-actions">
                             <button class="${toggleClass}" data-rule-id="${escapeHtml(rule.id)}" title="${isEnabled ? 'Disable this rule' : 'Enable this rule'}">${isEnabled ? 'On' : 'Off'}</button>
