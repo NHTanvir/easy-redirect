@@ -892,6 +892,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
         return true;
     }
+    if (request.action === 'getIncognitoMode') {
+        chrome.storage.sync.get(['incognitoMode'], r => sendResponse({ incognitoMode: r.incognitoMode || 'block' }));
+        return true;
+    }
     if (request.action === 'updateRules') {
         // Defense-in-depth: if protection is active the request must carry a
         // verified token. The options page sets request.protectionOk = true after
