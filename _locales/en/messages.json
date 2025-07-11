@@ -6,5 +6,17 @@
   "extensionDescription": {
     "message": "Redirect blocked websites to a specific page",
     "description": "Extension description in chrome://extensions"
+  },
+  "actionTitle": {
+    "message": "Easy Redirect — open settings",
+    "description": "Tooltip for the toolbar icon"
+  },
+  "openSettingsDesc": {
+    "message": "Open Easy Redirect settings",
+    "description": "Command description"
+  },
+  "toggleExtensionDesc": {
+    "message": "Toggle Easy Redirect on/off",
+    "description": "Command description"
   }
 }
