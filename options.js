@@ -2861,4 +2861,29 @@ document.addEventListener('DOMContentLoaded', function() {
         const s = document.getElementById('profileStatus'); if (s) { s.textContent = 'Label saved.'; setTimeout(()=>s.textContent='', 2000); }
         document.title = name ? `Easy Redirect — ${name}` : 'Easy Redirect';
     });
+
+    // Temporary override (issue #36): delegated handlers on the rule list so
+    // newly-rendered rows pick up the click behaviour without re-binding.
+    // Clicking the "Allow" button toggles the duration menu; clicking a
+    // duration entry sends addTemporaryOverride and re-renders the list.
+    document.getElementById('websiteList')?.addEventListener('click', async e => {
+        const ovBtn = e.target.closest('.override-btn');
+        if (ovBtn) {
+            const m = document.querySelector(`.override-menu[data-rule-id="${ovBtn.dataset.ruleId}"]`);
+            if (m) m.style.display = m.style.display === 'none' ? '' : 'none';
+            return;
+        }
+        const dur = e.target.closest('.override-duration');
+        if (dur) {
+            const m = document.querySelector(`.override-menu[data-rule-id="${dur.dataset.ruleId}"]`);
+            if (m) m.style.display = 'none';
+            await chrome.runtime.sendMessage({
+                action: 'addTemporaryOverride',
+                ruleId: dur.dataset.ruleId,
+                minutes: parseInt(dur.dataset.minutes, 10)
+            });
+            const result = await chrome.storage.sync.get(['rules']);
+            await displayRules(Array.isArray(result.rules) ? result.rules : []);
+        }
+    });
 });
