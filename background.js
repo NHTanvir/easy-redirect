@@ -126,7 +126,10 @@ const DEFAULTS = {
     motivationQuotes: [],
     // Block sub-resources (feature #16). When true, iframe (sub_frame) requests to
     // blocked domains are also redirected, not just top-level navigations.
-    blockSubresources: false
+    blockSubresources: false,
+    // Desktop notification on redirect (issue #33). Throttled to avoid spam.
+    notifyOnRedirect: false,
+    notifyThrottleMs: 5000
 };
 
 // Daily quota counts. Stored in chrome.storage.local (not sync) because they
