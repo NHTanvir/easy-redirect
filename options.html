@@ -644,6 +644,20 @@
         </div>
     </div>
 
+    <!-- Sub-resource blocking section (feature #16) -->
+    <div class="section" id="subresourceSection">
+        <h3>Sub-resource Blocking</h3>
+        <div class="help-text" style="margin-bottom:12px;">
+            When enabled, iframes (embedded content) loading blocked domains are also redirected, not just top-level page navigations.
+        </div>
+        <label style="display:flex;align-items:center;gap:10px;margin-bottom:10px;cursor:pointer;">
+            <input type="checkbox" id="blockSubresources" style="width:16px;height:16px;">
+            <span style="font-size:14px;">Also block sub-frames (iframes) to blocked domains</span>
+        </label>
+        <button id="saveSubresourcesBtn">Save</button>
+        <div id="subresourcesStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
+    </div>
+
     <!-- Custom blocked page section (feature #13) -->
     <div class="section" id="blockedPageSection">
         <h3>Blocked Page</h3>
