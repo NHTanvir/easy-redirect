@@ -414,7 +414,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 'redirectUrl', 'rules', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups', 'theme',
                 'accessCode', 'uninstallUrl', 'disableDelaySecs',
                 'pomodoroWorkMinutes', 'pomodoroBreakMinutes',
-                'blockedPageEnabled', 'blockedPageTitle', 'blockedMessage'
+                'blockedPageEnabled', 'blockedPageTitle', 'blockedMessage',
+                'motivationEnabled', 'motivationQuotes'
             ]);
 
             redirectUrlInput.value = result.redirectUrl || 'https://www.google.com';
@@ -926,6 +927,19 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if (blockedPageTitleEl) blockedPageTitleEl.value = result.blockedPageTitle || '';
         if (blockedMessageEl)   blockedMessageEl.value   = result.blockedMessage   || '';
+        // Load motivation settings (feature #15).
+        const motEnabled = result.motivationEnabled || false;
+        const motQuotes  = Array.isArray(result.motivationQuotes) ? result.motivationQuotes : [];
+        const motEnabledEl = document.getElementById('motivationEnabled');
+        if (motEnabledEl) {
+            motEnabledEl.checked = motEnabled;
+            const motOptions = document.getElementById('motivationOptions');
+            if (motOptions) motOptions.style.display = motEnabled ? '' : 'none';
+        }
+        const motQuotesEl = document.getElementById('motivationQuotes');
+        if (motQuotesEl) {
+            motQuotesEl.value = motQuotes.join('\n');
+        }
         // Load stored image preview from local storage.
         chrome.storage.local.get(['blockedImageDataUrl'], localResult => {
             const previewDiv = document.getElementById('blockedImagePreview');
