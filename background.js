@@ -270,8 +270,10 @@ function createRule(pattern, type, opts = {}) {
         enabled: opts.enabled !== undefined ? opts.enabled : true,
         groupId: opts.groupId || 'default',
         createdAt: opts.createdAt || Date.now(),
-        hitCount: opts.hitCount || 0,
-        lastHitAt: opts.lastHitAt || null,
+        // Hit counter (feature #27): starts at 0 and null; incremented by the
+        // onRuleMatchedDebug listener in background.js each time a DNR rule fires.
+        hitCount: typeof opts.hitCount === 'number' ? opts.hitCount : 0,
+        lastHitAt: opts.lastHitAt !== undefined ? opts.lastHitAt : null,
         // Daily quota: maximum redirects allowed per calendar day (UTC). null
         // means no limit. When the day's hit count reaches this value the rule's
         // DNR entries are removed until the midnight alarm resets dailyCounts.
