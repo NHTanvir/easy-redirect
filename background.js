@@ -214,6 +214,30 @@ async function saveDailyCounts(dc) {
     await chrome.storage.local.set({ dailyCounts: dc });
 }
 
+// Return the Monday of the week containing `date` as a YYYY-MM-DD string.
+// ISO weeks start on Monday (day 1); Sunday is treated as the last day of the
+// previous week (diff = -6) rather than the first day of the new week.
+function getWeekStart(date = new Date()) {
+    const d = new Date(date);
+    const day = d.getDay(); // 0=Sun
+    const diff = (day === 0) ? -6 : 1 - day; // adjust so week starts Monday
+    d.setDate(d.getDate() + diff);
+    return d.toISOString().slice(0, 10);
+}
+
+// Read weeklyStats from chrome.storage.local. If the stored weekStart does not
+// match the current Monday the data belongs to a previous week and a fresh
+// empty object is returned instead (without touching storage).
+async function getWeeklyStats() {
+    const result = await chrome.storage.local.get(['weeklyStats']);
+    const stored = result.weeklyStats;
+    const currentWeekStart = getWeekStart();
+    if (!stored || stored.weekStart !== currentWeekStart) {
+        return { weekStart: currentWeekStart, days: {} };
+    }
+    return stored;
+}
+
 // Compute the number of milliseconds until the next midnight UTC. Used to
 // schedule the daily-quota reset alarm precisely at the day boundary.
 function msUntilMidnightUTC() {
