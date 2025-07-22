@@ -46,5 +46,21 @@
   "countdownGoBack": {
     "message": "Go back",
     "description": "Back button on countdown.html"
+  },
+  "optionsHeading": {
+    "message": "Easy Redirect Settings",
+    "description": "Main heading of the options page"
+  },
+  "addRuleLabel": {
+    "message": "Add rule",
+    "description": "Add rule button"
+  },
+  "clearAllLabel": {
+    "message": "Clear All",
+    "description": "Clear all rules button"
+  },
+  "enabledLabel": {
+    "message": "Extension enabled",
+    "description": "Toggle label"
   }
 }
