@@ -7,6 +7,11 @@
 (function () {
     'use strict';
 
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const m = chrome.i18n.getMessage(el.getAttribute('data-i18n'));
+        if (m) el.textContent = m;
+    });
+
     const params = new URLSearchParams(location.search);
     // ?from= is set by the countdown interstitial when it chains to blocked.html.
     // When blocked.html is the direct DNR redirect target, DNR cannot inject the
@@ -51,9 +56,10 @@
             // Title
             const titleEl = document.getElementById('blockedTitle');
             if (titleEl) {
+                const i18nTitle = chrome.i18n.getMessage('blockedPageTitle');
                 titleEl.textContent = (typeof syncResult.blockedPageTitle === 'string' && syncResult.blockedPageTitle.trim())
                     ? syncResult.blockedPageTitle.trim()
-                    : 'Site Blocked';
+                    : (i18nTitle || 'Site Blocked');
             }
 
             // Message
@@ -62,7 +68,8 @@
                 // A per-redirect ?msg= param takes precedence over the stored default.
                 const overrideMsg = params.get('msg');
                 const storedMsg = typeof syncResult.blockedMessage === 'string' ? syncResult.blockedMessage.trim() : '';
-                msgEl.textContent = overrideMsg || storedMsg ||
+                const i18nMsg = chrome.i18n.getMessage('blockedPageMessage');
+                msgEl.textContent = overrideMsg || storedMsg || i18nMsg ||
                     'This site has been blocked by Easy Redirect to help you stay focused.';
             }
 
