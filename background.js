@@ -1053,6 +1053,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         getTemporaryOverrides().then(o => sendResponse({ overrides: o }));
         return true;
     }
+    // Stats dashboard actions (feature #28).
+    if (request.action === 'getWeeklyStats') {
+        getWeeklyStats().then(stats => sendResponse({ stats }));
+        return true; // async
+    }
+    if (request.action === 'clearStats') {
+        clearStats().then(() => sendResponse({ ok: true }));
+        return true;
+    }
 });
 
 async function handleKeywordHit(sender, request) {
