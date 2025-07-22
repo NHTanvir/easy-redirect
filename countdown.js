@@ -14,6 +14,11 @@
 (function () {
     'use strict';
 
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const m = chrome.i18n.getMessage(el.getAttribute('data-i18n'));
+        if (m) el.textContent = m;
+    });
+
     const params = new URLSearchParams(location.search);
     const fromUrl    = params.get('from')   || '';
     const toUrl      = params.get('to')     || 'https://www.google.com';

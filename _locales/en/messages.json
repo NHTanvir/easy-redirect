@@ -1,0 +1,66 @@
+{
+  "extensionName": {
+    "message": "Easy Redirect",
+    "description": "Extension name"
+  },
+  "extensionDescription": {
+    "message": "Redirect blocked websites to a specific page",
+    "description": "Extension description in chrome://extensions"
+  },
+  "actionTitle": {
+    "message": "Easy Redirect — open settings",
+    "description": "Tooltip for the toolbar icon"
+  },
+  "openSettingsDesc": {
+    "message": "Open Easy Redirect settings",
+    "description": "Command description"
+  },
+  "toggleExtensionDesc": {
+    "message": "Toggle Easy Redirect on/off",
+    "description": "Command description"
+  },
+  "blockedPageTitle": {
+    "message": "Site Blocked",
+    "description": "Default heading on blocked.html"
+  },
+  "blockedPageMessage": {
+    "message": "This site has been blocked by Easy Redirect to help you stay focused.",
+    "description": "Default body on blocked.html"
+  },
+  "blockedPageGoBack": {
+    "message": "Go back",
+    "description": "Button on blocked.html"
+  },
+  "blockedPageSettings": {
+    "message": "Settings",
+    "description": "Link on blocked.html"
+  },
+  "countdownTitle": {
+    "message": "Taking a moment…",
+    "description": "Heading on countdown.html"
+  },
+  "countdownContinue": {
+    "message": "Continue anyway",
+    "description": "Skip button on countdown.html"
+  },
+  "countdownGoBack": {
+    "message": "Go back",
+    "description": "Back button on countdown.html"
+  },
+  "optionsHeading": {
+    "message": "Easy Redirect Settings",
+    "description": "Main heading of the options page"
+  },
+  "addRuleLabel": {
+    "message": "Add rule",
+    "description": "Add rule button"
+  },
+  "clearAllLabel": {
+    "message": "Clear All",
+    "description": "Clear all rules button"
+  },
+  "enabledLabel": {
+    "message": "Extension enabled",
+    "description": "Toggle label"
+  }
+}

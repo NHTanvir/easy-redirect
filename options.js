@@ -1,3 +1,18 @@
+function applyI18n() {
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const msg = chrome.i18n.getMessage(el.getAttribute('data-i18n'));
+        if (msg) el.textContent = msg;
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const msg = chrome.i18n.getMessage(el.getAttribute('data-i18n-placeholder'));
+        if (msg) el.placeholder = msg;
+    });
+    document.querySelectorAll('[data-i18n-title]').forEach(el => {
+        const msg = chrome.i18n.getMessage(el.getAttribute('data-i18n-title'));
+        if (msg) el.title = msg;
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const redirectUrlInput = document.getElementById('redirectUrl');
     const newWebsiteInput = document.getElementById('newWebsite');
@@ -414,6 +429,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function loadData() {
+        applyI18n();
         try {
             const result = await chrome.storage.sync.get([
                 'redirectUrl', 'rules', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups', 'theme',
