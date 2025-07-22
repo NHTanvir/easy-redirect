@@ -553,3 +553,21 @@ Message actions: `addTemporaryOverride`, `clearTemporaryOverride`,
 
 Options UI exposes the two modes as radio buttons plus a link to
 `chrome://extensions/?id=<id>` to streamline the second-half setup.
+
+### i18n infrastructure (issue #41)
+
+Adds Chrome extension i18n with English as the baseline locale. A new
+language is just a `_locales/<lang>/messages.json` file with the same keys.
+
+- `_locales/en/messages.json` holds all translatable strings: extension
+  name/description, command descriptions, options heading, blocked-page
+  copy, countdown-page copy.
+- `manifest.json` declares `"default_locale": "en"` and references strings
+  via `__MSG_key__` for the fields Chrome itself shows (name, description,
+  action.default_title, commands.*.description).
+- `applyI18n()` in `options.js` walks the DOM and substitutes
+  `[data-i18n]` (textContent), `[data-i18n-placeholder]` (placeholder),
+  and `[data-i18n-title]` (title) attributes from `chrome.i18n.getMessage`.
+- `blocked.js` and `countdown.js` apply the same `[data-i18n]` pass on
+  load. `blocked.js`'s fallback strings call `chrome.i18n.getMessage`
+  before the hard-coded English defaults.
