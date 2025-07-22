@@ -3,6 +3,14 @@ function applyI18n() {
         const msg = chrome.i18n.getMessage(el.getAttribute('data-i18n'));
         if (msg) el.textContent = msg;
     });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const msg = chrome.i18n.getMessage(el.getAttribute('data-i18n-placeholder'));
+        if (msg) el.placeholder = msg;
+    });
+    document.querySelectorAll('[data-i18n-title]').forEach(el => {
+        const msg = chrome.i18n.getMessage(el.getAttribute('data-i18n-title'));
+        if (msg) el.title = msg;
+    });
 }
 
 document.addEventListener('DOMContentLoaded', function() {
