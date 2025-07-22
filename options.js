@@ -421,6 +421,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function loadData() {
+        applyI18n();
         try {
             const result = await chrome.storage.sync.get([
                 'redirectUrl', 'rules', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups', 'theme',
