@@ -1194,7 +1194,12 @@ if (chrome.declarativeNetRequest && chrome.declarativeNetRequest.onRuleMatchedDe
         const result = await chrome.storage.sync.get(['rules']);
         const rules = Array.isArray(result.rules) ? result.rules : [];
         const rule = rules[sourceIndex];
-        if (!rule || rule.quota === null || rule.quota === undefined) return; // no quota set
+        if (!rule) return;
+
+        // Record the hit in weekly stats for the stats dashboard (feature #28).
+        await recordHit(rule.id);
+
+        if (rule.quota === null || rule.quota === undefined) return; // no quota set
 
         const dc = await getDailyCounts();
         const prev = dc.counts[rule.id] || 0;
