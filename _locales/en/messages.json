@@ -34,5 +34,17 @@
   "blockedPageSettings": {
     "message": "Settings",
     "description": "Link on blocked.html"
+  },
+  "countdownTitle": {
+    "message": "Taking a moment…",
+    "description": "Heading on countdown.html"
+  },
+  "countdownContinue": {
+    "message": "Continue anyway",
+    "description": "Skip button on countdown.html"
+  },
+  "countdownGoBack": {
+    "message": "Go back",
+    "description": "Back button on countdown.html"
   }
 }
