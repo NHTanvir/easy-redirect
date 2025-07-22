@@ -1,3 +1,10 @@
+function applyI18n() {
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const msg = chrome.i18n.getMessage(el.getAttribute('data-i18n'));
+        if (msg) el.textContent = msg;
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const redirectUrlInput = document.getElementById('redirectUrl');
     const newWebsiteInput = document.getElementById('newWebsite');
