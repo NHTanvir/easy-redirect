@@ -238,6 +238,24 @@ async function getWeeklyStats() {
     return stored;
 }
 
+// Record a hit for `ruleId` in the weekly stats. Increments the day's total
+// and the per-rule count, then persists to chrome.storage.local. Called by
+// the onRuleMatchedDebug listener so every DNR-matched redirect is tracked.
+async function recordHit(ruleId) {
+    const today = todayUTC();
+    const ws = await getWeeklyStats();
+    if (!ws.days[today]) ws.days[today] = { total: 0, byRule: {} };
+    ws.days[today].total = (ws.days[today].total || 0) + 1;
+    ws.days[today].byRule[ruleId] = (ws.days[today].byRule[ruleId] || 0) + 1;
+    await chrome.storage.local.set({ weeklyStats: ws });
+}
+
+// Wipe all weekly stats from local storage. Exposed via the clearStats message
+// action so the options page can offer a "Clear stats" button.
+async function clearStats() {
+    await chrome.storage.local.remove(['weeklyStats']);
+}
+
 // Compute the number of milliseconds until the next midnight UTC. Used to
 // schedule the daily-quota reset alarm precisely at the day boundary.
 function msUntilMidnightUTC() {
