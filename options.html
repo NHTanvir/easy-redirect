@@ -541,6 +541,39 @@
         [data-theme="dark"] #lockdownActivePanel {
             --danger-bg: #3b1212;
         }
+        /* Stats dashboard cards and bar chart (feature #28) */
+        .stat-card {
+            background: var(--bg-section);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 20px;
+            text-align: center;
+            min-width: 90px;
+        }
+        .stat-value {
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--text);
+        }
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        .stats-bar-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+        .stats-bar {
+            height: 14px;
+            background: #1976d2;
+            border-radius: 3px;
+            min-width: 4px;
+            transition: width 0.3s;
+        }
     </style>
 </head>
 <body>
