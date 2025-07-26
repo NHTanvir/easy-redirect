@@ -610,6 +610,26 @@ document.addEventListener('DOMContentLoaded', function() {
         if (statTopSiteEl) {
             statTopSiteEl.textContent = topSite.length > 16 ? topSite.slice(0, 14) + '…' : topSite;
         }
+
+        // Render a 7-day bar chart in #statsBarChart.
+        const barChart = document.getElementById('statsBarChart');
+        if (barChart) {
+            const maxVal = Math.max(...Object.values(stats.days).map(d => d.total || 0), 1);
+            const days = [];
+            for (let i = 6; i >= 0; i--) {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                days.push(d.toISOString().slice(0, 10));
+            }
+            barChart.innerHTML = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Last 7 days</div>' +
+                days.map(day => {
+                    const count = (stats.days[day] || {}).total || 0;
+                    const pct = Math.round((count / maxVal) * 160);
+                    const label = day.slice(5).replace('-', '/');
+                    return '<div class="stats-bar-row"><span style="width:36px;color:var(--text-muted)">'  + label +
+                        '</span><div class="stats-bar" style="width:' + pct + 'px"></div><span>' + count + '</span></div>';
+                }).join('');
+        }
     }
 
     // ---------------------------------------------------------------------------
