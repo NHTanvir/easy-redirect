@@ -1902,8 +1902,6 @@ document.addEventListener('DOMContentLoaded', function() {
         rules = sortRules(rules);
 
         // Show or hide bulk actions bar based on whether there are rules to show.
-        const bulkActionsEl = document.getElementById('bulkActions');
-        if (bulkActionsEl) bulkActionsEl.style.display = rules.length > 0 ? 'flex' : 'none';
 
         if (rules.length === 0) {
             const emptyMsg = searchQuery
@@ -2089,22 +2087,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
 
-        // Per-row enabled toggle checkbox — flip enabled without a full re-render
-        // to preserve focus and avoid scroll position jumps.
-        websiteListDiv.querySelectorAll('.rule-enabled-cb').forEach(cb => {
-            cb.addEventListener('change', async () => {
-                const ruleId = cb.dataset.ruleId;
-                const checked = cb.checked;
-                const result = await chrome.storage.sync.get(['rules']);
-                const rules = Array.isArray(result.rules) ? result.rules : [];
-                const next = rules.map(r => r.id === ruleId ? { ...r, enabled: checked } : r);
-                await chrome.storage.sync.set({ rules: next });
-                await updateRedirectRules();
-                // Update just this item's opacity instead of full re-render to preserve focus
-                const item = websiteListDiv.querySelector(`.website-item[data-rule-id="${CSS.escape(ruleId)}"]`);
-                if (item) item.classList.toggle('rule-disabled', !checked);
-            });
-        });
         // Bulk-select-cb: show the bulkActionBar and update selected count.
         const selectedIds = new Set();
         websiteListDiv.querySelectorAll('.bulk-select-cb').forEach(cb => {
@@ -2178,7 +2160,7 @@ document.addEventListener('DOMContentLoaded', function() {
             showStatus('Cannot change rules during lockdown.', 'error');
             return;
         }
-        const checkboxes = websiteListDiv.querySelectorAll('.rule-select-checkbox:checked');
+        const checkboxes = websiteListDiv.querySelectorAll('.bulk-select-cb:checked');
         const selectedIds = new Set([...checkboxes].map(cb => cb.dataset.ruleId));
         if (selectedIds.size === 0) {
             showStatus('Select at least one rule first.', 'error');
