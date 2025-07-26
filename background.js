@@ -214,6 +214,48 @@ async function saveDailyCounts(dc) {
     await chrome.storage.local.set({ dailyCounts: dc });
 }
 
+// Return the Monday of the week containing `date` as a YYYY-MM-DD string.
+// ISO weeks start on Monday (day 1); Sunday is treated as the last day of the
+// previous week (diff = -6) rather than the first day of the new week.
+function getWeekStart(date = new Date()) {
+    const d = new Date(date);
+    const day = d.getDay(); // 0=Sun
+    const diff = (day === 0) ? -6 : 1 - day; // adjust so week starts Monday
+    d.setDate(d.getDate() + diff);
+    return d.toISOString().slice(0, 10);
+}
+
+// Read weeklyStats from chrome.storage.local. If the stored weekStart does not
+// match the current Monday the data belongs to a previous week and a fresh
+// empty object is returned instead (without touching storage).
+async function getWeeklyStats() {
+    const result = await chrome.storage.local.get(['weeklyStats']);
+    const stored = result.weeklyStats;
+    const currentWeekStart = getWeekStart();
+    if (!stored || stored.weekStart !== currentWeekStart) {
+        return { weekStart: currentWeekStart, days: {} };
+    }
+    return stored;
+}
+
+// Record a hit for `ruleId` in the weekly stats. Increments the day's total
+// and the per-rule count, then persists to chrome.storage.local. Called by
+// the onRuleMatchedDebug listener so every DNR-matched redirect is tracked.
+async function recordHit(ruleId) {
+    const today = todayUTC();
+    const ws = await getWeeklyStats();
+    if (!ws.days[today]) ws.days[today] = { total: 0, byRule: {} };
+    ws.days[today].total = (ws.days[today].total || 0) + 1;
+    ws.days[today].byRule[ruleId] = (ws.days[today].byRule[ruleId] || 0) + 1;
+    await chrome.storage.local.set({ weeklyStats: ws });
+}
+
+// Wipe all weekly stats from local storage. Exposed via the clearStats message
+// action so the options page can offer a "Clear stats" button.
+async function clearStats() {
+    await chrome.storage.local.remove(['weeklyStats']);
+}
+
 // Compute the number of milliseconds until the next midnight UTC. Used to
 // schedule the daily-quota reset alarm precisely at the day boundary.
 function msUntilMidnightUTC() {
@@ -1011,6 +1053,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         getTemporaryOverrides().then(o => sendResponse({ overrides: o }));
         return true;
     }
+    // Stats dashboard actions (feature #28).
+    if (request.action === 'getWeeklyStats') {
+        getWeeklyStats().then(stats => sendResponse({ stats }));
+        return true; // async
+    }
+    if (request.action === 'clearStats') {
+        clearStats().then(() => sendResponse({ ok: true }));
+        return true;
+    }
 });
 
 async function handleKeywordHit(sender, request) {
@@ -1152,7 +1203,12 @@ if (chrome.declarativeNetRequest && chrome.declarativeNetRequest.onRuleMatchedDe
         const result = await chrome.storage.sync.get(['rules']);
         const rules = Array.isArray(result.rules) ? result.rules : [];
         const rule = rules[sourceIndex];
-        if (!rule || rule.quota === null || rule.quota === undefined) return; // no quota set
+        if (!rule) return;
+
+        // Record the hit in weekly stats for the stats dashboard (feature #28).
+        await recordHit(rule.id);
+
+        if (rule.quota === null || rule.quota === undefined) return; // no quota set
 
         const dc = await getDailyCounts();
         const prev = dc.counts[rule.id] || 0;

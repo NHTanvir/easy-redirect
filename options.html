@@ -541,6 +541,39 @@
         [data-theme="dark"] #lockdownActivePanel {
             --danger-bg: #3b1212;
         }
+        /* Stats dashboard cards and bar chart (feature #28) */
+        .stat-card {
+            background: var(--bg-section);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 20px;
+            text-align: center;
+            min-width: 90px;
+        }
+        .stat-value {
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--text);
+        }
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        .stats-bar-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+        .stats-bar {
+            height: 14px;
+            background: #1976d2;
+            border-radius: 3px;
+            min-width: 4px;
+            transition: width 0.3s;
+        }
     </style>
 </head>
 <body>
@@ -658,6 +691,32 @@
         <div id="incognitoStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
     </div>
 
+    <!-- Stats dashboard (feature #28) -->
+    <div class="section" id="statsSection">
+        <h3>Stats Dashboard</h3>
+        <div class="help-text" style="margin-bottom:12px;">
+            Blocking activity for the current week. Data is stored locally on this device.
+        </div>
+        <div id="statsSummary" style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:16px;">
+            <div class="stat-card">
+                <div class="stat-value" id="statToday">—</div>
+                <div class="stat-label">Today</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statWeek">—</div>
+                <div class="stat-label">This week</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statTopSite">—</div>
+                <div class="stat-label">Top blocked</div>
+            </div>
+        </div>
+        <div id="statsBarChart" style="margin-bottom:12px;"></div>
+        <div id="statsTopList" style="margin-bottom:12px;"></div>
+        <button id="clearStatsBtn" style="background:#b71c1c;">Clear stats</button>
+        <div id="statsStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
+    </div>
+
     <div class="section">
         <h3>Add Block Rule</h3>
         <input type="text" id="newWebsite" placeholder="example.com  or  reddit.com/r/funny  or  *.site.com/*  or  r/regex.*">
@@ -771,7 +830,7 @@
         <div id="blockedPageStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
     </div>
 
-    <div class="section">
+    <div class="section" id="ruleList">
         <h3 id="rulesHeading">Block Rules</h3>
         <div id="groupTabs" class="group-tabs"></div>
         <div id="groupRedirectField" style="display:none; margin-bottom:8px; padding:8px; background:#f5f5f5; border-radius:4px; font-size:13px;"></div>
