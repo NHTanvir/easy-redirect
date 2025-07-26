@@ -943,55 +943,42 @@
         [data-theme="dark"] #lockdownActivePanel {
             --danger-bg: #3b1212;
         }
-        /* Stats dashboard cards and bar chart (feature #28) */
+        /* ─── Stats ───────────────────────────────────────────────────── */
+        .stat-cards { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
         .stat-card {
-            background: var(--bg-section);
+            background: var(--bg);
             border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 12px 20px;
+            border-radius: 12px;
+            padding: 16px 22px;
             text-align: center;
-            min-width: 90px;
+            min-width: 100px;
+            flex: 1;
         }
-        .stat-value {
-            font-size: 26px;
-            font-weight: 700;
-            color: var(--text);
+        .stat-value { font-size: 32px; font-weight: 800; color: var(--accent); letter-spacing: -1px; }
+        .stat-label { font-size: 11px; font-weight: 600; color: var(--text-muted); margin-top: 4px; text-transform: uppercase; letter-spacing: .5px; }
+
+        .stats-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: 12px; }
+        .stats-bar-track { flex: 1; background: var(--border); border-radius: 3px; height: 10px; overflow: hidden; }
+        .stats-bar { height: 10px; background: var(--accent); border-radius: 3px; min-width: 0; transition: width .3s; }
+
+        /* ─── Pomodoro ────────────────────────────────────────────────── */
+        #pomodoroCountdown {
+            display: none;
+            font-variant-numeric: tabular-nums;
+            font-weight: 700; font-size: 22px;
+            letter-spacing: 1px;
+            padding: 5px 12px; border-radius: 7px;
         }
-        .stat-label {
-            font-size: 12px;
-            color: var(--text-muted);
-            margin-top: 2px;
-        }
-        .stats-bar-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 6px;
-            font-size: 13px;
-        }
-        .stats-bar {
-            height: 14px;
-            background: #1976d2;
-            border-radius: 3px;
-            min-width: 4px;
-            transition: width 0.3s;
-        }
-        /* Pomodoro countdown colours (feature #10) */
-        #pomodoroCountdown.pomo-work {
-            background: #e8f5e9;
-            color: #2e7d32;
-        }
-        #pomodoroCountdown.pomo-break {
-            background: #e3f2fd;
-            color: #1565c0;
-        }
-        [data-theme="dark"] #pomodoroCountdown.pomo-work {
-            background: #1b3a1d;
-            color: #81c784;
-        }
-        [data-theme="dark"] #pomodoroCountdown.pomo-break {
-            background: #0d2a45;
-            color: #64b5f6;
+        #pomodoroCountdown.pomo-work { background: var(--green-bg); color: var(--green-text); }
+        #pomodoroCountdown.pomo-break { background: var(--blue-bg); color: #1565C0; }
+
+        /* ─── Lockdown panel ──────────────────────────────────────────── */
+        #lockdownActivePanel {
+            background: var(--red-bg);
+            border: 1px solid var(--red);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 14px;
         }
     </style>
 </head>
