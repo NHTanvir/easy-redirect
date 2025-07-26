@@ -1588,36 +1588,46 @@
                 </div>
             </div>
 
-    <div class="section">
-        <h3>Bulk Add Rules</h3>
-        <textarea id="bulkInput" rows="6" placeholder="One entry per line:&#10;example.com&#10;reddit.com/r/funny&#10;kw:gambling&#10;*.site.com/*" style="width:100%;box-sizing:border-box;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);resize:vertical;"></textarea>
-        <div style="display:flex;align-items:center;gap:12px;margin-top:8px;flex-wrap:wrap;">
-            <select id="bulkGroupSelect" style="padding:7px;border:1px solid var(--border);border-radius:4px;font-size:13px;background:var(--input-bg);color:var(--text);"></select>
-            <button id="bulkAddBtn">Add All</button>
-        </div>
-        <div class="help-text" style="margin-top:6px;">Enter one domain, path, keyword (kw:), or wildcard per line. Duplicates are skipped.</div>
-    </div>
+            <!-- Bulk add card -->
+            <div class="card">
+                <div class="card-title">Bulk Add Rules</div>
+                <textarea id="bulkInput" rows="5"
+                          placeholder="One entry per line:&#10;example.com&#10;reddit.com/r/funny&#10;kw:gambling&#10;*.site.com/*"
+                          style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;resize:vertical;"></textarea>
+                <div class="inline-row" style="margin-top:8px;">
+                    <select id="bulkGroupSelect" style="width:auto;font-size:13px;"></select>
+                    <button id="bulkAddBtn" style="margin-top:0;">Add All</button>
+                </div>
+                <p class="help-text">One domain, path, keyword or wildcard per line. Duplicates are skipped.</p>
+            </div>
 
-    <div class="section">
-        <h3>Prebuilt Categories</h3>
-        <div class="help-text" style="margin-bottom:12px;">Add a whole category as a new group. Lists are built-in and do not auto-update.</div>
-        <div id="categoryList"></div>
-    </div>
+            <!-- Prebuilt categories card -->
+            <div class="card">
+                <div class="card-title">Prebuilt Categories</div>
+                <p class="help-text" style="margin-bottom:12px;">Add a whole category as a new group. Lists are built-in and do not auto-update.</p>
+                <div id="categoryList"></div>
+            </div>
 
-    <div class="section">
-        <h3>Import / Export</h3>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-            <button id="exportJsonBtn">Export JSON</button>
-            <button id="exportTxtBtn" style="background:#607d8b;">Export plain text</button>
+            <!-- Import / Export card -->
+            <div class="card">
+                <div class="card-title">Import / Export</div>
+                <div class="btn-row" style="margin-bottom:10px;margin-top:0;">
+                    <button id="exportJsonBtn">Export JSON</button>
+                    <button id="exportTxtBtn" class="btn-secondary">Export plain text</button>
+                    <button id="importBtn" class="btn-warning">Import file…</button>
+                </div>
+                <div class="inline-row" style="font-size:13px;">
+                    <span class="text-muted">Import mode:</span>
+                    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
+                        <input type="radio" name="importMode" value="merge" checked> Merge
+                    </label>
+                    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
+                        <input type="radio" name="importMode" value="replace"> Replace all
+                    </label>
+                </div>
+                <input type="file" id="importFile" accept=".json,.txt" style="display:none;">
+            </div>
         </div>
-        <div style="margin-top:8px;">
-            <label style="font-size:13px;color:var(--text-muted);">Import mode:</label>
-            <label style="margin-left:12px;font-size:13px;"><input type="radio" name="importMode" value="merge" checked> Merge with existing</label>
-            <label style="margin-left:12px;font-size:13px;"><input type="radio" name="importMode" value="replace"> Replace all</label>
-        </div>
-        <input type="file" id="importFile" accept=".json,.txt" style="display:none;">
-        <button id="importBtn" style="background:#ff9800;margin-top:8px;">Import file…</button>
-    </div>
 
     <!-- Security / lock section (feature #17) -->
     <div class="section" id="securitySection">
