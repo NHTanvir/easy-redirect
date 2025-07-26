@@ -570,6 +570,49 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // ---------------------------------------------------------------------------
+    // Stats dashboard (feature #28)
+    // ---------------------------------------------------------------------------
+
+    // Populate the Stats Dashboard section with blocking data from the current week.
+    // Reads weeklyStats from background via message, then updates the stat cards,
+    // bar chart, and top-sites list.
+    async function loadStats() {
+        const resp = await chrome.runtime.sendMessage({ action: 'getWeeklyStats' });
+        const stats = resp && resp.stats ? resp.stats : { weekStart: '', days: {} };
+        const today = new Date().toISOString().slice(0, 10);
+
+        // Calculate today's total and weekly total.
+        const todayData = stats.days[today] || { total: 0, byRule: {} };
+        const todayTotal = todayData.total;
+        const weekTotal = Object.values(stats.days).reduce((s, d) => s + (d.total || 0), 0);
+
+        const statTodayEl = document.getElementById('statToday');
+        const statWeekEl = document.getElementById('statWeek');
+        if (statTodayEl) statTodayEl.textContent = todayTotal;
+        if (statWeekEl) statWeekEl.textContent = weekTotal;
+
+        // Aggregate byRule counts across the whole week.
+        const byRule = {};
+        for (const day of Object.values(stats.days)) {
+            for (const [ruleId, count] of Object.entries(day.byRule || {})) {
+                byRule[ruleId] = (byRule[ruleId] || 0) + count;
+            }
+        }
+
+        // Get rules from storage to map ruleId to pattern.
+        const result = await chrome.storage.sync.get(['rules']);
+        const rules = result.rules || [];
+        const ruleMap = Object.fromEntries(rules.map(r => [r.id, r.pattern]));
+
+        const sorted = Object.entries(byRule).sort((a, b) => b[1] - a[1]).slice(0, 5);
+        const topSite = sorted[0] ? (ruleMap[sorted[0][0]] || sorted[0][0]) : '—';
+        const statTopSiteEl = document.getElementById('statTopSite');
+        if (statTopSiteEl) {
+            statTopSiteEl.textContent = topSite.length > 16 ? topSite.slice(0, 14) + '…' : topSite;
+        }
+    }
+
+    // ---------------------------------------------------------------------------
     // Security section — set a new PIN/password (feature #17, commit 7)
     // ---------------------------------------------------------------------------
 
