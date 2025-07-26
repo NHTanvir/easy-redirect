@@ -921,6 +921,7 @@ chrome.runtime.onStartup.addListener(async () => {
     await ensureScheduleAlarm();
     await resumeCountdownIfPending(); // Resume any countdown that was running before worker shutdown.
     await initLockdownCache(); // warm cache so isLockedDown() is accurate immediately
+    await restorePomodoroAlarm(); // Re-arm Pomodoro alarm if a session was active at shutdown.
     updateRedirectRules();
     registerContextMenus();
     scheduleMidnightAlarm();
@@ -1062,6 +1063,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         clearStats().then(() => sendResponse({ ok: true }));
         return true;
     }
+    // Pomodoro timer control (feature #10).
+    if (request.action === 'startPomodoro') {
+        startPomodoro().then(() => sendResponse({ ok: true }));
+        return true;
+    }
+    if (request.action === 'stopPomodoro') {
+        stopPomodoro().then(() => sendResponse({ ok: true }));
+        return true;
+    }
 });
 
 async function handleKeywordHit(sender, request) {
@@ -1111,6 +1121,61 @@ async function stopLockdown() {
     chrome.action.setBadgeText({ text: '' }); // clear LOCK badge
     await updateRedirectRules();
     console.log('[lockdown] Stopped.');
+}
+
+// Pomodoro timer helpers (feature #10)
+async function startPomodoro() {
+    const r = await chrome.storage.sync.get(['pomodoroWorkMinutes']);
+    const workMins = (typeof r.pomodoroWorkMinutes === 'number' && r.pomodoroWorkMinutes > 0)
+        ? r.pomodoroWorkMinutes : 25;
+    await chrome.alarms.clear('pomodoroWork');
+    await chrome.alarms.clear('pomodoroBreak');
+    await persist({ pomodoroEnabled: true, pomodoroState: 'work', pomodoroStartedAt: Date.now() });
+    chrome.alarms.create('pomodoroWork', { delayInMinutes: workMins });
+    await updateRedirectRules();
+    console.log(`[pomodoro] Started — ${workMins}-min work session.`);
+}
+
+async function stopPomodoro() {
+    await chrome.alarms.clear('pomodoroWork');
+    await chrome.alarms.clear('pomodoroBreak');
+    await persist({ pomodoroEnabled: false, pomodoroState: 'off', pomodoroStartedAt: null });
+    await updateRedirectRules();
+    console.log('[pomodoro] Stopped.');
+}
+
+async function restorePomodoroAlarm() {
+    const r = await chrome.storage.sync.get([
+        'pomodoroEnabled', 'pomodoroState', 'pomodoroStartedAt',
+        'pomodoroWorkMinutes', 'pomodoroBreakMinutes'
+    ]);
+    if (!r.pomodoroEnabled || r.pomodoroState === 'off') return;
+    const workMins = (typeof r.pomodoroWorkMinutes === 'number' && r.pomodoroWorkMinutes > 0)
+        ? r.pomodoroWorkMinutes : 25;
+    const breakMins = (typeof r.pomodoroBreakMinutes === 'number' && r.pomodoroBreakMinutes > 0)
+        ? r.pomodoroBreakMinutes : 5;
+    const startedAt = r.pomodoroStartedAt || Date.now();
+    const phaseMins = r.pomodoroState === 'work' ? workMins : breakMins;
+    const endsAt = startedAt + phaseMins * 60 * 1000;
+    const remainingMs = endsAt - Date.now();
+    if (remainingMs <= 0) {
+        // Phase expired while the service worker was inactive — transition now.
+        if (r.pomodoroState === 'work') {
+            await persist({ pomodoroState: 'break', pomodoroStartedAt: Date.now() });
+            await updateRedirectRules();
+            chrome.alarms.create('pomodoroBreak', { delayInMinutes: breakMins });
+            console.log('[pomodoro] Resumed: work expired, starting break.');
+        } else {
+            await persist({ pomodoroState: 'work', pomodoroStartedAt: Date.now() });
+            await updateRedirectRules();
+            chrome.alarms.create('pomodoroWork', { delayInMinutes: workMins });
+            console.log('[pomodoro] Resumed: break expired, starting work.');
+        }
+    } else {
+        const alarmName = r.pomodoroState === 'work' ? 'pomodoroWork' : 'pomodoroBreak';
+        chrome.alarms.create(alarmName, { when: endsAt });
+        console.log(`[pomodoro] Restored — ${alarmName} fires in ${Math.ceil(remainingMs / 60000)} min.`);
+    }
 }
 
 async function updateRedirectRules() {
