@@ -752,37 +752,120 @@
             background: var(--bg-card); color: var(--text-muted); cursor: pointer;
         }
 
-        /* Schedule edit modal (feature #8) */
+        /* ─── Bulk actions ────────────────────────────────────────────── */
+        #bulkActionBar {
+            display: none;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+            padding: 6px 10px;
+            background: var(--accent-light);
+            border-radius: 6px;
+            border: 1px solid var(--accent);
+        }
+
+        /* ─── Search/sort row ─────────────────────────────────────────── */
+        #ruleSearchRow {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        #ruleSearch { flex: 1; }
+        #sortSelect {
+            padding: 7px 8px;
+            width: auto;
+            font-size: 12px;
+        }
+        #sortDirBtn {
+            padding: 7px 10px;
+            font-size: 13px;
+            background: var(--bg-card);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            min-width: 34px;
+            margin-top: 0;
+        }
+        #sortDirBtn:hover { background: var(--bg); }
+
+        /* ─── Mode toggle ─────────────────────────────────────────────── */
+        .mode-toggle {
+            display: inline-flex;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .mode-toggle button {
+            background: var(--bg-card);
+            color: var(--text);
+            margin-top: 0;
+            border-radius: 0;
+            padding: 9px 20px;
+            font-size: 13px;
+            font-weight: 500;
+            border-right: 1px solid var(--border);
+        }
+        .mode-toggle button:last-child { border-right: none; }
+        .mode-toggle button.active { background: var(--accent); color: #fff; font-weight: 700; }
+        .mode-toggle button:hover:not(.active) { background: var(--accent-light); color: var(--accent); }
+
+        /* ─── Category cards ──────────────────────────────────────────── */
+        #categoryList {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        /* ─── Schedule modal ──────────────────────────────────────────── */
         #scheduleModal {
             display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.45);
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,.45);
             z-index: 8000;
-            align-items: center;
-            justify-content: center;
+            align-items: center; justify-content: center;
         }
         #scheduleModal.visible { display: flex; }
         #scheduleBox {
-            background: var(--bg-section);
+            background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: 10px;
+            border-radius: 12px;
             padding: 28px 32px;
-            max-width: 420px;
-            width: 100%;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+            max-width: 420px; width: 100%;
+            box-shadow: 0 8px 32px rgba(0,0,0,.18);
         }
-        #scheduleBox h3 { margin: 0 0 12px; color: var(--text); font-size: 17px; }
+        #scheduleBox h3 { margin: 0 0 12px; font-size: 17px; }
         .schedule-days { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
         .schedule-days label {
             display: flex; align-items: center; gap: 4px;
-            font-size: 13px; cursor: pointer; padding: 4px 8px;
-            border: 1px solid var(--border); border-radius: 4px;
+            font-size: 12px; cursor: pointer;
+            padding: 4px 9px;
+            border: 1px solid var(--border); border-radius: 5px;
             background: var(--bg); color: var(--text);
         }
         .schedule-days label:has(input:checked) {
-            background: #1565C0; color: #fff; border-color: #1565C0;
+            background: var(--accent); color: #fff; border-color: var(--accent);
         }
+
+        /* ─── Delay modal ─────────────────────────────────────────────── */
+        #delayModal {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,.5);
+            z-index: 1000;
+            align-items: center; justify-content: center;
+        }
+        #delayBox {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 28px;
+            max-width: 420px; width: 90%;
+            box-shadow: 0 8px 32px rgba(0,0,0,.2);
+        }
+        #delayBox h3 { margin: 0 0 10px; font-size: 16px; }
 
         /* Lock screen overlay (feature #17) */
         #lockOverlay {
