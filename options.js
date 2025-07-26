@@ -1949,6 +1949,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // background.js falls back gracefully when the URL is malformed, but the
             // user should know to fix or clear it so the override actually takes effect.
             const hasInvalidRuleUrl = rule.redirectUrl && !_isValidUrl(rule.redirectUrl);
+            const hasDetails = quotaVal || rule.redirectUrl || exceptions.length > 0 || hasInvalidRuleUrl;
             return `
                 <div class="website-item${isEnabled ? '' : ' rule-disabled'}" data-rule-id="${escapeHtml(rule.id)}">
                     <div class="rule-main-row">
@@ -1957,50 +1958,65 @@ document.addEventListener('DOMContentLoaded', function() {
                                 style="width:14px;height:14px;flex-shrink:0;cursor:pointer;accent-color:var(--accent);">
                             <span class="${badgeClass}">${badgeLabel}</span>
                             <span class="rule-pattern">${highlightMatch(rule.pattern, searchQuery)}</span>
-                            ${(rule.hitCount > 0) ? `<span style="font-size:11px;padding:1px 6px;border-radius:8px;background:#546e7a;color:#fff;white-space:nowrap;" title="${rule.hitCount} redirect${rule.hitCount === 1 ? '' : 's'} triggered by this rule${rule.lastHitAt ? ' (last: ' + new Date(rule.lastHitAt).toLocaleString() + ')' : ''}">${formatHitCount(rule.hitCount)} blocked</span>` : ''}
-                            ${tempOverrides[rule.id] ? `<span style="background:#e65100;color:#fff;font-size:11px;padding:2px 6px;border-radius:3px;margin-left:6px;" title="Temporary override active until ${new Date(tempOverrides[rule.id]).toLocaleString()}">Allowed for ${Math.max(0, Math.ceil((tempOverrides[rule.id] - Date.now()) / 60000))}m</span>` : ''}
+                            ${(rule.hitCount > 0) ? `<span style="font-size:11px;padding:1px 6px;border-radius:10px;background:var(--blue-bg);color:var(--accent);white-space:nowrap;border:1px solid var(--accent)" title="${rule.hitCount} redirect${rule.hitCount === 1 ? '' : 's'}${rule.lastHitAt ? ' (last: ' + new Date(rule.lastHitAt).toLocaleString() + ')' : ''}">${formatHitCount(rule.hitCount)} blocked</span>` : ''}
+                            ${tempOverrides[rule.id] ? `<span style="background:#e65100;color:#fff;font-size:11px;padding:2px 7px;border-radius:10px;white-space:nowrap;" title="Temporarily allowed until ${new Date(tempOverrides[rule.id]).toLocaleString()}">⏸ ${Math.max(0, Math.ceil((tempOverrides[rule.id] - Date.now()) / 60000))}m</span>` : ''}
+                            ${rule.redirectUrl ? `<span style="font-size:11px;padding:1px 6px;border-radius:10px;background:#4a148c;color:#fff;white-space:nowrap;">↪ custom</span>` : ''}
                         </span>
                         <span class="rule-actions">
-                            <button class="${toggleClass}" data-rule-id="${escapeHtml(rule.id)}" title="${isEnabled ? 'Disable this rule' : 'Enable this rule'}">${isEnabled ? 'On' : 'Off'}</button>
-                            <select class="rule-group-select" data-rule-id="${escapeHtml(rule.id)}" title="Move to group">${groupOptions}</select>
-                            <button class="add-exception-btn" data-rule-id="${escapeHtml(rule.id)}" title="Add exception">+ except</button>
-                            <span class="override-wrap" style="position:relative;display:inline-block;margin-left:4px;">
-                                <button class="override-btn" data-rule-id="${escapeHtml(rule.id)}" title="Temporarily allow this site"
-                                        style="background:#e65100;font-size:12px;padding:5px 10px;">&#9208; Allow</button>
-                                <div class="override-menu" data-rule-id="${escapeHtml(rule.id)}"
-                                     style="display:none;position:absolute;right:0;top:100%;background:var(--bg-card);border:1px solid var(--border);border-radius:4px;z-index:100;min-width:120px;">
-                                    <div class="override-duration" data-rule-id="${escapeHtml(rule.id)}" data-minutes="5" style="padding:8px 12px;cursor:pointer;font-size:13px;">5 minutes</div>
-                                    <div class="override-duration" data-rule-id="${escapeHtml(rule.id)}" data-minutes="15" style="padding:8px 12px;cursor:pointer;font-size:13px;">15 minutes</div>
-                                    <div class="override-duration" data-rule-id="${escapeHtml(rule.id)}" data-minutes="60" style="padding:8px 12px;cursor:pointer;font-size:13px;">1 hour</div>
-                                </div>
-                            </span>
-                            <button class="remove-btn" data-rule-id="${escapeHtml(rule.id)}">Remove</button>
+                            <button class="${toggleClass}" data-rule-id="${escapeHtml(rule.id)}" title="${isEnabled ? 'Disable' : 'Enable'} this rule">${isEnabled ? 'On' : 'Off'}</button>
+                            <button class="rule-expand-btn" data-rule-id="${escapeHtml(rule.id)}" title="More options">⋯</button>
+                            <button class="remove-btn" data-rule-id="${escapeHtml(rule.id)}" title="Delete rule">✕</button>
                         </span>
                     </div>
-                    <div class="rule-quota-row" style="display:flex;align-items:center;gap:6px;margin-top:4px;font-size:12px;color:var(--text-muted);">
-                        <label style="white-space:nowrap;">Daily limit:</label>
-                        <input type="number" class="rule-quota-input" data-rule-id="${escapeHtml(rule.id)}"
-                            min="1" value="${escapeHtml(String(quotaVal))}" placeholder="∞"
-                            title="Max redirects per day (leave blank for no limit)"
-                            style="width:64px;padding:2px 6px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
-                        <span class="rule-today-count" data-rule-id="${escapeHtml(rule.id)}" style="color:var(--text-muted);"></span>
-                    </div>
-                    <div class="rule-redirect-row" style="display:flex;flex-direction:column;gap:3px;margin-top:4px;font-size:12px;color:var(--text-muted);">
-                        <div style="display:flex;align-items:center;gap:6px;">
-                            <label style="white-space:nowrap;" title="Override the redirect URL for this rule only">Redirect to:</label>
-                            <input type="url" class="rule-redirect-input" data-rule-id="${escapeHtml(rule.id)}"
-                                value="${escapeHtml(rule.redirectUrl || '')}"
-                                placeholder="(use group / global default)"
-                                title="Per-rule redirect URL override. Leave blank to use group or global default."
-                                style="flex:1;min-width:180px;padding:2px 6px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
-                            ${rule.redirectUrl ? `<span style="font-size:11px;padding:1px 6px;border-radius:8px;background:#4a148c;color:#fff;white-space:nowrap;" title="This rule has its own redirect URL">custom</span>` : ''}
-                            ${hasInvalidRuleUrl ? `<span style="font-size:11px;padding:1px 6px;border-radius:8px;background:#c62828;color:#fff;white-space:nowrap;" title="The stored redirect URL is invalid and will be ignored — clear or fix it">invalid URL</span>` : ''}
+                    <div class="rule-details" data-rule-id="${escapeHtml(rule.id)}">
+                        <div class="rule-details-row">
+                            <label>Move to:</label>
+                            <select class="rule-group-select" data-rule-id="${escapeHtml(rule.id)}" title="Move to group" style="font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">${groupOptions}</select>
                         </div>
-                        <div style="font-size:11px;opacity:0.75;padding-left:72px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="Effective redirect URL for this rule">
-                            &#8618; ${escapeHtml(effectiveRedirectUrl)}${effectiveLabel}
+                        <div class="rule-details-row">
+                            <label>Temp allow:</label>
+                            <span class="override-wrap" style="position:relative;display:inline-block;">
+                                <button class="override-btn" data-rule-id="${escapeHtml(rule.id)}" title="Temporarily allow this site"
+                                        style="background:#e65100;color:#fff;font-size:12px;padding:4px 10px;border-radius:5px;margin-top:0;">⏸ Allow</button>
+                                <div class="override-menu" data-rule-id="${escapeHtml(rule.id)}"
+                                     style="display:none;position:absolute;left:0;top:100%;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;z-index:100;min-width:130px;box-shadow:0 4px 12px rgba(0,0,0,.15);">
+                                    <div class="override-duration" data-rule-id="${escapeHtml(rule.id)}" data-minutes="5" style="padding:8px 14px;cursor:pointer;font-size:13px;">5 minutes</div>
+                                    <div class="override-duration" data-rule-id="${escapeHtml(rule.id)}" data-minutes="15" style="padding:8px 14px;cursor:pointer;font-size:13px;">15 minutes</div>
+                                    <div class="override-duration" data-rule-id="${escapeHtml(rule.id)}" data-minutes="60" style="padding:8px 14px;cursor:pointer;font-size:13px;">1 hour</div>
+                                </div>
+                            </span>
+                        </div>
+                        <div class="rule-details-row">
+                            <label>Daily limit:</label>
+                            <input type="number" class="rule-quota-input" data-rule-id="${escapeHtml(rule.id)}"
+                                min="1" value="${escapeHtml(String(quotaVal))}" placeholder="∞ (no limit)"
+                                title="Max redirects per day (leave blank for no limit)"
+                                style="width:80px;padding:3px 6px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
+                            <span class="rule-today-count" data-rule-id="${escapeHtml(rule.id)}" style="color:var(--text-muted);font-size:12px;"></span>
+                        </div>
+                        <div class="rule-details-row" style="align-items:flex-start;">
+                            <label style="padding-top:4px;">Redirect to:</label>
+                            <div style="flex:1;display:flex;flex-direction:column;gap:3px;">
+                                <input type="url" class="rule-redirect-input" data-rule-id="${escapeHtml(rule.id)}"
+                                    value="${escapeHtml(rule.redirectUrl || '')}"
+                                    placeholder="Default (use group / global setting)"
+                                    title="Per-rule redirect URL override"
+                                    style="width:100%;padding:3px 6px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
+                                <span style="font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="Effective redirect URL">
+                                    ↪ ${escapeHtml(effectiveRedirectUrl)}${effectiveLabel}
+                                    ${hasInvalidRuleUrl ? '<span style="color:var(--red);margin-left:6px;">⚠ Invalid URL</span>' : ''}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="rule-details-row">
+                            <label>Exceptions:</label>
+                            <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
+                                ${exceptions.length > 0 ? exceptionItems : '<span style="color:var(--text-muted);font-size:12px;">none</span>'}
+                                <button class="add-exception-btn" data-rule-id="${escapeHtml(rule.id)}"
+                                    style="font-size:11px;padding:2px 7px;margin-top:0;border-radius:5px;background:var(--accent-light);color:var(--accent);border:1px solid var(--accent);">+ Add</button>
+                            </div>
                         </div>
                     </div>
-                    ${exceptions.length > 0 ? `<div class="exception-list">${exceptionItems}</div>` : ''}
                 </div>
             `;
         }).join('');
