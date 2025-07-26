@@ -1314,236 +1314,6 @@
                 </div>
             </div>
 
-    <div class="section" id="profileSection">
-        <h3>Profile</h3>
-        <div class="help-text" style="margin-bottom:12px;">
-            Each Chrome profile has its own isolated rule set. Use the label below to identify this profile, and use Import/Export to share or back up rules across profiles.
-        </div>
-        <div style="margin-bottom:12px;">
-            <label style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:4px;">Profile label (optional)</label>
-            <input type="text" id="profileName" placeholder="e.g. Work, Personal, Study"
-                   maxlength="50"
-                   style="width:100%;max-width:320px;box-sizing:border-box;">
-        </div>
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">
-            Extension ID: <code id="profileExtId" style="font-family:monospace;user-select:all;">—</code>
-        </div>
-        <button id="saveProfileBtn">Save label</button>
-        <div id="profileStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
-    </div>
-
-    <div class="section">
-        <h3>Redirect URL</h3>
-        <input type="text" id="redirectUrl" placeholder="https://example.com/blocked-page">
-        <button id="saveRedirectUrl">Save Redirect URL</button>
-    </div>
-
-    <div class="section" id="notificationSection">
-        <h3>Redirect Notifications</h3>
-        <div class="help-text" style="margin-bottom:12px;">Show a desktop notification each time a site is redirected.</div>
-        <label style="display:flex;align-items:center;gap:10px;margin-bottom:10px;cursor:pointer;">
-            <input type="checkbox" id="notifyOnRedirect" style="width:16px;height:16px;">
-            <span style="font-size:14px;">Show notification on redirect</span>
-        </label>
-        <div id="notifyOptions" style="display:none;margin-bottom:10px;">
-            <label style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:4px;">Minimum seconds between notifications</label>
-            <input type="number" id="notifyThrottleSecs" min="1" max="60" value="5"
-                   style="width:80px;padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
-            <span style="font-size:13px;color:var(--text-muted);margin-left:6px;">seconds</span>
-        </div>
-        <button id="saveNotifyBtn">Save</button>
-        <div id="notifyStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
-    </div>
-
-    <div class="section" id="incognitoSection">
-        <h3>Incognito Mode</h3>
-        <div class="help-text" style="margin-bottom:12px;">
-            Controls whether Easy Redirect rules apply in incognito (private) browsing windows.
-            To enable incognito blocking, also enable <strong>"Allow in incognito"</strong> for this extension in
-            <a href="#" id="openExtensionsPageLink" style="color:var(--accent);">chrome://extensions</a>.
-        </div>
-        <div style="margin-bottom:12px;">
-            <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer;">
-                <input type="radio" name="incognitoMode" value="block" id="incognitoBlock">
-                <span style="font-size:14px;">Block — apply redirect rules in incognito tabs</span>
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="radio" name="incognitoMode" value="allow" id="incognitoAllow">
-                <span style="font-size:14px;">Allow — skip redirect rules in incognito tabs</span>
-            </label>
-        </div>
-        <button id="saveIncognitoBtn">Save</button>
-        <div id="incognitoStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
-    </div>
-
-    <!-- Stats dashboard (feature #28) -->
-    <div class="section" id="statsSection">
-        <h3>Stats Dashboard</h3>
-        <div class="help-text" style="margin-bottom:12px;">
-            Blocking activity for the current week. Data is stored locally on this device.
-        </div>
-        <div id="statsSummary" style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:16px;">
-            <div class="stat-card">
-                <div class="stat-value" id="statToday">—</div>
-                <div class="stat-label">Today</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="statWeek">—</div>
-                <div class="stat-label">This week</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="statTopSite">—</div>
-                <div class="stat-label">Top blocked</div>
-            </div>
-        </div>
-        <div id="statsBarChart" style="margin-bottom:12px;"></div>
-        <div id="statsTopList" style="margin-bottom:12px;"></div>
-        <button id="clearStatsBtn" style="background:#b71c1c;">Clear stats</button>
-        <div id="statsStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
-    </div>
-
-    <!-- Pomodoro timer (feature #10) -->
-    <div class="section" id="pomodoroSection">
-        <h3>Pomodoro Timer</h3>
-        <div class="help-text" style="margin-bottom:12px;">
-            Alternate between focused work sessions (rules active) and breaks (rules suspended).
-            The timer keeps running in the background even when this page is closed.
-        </div>
-        <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:14px;align-items:center;">
-            <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
-                Work
-                <input type="number" id="pomodoroWorkInput" min="1" max="120" step="1" value="25"
-                       style="width:60px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);text-align:right;">
-                min
-            </label>
-            <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
-                Break
-                <input type="number" id="pomodoroBreakInput" min="1" max="60" step="1" value="5"
-                       style="width:60px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);text-align:right;">
-                min
-            </label>
-        </div>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
-            <button id="pomodoroStartBtn" style="background:#43a047;">&#9654; Start timer</button>
-            <button id="pomodoroStopBtn" style="display:none;background:#e53935;">&#9632; Stop timer</button>
-            <span id="pomodoroCountdown" style="display:none;font-variant-numeric:tabular-nums;font-weight:700;font-size:20px;letter-spacing:1px;padding:4px 10px;border-radius:6px;"></span>
-        </div>
-        <div id="pomodoroStatus" style="min-height:18px;font-size:13px;color:var(--text-muted);"></div>
-    </div>
-
-    <div class="section">
-        <h3>Add Block Rule</h3>
-        <input type="text" id="newWebsite" placeholder="example.com  or  reddit.com/r/funny  or  *.site.com/*  or  r/regex.*">
-        <div class="help-text">
-            Plain domains block all subdomains. Add a path to block just a
-            section (e.g. <code>reddit.com/r/funny</code>,
-            <code>youtube.com/@chan</code>). Use <code>*</code> for wildcards
-            (e.g. <code>*.facebook.com/*</code>). Prefix with
-            <code>kw:</code> to block by page title/body keyword
-            (e.g. <code>kw:gambling</code> — at least 3 chars).
-            For full regex power, prefix with <code>r/</code> or wrap in
-            <code>/…/</code> (e.g. <code>r/(facebook|instagram)\.com</code>,
-            <code>/news.*\.html$/</code>). Up to 10 regex rules are active at once.
-        </div>
-        <button id="addWebsite" data-i18n="addRuleLabel">Add Rule</button>
-        <!-- Access-code challenge (feature #18) — hidden unless enabled in settings -->
-        <div id="accessCodeChallenge" style="display:none;margin-top:14px;padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;">
-            <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">
-                Type the code below exactly to add this rule (paste is disabled):
-            </div>
-            <div id="accessCodeDisplay" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;word-break:break-all;padding:8px;background:var(--bg-section);border:1px solid var(--border);border-radius:4px;user-select:none;margin-bottom:8px;line-height:1.6;"></div>
-            <input type="text" id="accessCodeInput" placeholder="Type the code here…"
-                   autocomplete="off" autocorrect="off" spellcheck="false"
-                   style="width:100%;box-sizing:border-box;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;letter-spacing:1px;margin-bottom:8px;">
-            <div style="display:flex;gap:8px;">
-                <button id="accessCodeConfirmBtn" style="background:#2196F3;">Confirm</button>
-                <button id="accessCodeCancelBtn" style="background:#9e9e9e;">Cancel</button>
-            </div>
-            <div id="accessCodeError" style="min-height:16px;font-size:12px;color:#c62828;margin-top:6px;"></div>
-        </div>
-        <div id="regexTestRow" style="display:none; margin-top: 10px;">
-            <label style="font-size: 13px; color: var(--text-muted); display: block; margin-bottom: 4px;">
-                Test regex against a URL:
-            </label>
-            <div style="display: flex; gap: 8px; align-items: center;">
-                <input type="text" id="regexTestUrl" placeholder="https://example.com/page" style="flex: 1; margin-top: 0;">
-                <button id="regexTestBtn" style="margin-top: 0; white-space: nowrap;">Test</button>
-            </div>
-            <div id="regexTestResult" class="help-text" style="margin-top: 4px;"></div>
-        </div>
-    </div>
-
-    <!-- Sub-resource blocking section (feature #16) -->
-    <div class="section" id="subresourceSection">
-        <h3>Sub-resource Blocking</h3>
-        <div class="help-text" style="margin-bottom:12px;">
-            When enabled, iframes (embedded content) loading blocked domains are also redirected, not just top-level page navigations.
-        </div>
-        <label style="display:flex;align-items:center;gap:10px;margin-bottom:10px;cursor:pointer;">
-            <input type="checkbox" id="blockSubresources" style="width:16px;height:16px;">
-            <span style="font-size:14px;">Also block sub-frames (iframes) to blocked domains</span>
-        </label>
-        <button id="saveSubresourcesBtn">Save</button>
-        <div id="subresourcesStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
-    </div>
-
-    <!-- Custom blocked page section (feature #13) -->
-    <div class="section" id="blockedPageSection">
-        <h3>Blocked Page</h3>
-        <div class="help-text" style="margin-bottom:12px;">
-            When enabled, blocked sites redirect to a built-in page instead of your configured
-            redirect URL. Existing per-rule and per-group redirect overrides still take precedence.
-        </div>
-        <label style="display:flex;align-items:center;gap:10px;margin-bottom:14px;cursor:pointer;">
-            <input type="checkbox" id="blockedPageEnabled" style="width:16px;height:16px;">
-            <span style="font-size:14px;">Use built-in blocked page</span>
-        </label>
-        <div id="blockedPageOptions" style="display:none;">
-            <div style="margin-bottom:12px;">
-                <label style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:4px;">Page title</label>
-                <input type="text" id="blockedPageTitle" placeholder="Site Blocked"
-                       style="width:100%;box-sizing:border-box;" maxlength="80">
-            </div>
-            <div style="margin-bottom:12px;">
-                <label style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:4px;">Message</label>
-                <textarea id="blockedMessage" rows="3" maxlength="500"
-                          placeholder="This site has been blocked by Easy Redirect to help you stay focused."
-                          style="width:100%;box-sizing:border-box;resize:vertical;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);font-size:13px;font-family:inherit;"></textarea>
-            </div>
-            <div style="margin-bottom:12px;">
-                <label style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:4px;">Custom image (optional)</label>
-                <input type="file" id="blockedImageUpload" accept="image/*" style="font-size:13px;">
-                <div class="help-text" style="margin-top:4px;">Stored locally on this device (not synced). Max ~1 MB.</div>
-                <div id="blockedImagePreview" style="margin-top:8px;display:none;">
-                    <img id="blockedImagePreviewImg" src="" alt="Preview"
-                         style="max-width:120px;max-height:120px;border-radius:6px;border:1px solid var(--border);object-fit:contain;">
-                    <button id="clearBlockedImageBtn" style="margin-top:4px;background:transparent;color:#c62828;border:1px solid #c62828;font-size:12px;padding:3px 10px;display:block;">Remove image</button>
-                </div>
-            </div>
-            <div style="margin-bottom:12px;" id="motivationSection">
-                <label style="display:flex;align-items:center;gap:10px;margin-bottom:8px;cursor:pointer;">
-                    <input type="checkbox" id="motivationEnabled" style="width:16px;height:16px;">
-                    <span style="font-size:14px;">Show motivational quote</span>
-                </label>
-                <div id="motivationOptions" style="display:none;">
-                    <label style="font-size:13px;color:var(--text-muted);display:block;margin-bottom:4px;">
-                        Quotes (one per line, leave empty for built-in quotes)
-                    </label>
-                    <textarea id="motivationQuotes" rows="4" maxlength="2000"
-                        placeholder="Stay focused. Every blocked visit is a small win.&#10;Your future self will thank you."
-                        style="width:100%;box-sizing:border-box;resize:vertical;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);font-size:13px;font-family:inherit;"></textarea>
-                    <div class="help-text" style="margin-top:4px;">Leave empty to use the built-in quote collection.</div>
-                </div>
-            </div>
-            <div style="margin-bottom:12px;">
-                <button id="previewBlockedPageBtn" style="background:#6a1b9a;margin-top:0;">Preview blocked page</button>
-                <div class="help-text" style="margin-top:4px;">Opens blocked.html in a new tab with current settings applied.</div>
-            </div>
-        </div>
-        <button id="saveBlockedPageBtn">Save blocked page settings</button>
-        <div id="blockedPageStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
-    </div>
-
             <!-- Rule list card -->
             <div class="card" id="ruleList">
                 <!-- Group tabs -->
@@ -1629,160 +1399,401 @@
             </div>
         </div>
 
-    <!-- Security / lock section (feature #17) -->
-    <div class="section" id="securitySection">
-        <h3>Security</h3>
-        <div class="help-text" style="margin-bottom:14px;">
-            Set a PIN or password to lock the settings page. Anyone who opens
-            Easy Redirect will need to enter it before viewing or changing rules.
-        </div>
-        <div id="securityNone" style="display:none;">
-            <p style="margin:0 0 12px;color:var(--text-muted);font-size:13px;">No lock is currently set.</p>
-            <label style="font-size:13px;display:block;margin-bottom:6px;">New PIN or password</label>
-            <input type="password" id="secNewPin" placeholder="Enter PIN or password" autocomplete="new-password"
-                   style="width:100%;box-sizing:border-box;margin-bottom:8px;">
-            <label style="font-size:13px;display:block;margin-bottom:6px;">Confirm</label>
-            <input type="password" id="secConfirmPin" placeholder="Re-enter PIN or password" autocomplete="new-password"
-                   style="width:100%;box-sizing:border-box;margin-bottom:10px;">
-            <button id="secSetBtn">Set lock</button>
-        </div>
-        <div id="securityActive" style="display:none;">
-            <p style="margin:0 0 10px;font-size:13px;">
-                <strong>Lock is active.</strong>
-                The settings page will require a PIN or password each time it is opened.
-            </p>
-            <!-- Change-password form (feature #17, commit 8) -->
-            <details id="changePasswordDetails" style="margin-bottom:12px;">
-                <summary style="cursor:pointer;font-size:13px;color:var(--btn-blue);user-select:none;">Change password…</summary>
-                <div style="margin-top:10px;">
-                    <label style="font-size:13px;display:block;margin-bottom:4px;">Current password</label>
-                    <input type="password" id="secCurrentPin" placeholder="Current PIN or password"
-                           autocomplete="current-password"
-                           style="width:100%;box-sizing:border-box;margin-bottom:8px;">
-                    <label style="font-size:13px;display:block;margin-bottom:4px;">New password</label>
-                    <input type="password" id="secNewPin2" placeholder="New PIN or password"
-                           autocomplete="new-password"
-                           style="width:100%;box-sizing:border-box;margin-bottom:8px;">
-                    <label style="font-size:13px;display:block;margin-bottom:4px;">Confirm new password</label>
-                    <input type="password" id="secConfirmPin2" placeholder="Re-enter new PIN or password"
-                           autocomplete="new-password"
-                           style="width:100%;box-sizing:border-box;margin-bottom:10px;">
-                    <button id="secChangeBtn">Change password</button>
+        <!-- ══════════════════ TAB: SETTINGS ══════════════════ -->
+        <div class="tab-panel" id="tab-settings">
+            <div class="panel-heading">Settings</div>
+
+            <!-- Matching mode -->
+            <div class="card">
+                <div class="card-title">Matching Mode</div>
+                <div class="inline-row" style="justify-content:space-between;flex-wrap:wrap;gap:12px;">
+                    <p class="help-text" style="margin:0;flex:1;min-width:200px;">
+                        <strong>Blocklist</strong> redirects the listed sites.
+                        <strong>Allowlist</strong> inverts: every site is redirected except the ones you list.
+                    </p>
+                    <div class="mode-toggle" role="group" aria-label="Matching mode">
+                        <button id="modeBlocklistBtn" data-mode="blocklist">Blocklist</button>
+                        <button id="modeAllowlistBtn" data-mode="allowlist">Allowlist</button>
+                    </div>
                 </div>
-            </details>
-            <button id="secRemoveBtn" style="background:#f44336;">Remove lock</button>
-        </div>
-        <div id="secStatus" style="min-height:18px;font-size:13px;margin-top:10px;"></div>
-    </div>
-
-    <!-- Random access code section (feature #18) -->
-    <div class="section" id="accessCodeSection">
-        <h3>Add-rule friction code</h3>
-        <div class="help-text" style="margin-bottom:12px;">
-            When enabled, a randomly generated code is shown each time you try
-            to add a rule. You must type the full code (paste is disabled) before
-            the rule is saved. This discourages impulsive additions.
-        </div>
-        <label style="font-size:13px;display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:12px;">
-            <input type="checkbox" id="accessCodeEnabled"> Enable friction code
-        </label>
-        <div id="accessCodeLengthRow" style="display:none;">
-            <label style="font-size:13px;display:block;margin-bottom:6px;">
-                Code length:
-                <strong id="accessCodeLengthDisplay">64</strong> characters
-            </label>
-            <input type="range" id="accessCodeLength" min="32" max="256" step="8" value="64"
-                   style="width:100%;margin-bottom:8px;">
-            <div class="help-text">Range: 32 – 256 characters. Default: 64.</div>
-        </div>
-        <button id="saveAccessCodeBtn" style="margin-top:8px;">Save</button>
-        <div id="accessCodeStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
-    </div>
-
-    <!-- Disable delay settings section (feature #20) -->
-    <div class="section" id="disableDelaySection">
-        <h3>Disable delay</h3>
-        <div class="help-text" style="margin-bottom:10px;">
-            Wait this many seconds after you press <strong>Disable</strong> before blocking actually stops.
-            During the countdown, blocking remains active and a badge shows the time left.
-            Set to 0 for instant disable (default).
-        </div>
-        <div style="display:flex;align-items:center;gap:10px;">
-            <input type="number" id="disableDelayInput" min="0" max="300" step="1" value="0"
-                   style="width:80px;">
-            <span class="help-text" style="margin:0;">seconds (0 – 300)</span>
-        </div>
-        <button id="saveDisableDelayBtn" style="margin-top:8px;">Save</button>
-        <div id="disableDelayStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
-    </div>
-
-    <!-- Lockdown / focus mode section (feature #11) -->
-    <div class="section" id="lockdownSection">
-        <h3>Lockdown / focus mode</h3>
-        <div class="help-text" style="margin-bottom:10px;">
-            Activate a hard lockdown for a fixed duration. While locked down you
-            <strong>cannot</strong> disable the extension, add or remove rules, or change
-            the redirect URL — even with the PIN or friction code. The lock expires
-            automatically when the timer runs out.
-        </div>
-        <div id="lockdownActivePanel" style="display:none;background:var(--danger-bg,#fdecea);border:1px solid #e53935;border-radius:6px;padding:12px 16px;margin-bottom:12px;">
-            <strong style="color:#b71c1c;">Lockdown active</strong>
-            <span id="lockdownCountdown" style="margin-left:12px;font-variant-numeric:tabular-nums;font-weight:700;"></span>
-            <div class="help-text" style="margin-top:4px;">You cannot modify rules until the countdown reaches zero.</div>
-        </div>
-        <div id="lockdownSetupPanel">
-            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
-                <label style="font-size:14px;display:flex;align-items:center;gap:6px;">
-                    Duration
-                    <input type="number" id="lockdownDurationInput" min="1" max="1440" step="1" value="60"
-                        style="width:70px;padding:4px 6px;border-radius:4px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);">
-                    minutes
-                </label>
-                <label style="font-size:14px;display:flex;align-items:center;gap:6px;">
-                    Scope
-                    <select id="lockdownScopeSelect" style="padding:4px 6px;border-radius:4px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);">
-                        <option value="all">All rules</option>
-                        <option value="groups">Current group only</option>
-                        <option value="allowlist-exempt">All except always-allowed</option>
-                    </select>
-                </label>
             </div>
-            <button id="lockdownActivateBtn" style="background:#e53935;color:#fff;">
-                Activate lockdown
-            </button>
-            <div id="lockdownConfirmPanel" style="display:none;margin-top:12px;padding:12px;border:2px solid #e53935;border-radius:6px;background:var(--danger-bg,#fdecea);">
-                <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#b71c1c;">
-                    Are you sure? This cannot be cancelled once started.
+
+            <!-- Redirect URL -->
+            <div class="card">
+                <div class="card-title">Redirect URL</div>
+                <input type="text" id="redirectUrl" placeholder="https://example.com/blocked-page">
+                <div class="btn-row">
+                    <button id="saveRedirectUrl">Save URL</button>
+                </div>
+            </div>
+
+            <!-- Notifications -->
+            <div class="card" id="notificationSection">
+                <div class="card-title">Redirect Notifications</div>
+                <label class="check-row">
+                    <input type="checkbox" id="notifyOnRedirect">
+                    <span>Show a desktop notification each time a site is redirected</span>
+                </label>
+                <div id="notifyOptions" style="margin-bottom:8px;">
+                    <label class="field-label">Minimum seconds between notifications</label>
+                    <div class="inline-row">
+                        <input type="number" id="notifyThrottleSecs" min="1" max="60" value="5" style="width:80px;">
+                        <span class="text-muted" style="font-size:13px;">seconds</span>
+                    </div>
+                </div>
+                <div class="btn-row">
+                    <button id="saveNotifyBtn">Save</button>
+                </div>
+                <div id="notifyStatus" class="field-status"></div>
+            </div>
+
+            <!-- Incognito -->
+            <div class="card" id="incognitoSection">
+                <div class="card-title">Incognito Mode</div>
+                <p class="help-text" style="margin-bottom:12px;">
+                    Controls whether rules apply in incognito windows.
+                    To enable incognito blocking, also enable <strong>"Allow in incognito"</strong> in
+                    <a href="#" id="openExtensionsPageLink" style="color:var(--accent);">chrome://extensions</a>.
                 </p>
-                <p style="margin:0 0 10px;font-size:13px;">Type <strong>LOCK</strong> to confirm:</p>
-                <input type="text" id="lockdownConfirmInput" placeholder="LOCK" autocomplete="off"
-                    style="width:120px;padding:6px;border-radius:4px;border:2px solid #e53935;font-size:15px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">
-                <button id="lockdownConfirmBtn" style="margin-left:8px;background:#b71c1c;color:#fff;" disabled>
-                    Lock now
-                </button>
-                <button id="lockdownCancelBtn" style="margin-left:6px;">Cancel</button>
+                <label class="check-row" style="margin-bottom:6px;">
+                    <input type="radio" name="incognitoMode" value="block" id="incognitoBlock">
+                    <span>Block — apply redirect rules in incognito tabs</span>
+                </label>
+                <label class="check-row">
+                    <input type="radio" name="incognitoMode" value="allow" id="incognitoAllow">
+                    <span>Allow — skip redirect rules in incognito tabs</span>
+                </label>
+                <div class="btn-row">
+                    <button id="saveIncognitoBtn">Save</button>
+                </div>
+                <div id="incognitoStatus" class="field-status"></div>
+            </div>
+
+            <!-- Profile -->
+            <div class="card" id="profileSection">
+                <div class="card-title">Profile</div>
+                <p class="help-text" style="margin-bottom:12px;">
+                    Each Chrome profile has its own isolated rule set.
+                    Use the label to identify this profile in exports.
+                </p>
+                <div class="field-group">
+                    <label class="field-label">Profile label (optional)</label>
+                    <input type="text" id="profileName" placeholder="e.g. Work, Personal, Study" maxlength="50">
+                </div>
+                <p class="help-text" style="margin-bottom:10px;">
+                    Extension ID: <code id="profileExtId">—</code>
+                </p>
+                <div class="btn-row">
+                    <button id="saveProfileBtn">Save label</button>
+                </div>
+                <div id="profileStatus" class="field-status"></div>
+            </div>
+
+            <!-- Sub-resource blocking -->
+            <div class="card" id="subresourceSection">
+                <div class="card-title">Sub-resource Blocking</div>
+                <p class="help-text" style="margin-bottom:12px;">
+                    When enabled, iframes loading blocked domains are also redirected,
+                    not just top-level page navigations.
+                </p>
+                <label class="check-row">
+                    <input type="checkbox" id="blockSubresources">
+                    <span>Also block sub-frames (iframes) to blocked domains</span>
+                </label>
+                <div class="btn-row">
+                    <button id="saveSubresourcesBtn">Save</button>
+                </div>
+                <div id="subresourcesStatus" class="field-status"></div>
             </div>
         </div>
-        <div id="lockdownStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
-    </div>
 
-    <!-- Uninstall warning URL section (feature #19) -->
-    <div class="section" id="uninstallUrlSection">
-        <h3>Uninstall feedback URL</h3>
-        <div class="help-text" style="margin-bottom:10px;">
-            When the extension is uninstalled Chrome will open this URL. Leave blank
-            to use the default feedback form, or enter your own. Clear the field and
-            save to disable the redirect entirely.
-        </div>
-        <input type="text" id="uninstallUrlInput" placeholder="https://… (leave blank for default)">
-        <div class="help-text" style="margin-top:4px;">
-            Default: <code id="uninstallDefaultDisplay"></code>
-        </div>
-        <button id="saveUninstallUrlBtn" style="margin-top:8px;">Save</button>
-        <div id="uninstallUrlStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
-    </div>
+        <!-- ══════════════════ TAB: FOCUS ══════════════════ -->
+        <div class="tab-panel" id="tab-focus">
+            <div class="panel-heading">Focus &amp; Timer</div>
 
-    <div id="status" class="status" style="display: none;"></div>
+            <!-- Pomodoro -->
+            <div class="card" id="pomodoroSection">
+                <div class="card-title">Pomodoro Timer</div>
+                <p class="help-text" style="margin-bottom:14px;">
+                    Alternate between work sessions (rules active) and breaks (rules suspended).
+                    Keeps running in the background.
+                </p>
+                <div class="inline-row" style="margin-bottom:14px;gap:20px;">
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Work
+                        <input type="number" id="pomodoroWorkInput" min="1" max="120" step="1" value="25" style="width:60px;text-align:right;">
+                        min
+                    </label>
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Break
+                        <input type="number" id="pomodoroBreakInput" min="1" max="60" step="1" value="5" style="width:60px;text-align:right;">
+                        min
+                    </label>
+                </div>
+                <div class="inline-row" style="margin-bottom:8px;">
+                    <button id="pomodoroStartBtn" class="btn-success">&#9654; Start timer</button>
+                    <button id="pomodoroStopBtn" class="btn-danger">&#9632; Stop timer</button>
+                    <span id="pomodoroCountdown"></span>
+                </div>
+                <div id="pomodoroStatus" class="field-status"></div>
+            </div>
+
+            <!-- Lockdown -->
+            <div class="card" id="lockdownSection">
+                <div class="card-title">Lockdown / Focus Mode</div>
+                <p class="help-text" style="margin-bottom:12px;">
+                    Activate a hard lockdown for a fixed duration. While locked you
+                    <strong>cannot</strong> disable the extension, add or remove rules,
+                    or change the redirect URL. The lock expires automatically.
+                </p>
+                <div id="lockdownActivePanel" style="display:none;">
+                    <strong style="color:#B71C1C;">Lockdown active</strong>
+                    <span id="lockdownCountdown" style="margin-left:12px;font-variant-numeric:tabular-nums;font-weight:700;"></span>
+                    <p class="help-text" style="margin-top:4px;">You cannot modify rules until the countdown reaches zero.</p>
+                </div>
+                <div id="lockdownSetupPanel">
+                    <div class="inline-row" style="flex-wrap:wrap;margin-bottom:12px;">
+                        <label style="font-size:13px;display:flex;align-items:center;gap:6px;">
+                            Duration
+                            <input type="number" id="lockdownDurationInput" min="1" max="1440" step="1" value="60"
+                                   style="width:70px;">
+                            minutes
+                        </label>
+                        <label style="font-size:13px;display:flex;align-items:center;gap:6px;">
+                            Scope
+                            <select id="lockdownScopeSelect" style="width:auto;">
+                                <option value="all">All rules</option>
+                                <option value="groups">Current group only</option>
+                                <option value="allowlist-exempt">All except always-allowed</option>
+                            </select>
+                        </label>
+                    </div>
+                    <button id="lockdownActivateBtn" class="btn-danger">Activate lockdown</button>
+                    <div id="lockdownConfirmPanel">
+                        <p style="margin:0 0 6px;font-size:14px;font-weight:600;color:#B71C1C;">
+                            Are you sure? This cannot be cancelled once started.
+                        </p>
+                        <p style="margin:0 0 10px;font-size:13px;">Type <strong>LOCK</strong> to confirm:</p>
+                        <input type="text" id="lockdownConfirmInput" placeholder="LOCK"
+                               autocomplete="off" style="width:110px;">
+                        <button id="lockdownConfirmBtn" class="btn-danger" style="margin-left:8px;" disabled>Lock now</button>
+                        <button id="lockdownCancelBtn" class="btn-ghost" style="margin-left:6px;">Cancel</button>
+                    </div>
+                </div>
+                <div id="lockdownStatus" class="field-status"></div>
+            </div>
+
+            <!-- Disable delay -->
+            <div class="card" id="disableDelaySection">
+                <div class="card-title">Disable Delay</div>
+                <p class="help-text" style="margin-bottom:12px;">
+                    Wait this many seconds after pressing <strong>Disable</strong> before blocking stops.
+                    During the countdown, blocking remains active and the badge shows time remaining.
+                    Set to 0 for instant disable.
+                </p>
+                <div class="inline-row">
+                    <input type="number" id="disableDelayInput" min="0" max="300" step="1" value="0" style="width:80px;">
+                    <span class="text-muted" style="font-size:13px;">seconds (0 – 300)</span>
+                </div>
+                <div class="btn-row">
+                    <button id="saveDisableDelayBtn">Save</button>
+                </div>
+                <div id="disableDelayStatus" class="field-status"></div>
+            </div>
+        </div>
+
+        <!-- ══════════════════ TAB: BLOCKED PAGE ══════════════════ -->
+        <div class="tab-panel" id="tab-blocked">
+            <div class="panel-heading">Blocked Page</div>
+
+            <div class="card" id="blockedPageSection">
+                <div class="card-title">Custom Blocked Page</div>
+                <p class="help-text" style="margin-bottom:14px;">
+                    When enabled, blocked sites redirect to a built-in page instead of your configured
+                    redirect URL. Per-rule and per-group redirect overrides still take precedence.
+                </p>
+                <label class="check-row" style="margin-bottom:14px;">
+                    <input type="checkbox" id="blockedPageEnabled">
+                    <span style="font-size:14px;">Use built-in blocked page</span>
+                </label>
+
+                <div id="blockedPageOptions">
+                    <div class="field-group">
+                        <label class="field-label">Page title</label>
+                        <input type="text" id="blockedPageTitle" placeholder="Site Blocked" maxlength="80">
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">Message</label>
+                        <textarea id="blockedMessage" rows="3" maxlength="500"
+                                  placeholder="This site has been blocked by Easy Redirect to help you stay focused."
+                                  style="resize:vertical;"></textarea>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">Custom image (optional)</label>
+                        <input type="file" id="blockedImageUpload" accept="image/*">
+                        <p class="help-text">Stored locally on this device (not synced). Max ~1 MB.</p>
+                        <div id="blockedImagePreview">
+                            <img id="blockedImagePreviewImg" src="" alt="Preview">
+                            <button id="clearBlockedImageBtn" class="btn-ghost btn-sm" style="display:block;margin-top:4px;color:var(--red);border-color:var(--red);">Remove image</button>
+                        </div>
+                    </div>
+
+                    <hr class="divider">
+
+                    <div id="motivationSection">
+                        <label class="check-row" style="margin-bottom:8px;">
+                            <input type="checkbox" id="motivationEnabled">
+                            <span style="font-size:14px;">Show motivational quote</span>
+                        </label>
+                        <div id="motivationOptions">
+                            <label class="field-label">Quotes (one per line; empty = built-in collection)</label>
+                            <textarea id="motivationQuotes" rows="4" maxlength="2000"
+                                      placeholder="Stay focused. Every blocked visit is a small win.&#10;Your future self will thank you."
+                                      style="resize:vertical;"></textarea>
+                        </div>
+                    </div>
+
+                    <hr class="divider">
+
+                    <div class="btn-row">
+                        <button id="previewBlockedPageBtn" style="background:#6A1B9A;">Preview blocked page</button>
+                    </div>
+                    <p class="help-text">Opens blocked.html in a new tab with current settings applied.</p>
+                </div>
+
+                <div class="btn-row" style="margin-top:14px;">
+                    <button id="saveBlockedPageBtn">Save blocked page settings</button>
+                </div>
+                <div id="blockedPageStatus" class="field-status"></div>
+            </div>
+        </div>
+
+        <!-- ══════════════════ TAB: STATS ══════════════════ -->
+        <div class="tab-panel" id="tab-stats">
+            <div class="panel-heading">Stats Dashboard</div>
+
+            <div class="card" id="statsSection">
+                <div class="card-title">This Week's Activity</div>
+                <p class="help-text" style="margin-bottom:14px;">Blocking activity for the current week. Stored locally on this device.</p>
+                <div class="stat-cards" id="statsSummary">
+                    <div class="stat-card">
+                        <div class="stat-value" id="statToday">—</div>
+                        <div class="stat-label">Today</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statWeek">—</div>
+                        <div class="stat-label">This week</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statTopSite">—</div>
+                        <div class="stat-label">Top blocked</div>
+                    </div>
+                </div>
+                <div id="statsBarChart" style="margin-bottom:12px;"></div>
+                <div id="statsTopList" style="margin-bottom:12px;"></div>
+                <div class="btn-row">
+                    <button id="clearStatsBtn" class="btn-danger">Clear stats</button>
+                </div>
+                <div id="statsStatus" class="field-status"></div>
+            </div>
+        </div>
+
+        <!-- ══════════════════ TAB: ADVANCED ══════════════════ -->
+        <div class="tab-panel" id="tab-advanced">
+            <div class="panel-heading">Advanced</div>
+
+            <!-- Security / PIN -->
+            <div class="card" id="securitySection">
+                <div class="card-title">Security — PIN Lock</div>
+                <p class="help-text" style="margin-bottom:14px;">
+                    Set a PIN or password to lock the settings page. Anyone who opens
+                    Easy Redirect will need to enter it before viewing or changing rules.
+                </p>
+                <div id="securityNone">
+                    <p style="margin:0 0 12px;color:var(--text-muted);font-size:13px;">No lock is currently set.</p>
+                    <div class="field-group">
+                        <label class="field-label">New PIN or password</label>
+                        <input type="password" id="secNewPin" placeholder="Enter PIN or password" autocomplete="new-password">
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">Confirm</label>
+                        <input type="password" id="secConfirmPin" placeholder="Re-enter PIN or password" autocomplete="new-password">
+                    </div>
+                    <div class="btn-row">
+                        <button id="secSetBtn">Set lock</button>
+                    </div>
+                </div>
+                <div id="securityActive">
+                    <p style="margin:0 0 10px;font-size:13px;">
+                        <strong>Lock is active.</strong>
+                        The settings page requires a PIN or password each time it is opened.
+                    </p>
+                    <details id="changePasswordDetails" style="margin-bottom:12px;">
+                        <summary>Change password…</summary>
+                        <div style="margin-top:12px;">
+                            <div class="field-group">
+                                <label class="field-label">Current password</label>
+                                <input type="password" id="secCurrentPin" placeholder="Current PIN or password" autocomplete="current-password">
+                            </div>
+                            <div class="field-group">
+                                <label class="field-label">New password</label>
+                                <input type="password" id="secNewPin2" placeholder="New PIN or password" autocomplete="new-password">
+                            </div>
+                            <div class="field-group">
+                                <label class="field-label">Confirm new password</label>
+                                <input type="password" id="secConfirmPin2" placeholder="Re-enter new PIN or password" autocomplete="new-password">
+                            </div>
+                            <div class="btn-row">
+                                <button id="secChangeBtn">Change password</button>
+                            </div>
+                        </div>
+                    </details>
+                    <button id="secRemoveBtn" class="btn-danger">Remove lock</button>
+                </div>
+                <div id="secStatus" class="field-status"></div>
+            </div>
+
+            <!-- Add-rule friction code -->
+            <div class="card" id="accessCodeSection">
+                <div class="card-title">Add-Rule Friction Code</div>
+                <p class="help-text" style="margin-bottom:12px;">
+                    When enabled, a randomly generated code is shown each time you try to add a rule.
+                    You must type the full code (paste disabled) to save. Discourages impulsive additions.
+                </p>
+                <label class="check-row" style="margin-bottom:10px;">
+                    <input type="checkbox" id="accessCodeEnabled">
+                    <span>Enable friction code</span>
+                </label>
+                <div id="accessCodeLengthRow">
+                    <label class="field-label">
+                        Code length: <strong id="accessCodeLengthDisplay">64</strong> characters
+                    </label>
+                    <input type="range" id="accessCodeLength" min="32" max="256" step="8" value="64">
+                    <p class="help-text">Range: 32 – 256 characters. Default: 64.</p>
+                </div>
+                <div class="btn-row">
+                    <button id="saveAccessCodeBtn">Save</button>
+                </div>
+                <div id="accessCodeStatus" class="field-status"></div>
+            </div>
+
+            <!-- Uninstall feedback URL -->
+            <div class="card" id="uninstallUrlSection">
+                <div class="card-title">Uninstall Feedback URL</div>
+                <p class="help-text" style="margin-bottom:12px;">
+                    When the extension is uninstalled, Chrome will open this URL.
+                    Leave blank to use the default feedback form.
+                </p>
+                <div class="field-group">
+                    <input type="text" id="uninstallUrlInput" placeholder="https://… (leave blank for default)">
+                    <p class="help-text">Default: <code id="uninstallDefaultDisplay"></code></p>
+                </div>
+                <div class="btn-row">
+                    <button id="saveUninstallUrlBtn">Save</button>
+                </div>
+                <div id="uninstallUrlStatus" class="field-status"></div>
+            </div>
+        </div>
 
     <!-- Per-group schedule editor modal (feature #8) -->
     <div id="scheduleModal" role="dialog" aria-modal="true" aria-labelledby="scheduleModalTitle">
