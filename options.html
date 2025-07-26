@@ -1240,35 +1240,30 @@
         </nav>
 
         <div class="sidebar-footer">
+            <div id="themeToggle" class="theme-toggle-row">
+                <button class="theme-btn active" data-theme="auto">Auto</button>
+                <button class="theme-btn" data-theme="light">Light</button>
+                <button class="theme-btn" data-theme="dark">Dark</button>
+            </div>
+            <div class="sidebar-shortcuts">
+                <kbd>Ctrl+Shift+B</kbd> open &middot; <kbd>Ctrl+Shift+Y</kbd> toggle<br>
+                <a href="#" id="shortcutsLink">Customise shortcuts</a>
+            </div>
         </div>
     </aside>
 
     <!-- ── Main content ── -->
     <main id="main-content">
 
-    <h1 data-i18n="optionsHeading">Easy Redirect — Settings</h1>
+        <!-- Status toast (sticky top) -->
+        <div id="status" role="alert"></div>
 
-    <p style="text-align:center;color:#666;font-size:12px;margin:0 0 16px;">
-      Shortcuts: <kbd style="background:#eee;padding:1px 5px;border-radius:3px;border:1px solid #ccc;">Ctrl+Shift+B</kbd> open settings &middot;
-      <kbd style="background:#eee;padding:1px 5px;border-radius:3px;border:1px solid #ccc;">Ctrl+Shift+Y</kbd> toggle &mdash;
-      <a href="#" id="shortcutsLink" style="color:#2196F3;">customise</a>
-    </p>
-
-    <div class="toggle-section">
-        <button id="toggleBtn" class="toggle-btn">Enable Redirector</button>
-        <div class="theme-toggle" id="themeToggle" style="display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-left:12px;">
-          <button data-theme="auto"  class="theme-btn active" style="background:var(--bg-section);color:var(--text);margin-top:0;border-radius:0;padding:8px 14px;font-size:13px;border-right:1px solid var(--border);">Auto</button>
-          <button data-theme="light" class="theme-btn"        style="background:var(--bg-section);color:var(--text);margin-top:0;border-radius:0;padding:8px 14px;font-size:13px;border-right:1px solid var(--border);">Light</button>
-          <button data-theme="dark"  class="theme-btn"        style="background:var(--bg-section);color:var(--text);margin-top:0;border-radius:0;padding:8px 14px;font-size:13px;">Dark</button>
+        <!-- Disable countdown banner -->
+        <div id="disableCountdownBanner">
+            <span style="color:var(--orange);font-size:18px;">&#9202;</span>
+            <span>Blocking active for <strong id="disableCountdownSecs">--</strong> more seconds&hellip;</span>
+            <button id="cancelDisableBtn" class="btn-warning" style="margin-top:0;padding:5px 12px;font-size:12px;">Cancel</button>
         </div>
-    </div>
-
-    <!-- Disable-delay countdown banner (feature #20) — hidden unless a countdown is active -->
-    <div id="disableCountdownBanner" style="display:none;align-items:center;gap:12px;padding:10px 16px;background:#FFF3E0;border:1px solid #E65100;border-radius:8px;margin-top:8px;font-size:14px;">
-        <span style="color:#E65100;font-size:18px;">&#9202;</span>
-        <span>Blocking active for <strong id="disableCountdownSecs">--</strong> more seconds&hellip;</span>
-        <button id="cancelDisableBtn" style="margin-top:0;padding:6px 14px;font-size:13px;background:#E65100;color:#fff;border:none;border-radius:6px;cursor:pointer;">Cancel</button>
-    </div>
 
     <div class="section mode-section">
         <div class="mode-copy">
