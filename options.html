@@ -691,6 +691,32 @@
         <div id="incognitoStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
     </div>
 
+    <!-- Stats dashboard (feature #28) -->
+    <div class="section" id="statsSection">
+        <h3>Stats Dashboard</h3>
+        <div class="help-text" style="margin-bottom:12px;">
+            Blocking activity for the current week. Data is stored locally on this device.
+        </div>
+        <div id="statsSummary" style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:16px;">
+            <div class="stat-card">
+                <div class="stat-value" id="statToday">—</div>
+                <div class="stat-label">Today</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statWeek">—</div>
+                <div class="stat-label">This week</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statTopSite">—</div>
+                <div class="stat-label">Top blocked</div>
+            </div>
+        </div>
+        <div id="statsBarChart" style="margin-bottom:12px;"></div>
+        <div id="statsTopList" style="margin-bottom:12px;"></div>
+        <button id="clearStatsBtn" style="background:#b71c1c;">Clear stats</button>
+        <div id="statsStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
+    </div>
+
     <div class="section">
         <h3>Add Block Rule</h3>
         <input type="text" id="newWebsite" placeholder="example.com  or  reddit.com/r/funny  or  *.site.com/*  or  r/regex.*">
