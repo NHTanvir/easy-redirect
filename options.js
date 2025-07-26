@@ -2823,11 +2823,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Show/hide the confirm panel based on the lockdown state.
     function _applyLockdownUiDisabled(locked) {
         // Disable the main add-rule form, enable/disable toggles, remove buttons.
-        const addRuleBtn = document.getElementById('addRuleBtn');
-        const clearAllBtn = document.getElementById('clearAllBtn');
-        const enableToggleBtn = document.getElementById('enableToggle');
+        const addRuleBtn = document.getElementById('addWebsite');
+        const clearAllBtn = document.getElementById('clearAll');
+        const enableToggleBtn = document.getElementById('toggleBtn');
         const redirectUrlInput = document.getElementById('redirectUrl');
-        const saveRedirectBtn = document.getElementById('saveRedirectBtn');
+        const saveRedirectBtn = document.getElementById('saveRedirectUrl');
 
         [addRuleBtn, clearAllBtn, enableToggleBtn, saveRedirectBtn].forEach(el => {
             if (el) el.disabled = locked;
