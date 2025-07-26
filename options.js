@@ -1366,16 +1366,13 @@ document.addEventListener('DOMContentLoaded', function() {
         container.innerHTML = '';
 
         groups.forEach(group => {
-            // Wrapper holds the tab button plus optional controls for non-default groups.
             const wrapper = document.createElement('span');
-            wrapper.style.cssText = 'display:inline-flex;align-items:center;gap:2px;';
+            wrapper.className = 'group-tab-wrapper';
 
             const btn = document.createElement('button');
             btn.className = 'group-tab' + (group.id === activeGroupId ? ' active' : '');
-            if (group.enabled === false) {
-                btn.style.opacity = '0.45';
-                btn.title = `${group.name} (disabled)`;
-            }
+            if (group.enabled === false) btn.style.opacity = '0.45';
+            btn.title = group.enabled === false ? `${group.name} (disabled)` : group.name;
             btn.style.borderLeftColor = group.color || '#2196F3';
             btn.textContent = group.name;
             btn.dataset.groupId = group.id;
@@ -1388,62 +1385,46 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             wrapper.appendChild(btn);
 
-            // Schedule indicator and edit button — shown for all groups (including Default).
+            // Controls — revealed on hover via CSS
+            const controls = document.createElement('span');
+            controls.className = 'tab-controls';
+
             const schedCtrl = document.createElement('button');
-            schedCtrl.style.cssText =
-                'font-size:10px;padding:2px 5px;margin-top:0;border-radius:10px;' +
-                (group.schedule ? 'background:#1565C0;color:#fff;' : 'background:var(--bg-section);color:var(--text-muted);border:1px solid var(--border);');
+            schedCtrl.className = 'tab-ctrl-btn' + (group.schedule ? ' ctrl-active' : '');
             schedCtrl.title = group.schedule
-                ? `Schedule active — days: ${(group.schedule.days||[]).map(d=>['Su','Mo','Tu','We','Th','Fr','Sa'][d]).join(',')} ${group.schedule.startTime}–${group.schedule.endTime}`
-                : 'Set schedule (always active)';
-            schedCtrl.textContent = group.schedule ? '⏰' : '—';
-            schedCtrl.addEventListener('click', (e) => {
-                e.stopPropagation();
-                openScheduleModal(group);
-            });
-            wrapper.appendChild(schedCtrl);
+                ? `Schedule: ${(group.schedule.days||[]).map(d=>['Su','Mo','Tu','We','Th','Fr','Sa'][d]).join(',')} ${group.schedule.startTime}–${group.schedule.endTime}`
+                : 'Set schedule';
+            schedCtrl.textContent = group.schedule ? '⏰' : '⏰';
+            schedCtrl.addEventListener('click', (e) => { e.stopPropagation(); openScheduleModal(group); });
+            controls.appendChild(schedCtrl);
 
-            // Delay indicator and edit button — shown for all groups (feature #12).
-            const delayCtrl = document.createElement('button');
             const hasDelay = typeof group.delaySeconds === 'number' && group.delaySeconds > 0;
-            delayCtrl.style.cssText =
-                'font-size:10px;padding:2px 5px;margin-top:0;border-radius:10px;' +
-                (hasDelay ? 'background:#6a1b9a;color:#fff;' : 'background:var(--bg-section);color:var(--text-muted);border:1px solid var(--border);');
+            const delayCtrl = document.createElement('button');
+            delayCtrl.className = 'tab-ctrl-btn' + (hasDelay ? ' ctrl-delay' : '');
             delayCtrl.title = hasDelay
-                ? `Countdown delay: ${group.delaySeconds}s${group.allowWindowSecs > 0 ? `, window: ${group.allowWindowSecs}s` : ''}`
-                : 'Set redirect delay (none)';
-            delayCtrl.textContent = hasDelay ? `${group.delaySeconds}s` : '⏱';
-            delayCtrl.addEventListener('click', (e) => {
-                e.stopPropagation();
-                openDelayModal(group);
-            });
-            wrapper.appendChild(delayCtrl);
+                ? `Delay: ${group.delaySeconds}s${group.allowWindowSecs > 0 ? `, window: ${group.allowWindowSecs}s` : ''}`
+                : 'Set delay';
+            delayCtrl.textContent = hasDelay ? `⏱${group.delaySeconds}s` : '⏱';
+            delayCtrl.addEventListener('click', (e) => { e.stopPropagation(); openDelayModal(group); });
+            controls.appendChild(delayCtrl);
 
-            // Toggle + delete controls — only for non-default groups.
             if (group.id !== 'default') {
                 const toggleCtrl = document.createElement('button');
-                toggleCtrl.style.cssText =
-                    'font-size:10px;padding:2px 5px;margin-top:0;background:#78909c;border-radius:10px;';
+                toggleCtrl.className = 'tab-ctrl-btn';
                 toggleCtrl.title = group.enabled === false ? 'Enable group' : 'Disable group';
                 toggleCtrl.textContent = group.enabled === false ? '▶' : '⏸';
-                toggleCtrl.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    toggleGroupEnabled(group.id);
-                });
-                wrapper.appendChild(toggleCtrl);
+                toggleCtrl.addEventListener('click', (e) => { e.stopPropagation(); toggleGroupEnabled(group.id); });
+                controls.appendChild(toggleCtrl);
 
                 const delCtrl = document.createElement('button');
-                delCtrl.style.cssText =
-                    'font-size:10px;padding:2px 5px;margin-top:0;background:#f44336;border-radius:10px;';
+                delCtrl.className = 'tab-ctrl-btn ctrl-danger';
                 delCtrl.title = 'Delete group';
                 delCtrl.textContent = '×';
-                delCtrl.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    deleteGroup(group.id);
-                });
-                wrapper.appendChild(delCtrl);
+                delCtrl.addEventListener('click', (e) => { e.stopPropagation(); deleteGroup(group.id); });
+                controls.appendChild(delCtrl);
             }
 
+            wrapper.appendChild(controls);
             container.appendChild(wrapper);
         });
 
