@@ -580,6 +580,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // This ensures the active panel and countdown reflect the current state after
         // any action that triggers a loadData() call (e.g. canceling a disable countdown).
         if (typeof refreshLockdownUi === 'function') refreshLockdownUi();
+        // Refresh stats dashboard (feature #28).
+        loadStats().catch(() => {}); // non-blocking; errors are silently ignored
     }
 
     // ---------------------------------------------------------------------------
