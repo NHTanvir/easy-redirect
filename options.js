@@ -1953,8 +1953,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="website-item${isEnabled ? '' : ' rule-disabled'}" data-rule-id="${escapeHtml(rule.id)}">
                     <div class="rule-main-row">
                         <span class="rule-meta">
-                            <input type="checkbox" class="bulk-select-cb" data-rule-id="${escapeHtml(rule.id)}" style="width:14px;height:14px;margin-right:4px;">
-                            <input type="checkbox" class="rule-select-checkbox" data-rule-id="${escapeHtml(rule.id)}" style="margin:0 4px 0 0;cursor:pointer;" title="Select this rule">
+                            <input type="checkbox" class="bulk-select-cb" data-rule-id="${escapeHtml(rule.id)}"
+                                style="width:14px;height:14px;flex-shrink:0;cursor:pointer;accent-color:var(--accent);">
                             <span class="${badgeClass}">${badgeLabel}</span>
                             <span class="rule-pattern">${highlightMatch(rule.pattern, searchQuery)}</span>
                             ${(rule.hitCount > 0) ? `<span style="font-size:11px;padding:1px 6px;border-radius:8px;background:#546e7a;color:#fff;white-space:nowrap;" title="${rule.hitCount} redirect${rule.hitCount === 1 ? '' : 's'} triggered by this rule${rule.lastHitAt ? ' (last: ' + new Date(rule.lastHitAt).toLocaleString() + ')' : ''}">${formatHitCount(rule.hitCount)} blocked</span>` : ''}
