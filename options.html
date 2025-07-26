@@ -669,95 +669,87 @@
         }
 
 
-        .rule-toggle-btn {
-            background: var(--exception-bg);
-            color: var(--exception-text);
-            padding: 3px 8px;
-            font-size: 11px;
-            margin-top: 0;
-            border-radius: 3px;
-        }
-
-        .rule-toggle-btn:hover {
-            background: #c8e6c9;
-        }
-
-        .rule-toggle-btn.rule-disabled-btn {
-            background: #f5f5f5;
-            color: #9e9e9e;
-        }
-
-        .rule-toggle-btn.rule-disabled-btn:hover {
-            background: #e0e0e0;
-        }
-
-        .website-item.rule-disabled {
-            opacity: 0.5;
-        }
-
-        .rule-disabled {
-            opacity: 0.45;
-        }
-
-        .rule-enabled-cb {
-            accent-color: var(--btn-blue, #2196F3);
-        }
-
+        /* ─── Group tabs ──────────────────────────────────────────────── */
         .group-tabs {
             display: flex;
-            gap: 8px;
+            gap: 5px;
             flex-wrap: wrap;
-            margin-bottom: 8px;
+            margin-bottom: 12px;
             align-items: center;
         }
 
+        /* Each group tab is a wrapper that reveals controls on hover */
+        .group-tab-wrapper {
+            display: inline-flex;
+            align-items: center;
+            gap: 0;
+            position: relative;
+        }
+        .group-tab-wrapper .tab-controls {
+            display: none;
+            align-items: center;
+            gap: 2px;
+            margin-left: 3px;
+        }
+        .group-tab-wrapper:hover .tab-controls { display: inline-flex; }
+
         .group-tab {
-            padding: 6px 14px;
+            padding: 5px 14px;
             border-radius: 20px;
             border: none;
             cursor: pointer;
-            font-size: 13px;
-            background: #f5f5f5;
+            font-size: 12px;
+            font-weight: 500;
+            background: var(--bg-card);
             color: var(--text);
             margin-top: 0;
-            border-left: 4px solid var(--btn-blue);
-            transition: background 0.15s;
+            border: 1px solid var(--border);
+            border-left: 3px solid;
+            transition: background .12s, border-color .12s;
+            white-space: nowrap;
         }
-
         .group-tab.active {
-            background: #e3f2fd;
-            color: #0d47a1;
-            font-weight: 600;
+            background: var(--accent-light);
+            color: var(--accent);
+            border-color: var(--accent);
+            font-weight: 700;
         }
+        .group-tab:hover:not(.active) { background: var(--border); }
 
-        .group-tab:hover:not(.active) {
-            background: var(--border-light);
+        /* Tiny control buttons that appear on hover */
+        .tab-ctrl-btn {
+            font-size: 10px;
+            padding: 2px 5px;
+            margin-top: 0;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            color: var(--text-muted);
+            cursor: pointer;
+            line-height: 1.4;
+            white-space: nowrap;
         }
+        .tab-ctrl-btn:hover { background: var(--accent-light); color: var(--accent); border-color: var(--accent); }
+        .tab-ctrl-btn.ctrl-active { background: #1565C0; color: #fff; border-color: #1565C0; }
+        .tab-ctrl-btn.ctrl-delay  { background: #6a1b9a; color: #fff; border-color: #6a1b9a; }
+        .tab-ctrl-btn.ctrl-danger { background: var(--red-bg); color: var(--red); border-color: transparent; }
+        .tab-ctrl-btn.ctrl-danger:hover { background: var(--red); color: #fff; }
 
         .group-tab-add {
             background: transparent;
-            border: 1px dashed var(--text-muted);
+            border: 1.5px dashed var(--border);
             color: var(--text-muted);
             border-radius: 20px;
-            padding: 5px 12px;
-            font-size: 13px;
-            cursor: pointer;
-            margin-top: 0;
+            padding: 4px 12px;
+            font-size: 12px; cursor: pointer; margin-top: 0;
+            transition: all .12s;
         }
-
-        .group-tab-add:hover {
-            background: var(--border-light);
-            border-color: var(--text);
-        }
+        .group-tab-add:hover { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
 
         .rule-group-select {
-            font-size: 11px;
-            padding: 2px 4px;
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            background: var(--bg-section);
-            color: var(--text-muted);
-            cursor: pointer;
+            font-size: 11px; padding: 2px 4px;
+            border: 1px solid var(--border); border-radius: 4px;
+            background: var(--bg-card); color: var(--text-muted); cursor: pointer;
         }
 
         /* Schedule edit modal (feature #8) */
