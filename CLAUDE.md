@@ -176,3 +176,15 @@ Author identity: `NHTanvir <n.mukto@codexpert.io>`.
 ## Testing
 
 Extension APIs (`chrome.runtime`, `chrome.storage.*`, `chrome.i18n`) are unavailable in `file://` context. Always load via `chrome://extensions` → Load unpacked. `blocked.html` and `countdown.html` render blank content when opened from disk.
+
+### Automated browser testing
+
+`chrome-devtools-mcp` starts Chrome with `--disable-extensions` by default, so the extension cannot be loaded into the MCP-managed browser unless the server itself is configured with `--categoryExtensions` (and the `install_extension` tool exposed). When that isn't available, drive a separate Chrome via raw CDP:
+
+```
+chrome.exe --remote-debugging-port=9222 \
+  --user-data-dir="%TEMP%\er-test-profile" \
+  --load-extension="C:\Users\SARK\Desktop\easy-redirect"
+```
+
+Then connect to `http://localhost:9222/json` via a Node script (`node:http` + `WebSocket`) and use `Page.captureScreenshot` / `Runtime.evaluate`. Reference scripts: `%TEMP%\cdp_screenshots.mjs`, `%TEMP%\cdp_uicheck3.mjs`. The extension ID is hashed from the unpacked path and stays stable for that profile.
