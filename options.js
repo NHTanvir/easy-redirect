@@ -174,6 +174,19 @@ document.addEventListener('DOMContentLoaded', function() {
     if (resetHitCountsBtn) {
         resetHitCountsBtn.addEventListener('click', resetHitCounts);
     }
+
+    // Wire the Clear stats button (feature #28).
+    document.getElementById('clearStatsBtn')?.addEventListener('click', async () => {
+        if (!confirm('Clear all blocking statistics? This cannot be undone.')) return;
+        await chrome.runtime.sendMessage({ action: 'clearStats' });
+        await loadStats();
+        const statsStatus = document.getElementById('statsStatus');
+        if (statsStatus) {
+            statsStatus.textContent = 'Stats cleared.';
+            setTimeout(() => { statsStatus.textContent = ''; }, 2000);
+        }
+    });
+
     document.getElementById('toggleBtn').addEventListener('click', toggleExtension);
     modeBlocklistBtn.addEventListener('click', () => switchMode('blocklist'));
     modeAllowlistBtn.addEventListener('click', () => switchMode('allowlist'));
