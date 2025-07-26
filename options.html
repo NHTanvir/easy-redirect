@@ -1798,6 +1798,352 @@
             </div>
         </div>
 
+        <!-- ══════════════════ TAB: DOCS ══════════════════ -->
+        <div class="tab-panel" id="tab-docs">
+            <div class="panel-heading">&#x1F4D6; Feature Guide</div>
+            <p class="help-text" style="margin-bottom:20px;font-size:13px;">
+                Everything Easy Redirect can do — tap any feature to see how it works and where to find it.
+            </p>
+
+            <!-- ── Core blocking ── -->
+            <details class="doc-section" open>
+                <summary>Blocking websites <span class="doc-badge">CORE</span></summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x1F4CB; Rules tab → Block a Website</div>
+                    <p>Type a website into the <strong>Block a Website</strong> input and click <strong>+ Block</strong>. The extension will redirect anyone visiting that site to your chosen redirect URL (default: Google).</p>
+                    <ul>
+                        <li><code>facebook.com</code> — blocks facebook.com <em>and</em> all subdomains (m.facebook.com, etc.)</li>
+                        <li><code>reddit.com/r/funny</code> — blocks only that subreddit, not all of Reddit</li>
+                        <li><code>*.ads.com/*</code> — wildcard pattern, blocks any URL matching the pattern</li>
+                        <li><code>kw:gambling</code> — blocks any URL whose address contains the word "gambling"</li>
+                        <li><code>r/casino.*\.com</code> — regex pattern (max 10 active at once)</li>
+                    </ul>
+                    <div class="doc-tip">&#x1F4A1; Tap <strong>▸ Advanced formats</strong> under the input for a full syntax reminder.</div>
+                </div>
+            </details>
+
+            <details class="doc-section">
+                <summary>Redirect URL — where blocked sites go <span class="doc-badge">CORE</span></summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x2699;&#xFE0F; Settings tab → Redirect URL</div>
+                    <p>The <strong>global redirect URL</strong> is where every blocked site sends the visitor. Default is <code>https://www.google.com</code>.</p>
+                    <p>You can override this at three levels (most specific wins):</p>
+                    <ul>
+                        <li><strong>Global</strong> — Settings → Redirect URL</li>
+                        <li><strong>Per group</strong> — click a group tab, then set its redirect URL in the field that appears below the tabs</li>
+                        <li><strong>Per rule</strong> — click ⋯ on any rule row and fill in "Redirect to:"</li>
+                    </ul>
+                </div>
+            </details>
+
+            <details class="doc-section">
+                <summary>Enable / Disable the extension <span class="doc-badge">CORE</span></summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x1F4CB; Sidebar — green/red button at the top</div>
+                    <p>The big button at the top of the sidebar toggles blocking on and off. When disabled, all redirect rules are removed from Chrome — sites load normally. Your rule list is kept; re-enabling restores everything instantly.</p>
+                    <p>Keyboard shortcut: <code>Ctrl+Shift+Y</code> (customisable in Advanced → Keyboard Shortcuts).</p>
+                </div>
+            </details>
+
+            <!-- ── Rules & groups ── -->
+            <details class="doc-section">
+                <summary>Groups — organise rules into categories</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x1F4CB; Rules tab → group tabs row</div>
+                    <p>Rules live inside <strong>groups</strong>. The <em>Default</em> group always exists. Click <strong>+ New Group</strong> to create more (e.g. "Work", "Social Media").</p>
+                    <p>Hover over any group tab to reveal its controls:</p>
+                    <ul>
+                        <li><strong>⏰</strong> — set a time schedule (active only on certain days/hours)</li>
+                        <li><strong>⏱</strong> — set a countdown delay before the redirect fires</li>
+                        <li><strong>⏸</strong> — disable the whole group without deleting it</li>
+                        <li><strong>×</strong> — delete the group (its rules move to Default)</li>
+                    </ul>
+                    <div class="doc-tip">&#x1F4A1; Each group can have its own redirect URL, schedule, and delay.</div>
+                </div>
+            </details>
+
+            <details class="doc-section">
+                <summary>Prebuilt categories — add 40+ sites in one click</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x1F4CB; Rules tab → Prebuilt Categories (scroll down)</div>
+                    <p>Six ready-made lists: <strong>Social Media, News &amp; Media, Video Streaming, Gaming, Adult, Gambling</strong>. Click <strong>Add all</strong> on any card to create a new group containing all the domains in that list. Duplicates are skipped if you already have them.</p>
+                </div>
+            </details>
+
+            <details class="doc-section">
+                <summary>Bulk add — paste many sites at once</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x1F4CB; Rules tab → Bulk Add Rules (scroll down)</div>
+                    <p>Paste one website per line into the textarea, choose a group from the dropdown, and click <strong>Add All</strong>. Duplicate entries are skipped automatically.</p>
+                </div>
+            </details>
+
+            <details class="doc-section">
+                <summary>Per-rule exceptions — allow a sub-page inside a blocked site</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x1F4CB; Rules tab → rule row → ⋯ → Exceptions</div>
+                    <p>Say you block <code>reddit.com</code> but still need <code>reddit.com/r/learnprogramming</code>. Click <strong>⋯</strong> on the reddit.com rule, then <strong>+ Add</strong> under Exceptions and enter the URL pattern to whitelist. That pattern will always pass through even while the parent rule is active.</p>
+                </div>
+            </details>
+
+            <details class="doc-section">
+                <summary>Enable / disable individual rules</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x1F4CB; Rules tab → rule row → On / Off button</div>
+                    <p>Every rule has an <strong>On / Off</strong> button. Turning it off keeps the rule saved but pauses it — Chrome stops redirecting that site until you turn it back on. No re-typing needed.</p>
+                </div>
+            </details>
+
+            <details class="doc-section">
+                <summary>Daily limit — auto-pause a rule after N redirects per day</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x1F4CB; Rules tab → rule row → ⋯ → Daily limit</div>
+                    <p>Enter a number in <strong>Daily limit</strong>. Once the rule has fired that many times today, it automatically suspends itself until midnight (UTC). The limit resets every day. Leave blank for no limit.</p>
+                    <div class="doc-tip">&#x1F4A1; Useful for "allow me to visit Twitter up to 5 times a day, then block it".</div>
+                </div>
+            </details>
+
+            <details class="doc-section">
+                <summary>Temporary allow — pause a rule for 5 / 15 / 60 minutes</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x1F4CB; Rules tab → rule row → ⋯ → Temp allow</div>
+                    <p>Click <strong>⏸ Allow</strong> and choose 5 minutes, 15 minutes, or 1 hour. The rule goes silent for that window — the site loads normally. After the time expires, blocking resumes automatically. An orange badge on the rule row shows how many minutes remain.</p>
+                </div>
+            </details>
+
+            <details class="doc-section">
+                <summary>Move a rule to a different group</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x1F4CB; Rules tab → rule row → ⋯ → Move to</div>
+                    <p>Click <strong>⋯</strong> on a rule and use the <strong>Move to</strong> dropdown to change which group it belongs to. The rule instantly appears under the chosen group tab.</p>
+                </div>
+            </details>
+
+            <!-- ── Scheduling & timers ── -->
+            <details class="doc-section">
+                <summary>Group schedule — block only on certain days/hours</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x1F4CB; Rules tab → hover a group tab → ⏰</div>
+                    <p>Click the <strong>⏰</strong> icon that appears when you hover a group tab. Choose which days of the week the group is active, plus a start and end time window. Outside that window the rules are automatically paused — no manual toggling needed.</p>
+                    <p>Example: "Block social media Mon–Fri 09:00–17:00 only."</p>
+                    <div class="doc-tip">&#x1F4A1; End time earlier than start time wraps midnight (e.g. 22:00–06:00 = nights only).</div>
+                </div>
+            </details>
+
+            <details class="doc-section">
+                <summary>Redirect delay / countdown — show a timer before blocking</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x1F4CB; Rules tab → hover a group tab → ⏱</div>
+                    <p>Set a <strong>countdown in seconds</strong>. Instead of an instant redirect, a full-screen countdown page appears. The user can click <strong>Continue anyway</strong> to skip the wait, or let the timer run out to proceed to the blocked-site redirect.</p>
+                    <p>The <strong>Allow window</strong> setting lets the site through for N seconds after the countdown finishes — so repeated visits in quick succession don't keep triggering the countdown.</p>
+                    <div class="doc-tip">&#x1F4A1; Find <strong>Reset delay windows</strong> at the bottom of the Rules tab to clear all allow-windows.</div>
+                </div>
+            </details>
+
+            <details class="doc-section">
+                <summary>Pomodoro timer — work sessions with automatic break unlocks</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x23F3; Focus &amp; Timer tab → Pomodoro Timer</div>
+                    <p>A built-in Pomodoro that cycles between <strong>Work</strong> sessions (rules fully active) and <strong>Break</strong> sessions (all rules suspended so you can browse freely). Set work and break durations in minutes, then click <strong>Start timer</strong>.</p>
+                    <p>The cycle runs in the background — it continues even if you close the options page. The current phase and remaining time are shown in the Focus tab.</p>
+                </div>
+            </details>
+
+            <details class="doc-section">
+                <summary>Lockdown mode — prevent disabling for a set duration</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x23F3; Focus &amp; Timer tab → Lockdown Mode</div>
+                    <p>Click <strong>Activate lockdown</strong> and type <code>LOCK</code> to confirm. For the chosen duration (up to 24 hours) you <em>cannot</em> turn off the extension, delete rules, or clear the list. A countdown shows remaining lockdown time.</p>
+                    <p>To end it early you must first pass the PIN screen (if a PIN is set).</p>
+                    <div class="doc-tip">&#x1F4A1; Use this when you need to commit to a focus session and don't trust yourself to stay off distracting sites.</div>
+                </div>
+            </details>
+
+            <details class="doc-section">
+                <summary>Disable delay — add a countdown before the extension turns off</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x2699;&#xFE0F; Settings tab → Disable Delay</div>
+                    <p>Set a number of seconds (up to 300). When you hit the Disable button, blocking stays active for that long before actually turning off. An orange badge on the toolbar counts down. Click <strong>Cancel</strong> in the options banner to abort.</p>
+                </div>
+            </details>
+
+            <!-- ── Blocked page ── -->
+            <details class="doc-section">
+                <summary>Custom blocked page — show your own message instead of redirecting</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x1F6AB; Blocked Page tab</div>
+                    <p>Enable <strong>Use custom blocked page</strong>. Instead of redirecting to another site, the user sees a built-in "Site Blocked" page with your custom title, message, and optional image.</p>
+                    <ul>
+                        <li><strong>Title</strong> — shown at the top of the card (default: "Site Blocked")</li>
+                        <li><strong>Message</strong> — body text explaining why the site is blocked</li>
+                        <li><strong>Image</strong> — upload a PNG/JPG (max 1 MB) that appears above the card</li>
+                        <li>Click <strong>Preview</strong> to see how it looks before saving</li>
+                    </ul>
+                    <div class="doc-tip">&#x1F4A1; Per-rule and per-group redirect URL overrides still take precedence over the custom blocked page.</div>
+                </div>
+            </details>
+
+            <details class="doc-section">
+                <summary>Motivational quotes on the blocked page</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x1F6AB; Blocked Page tab → Motivational Quotes section</div>
+                    <p>Tick <strong>Show motivational quote</strong>. A random quote appears at the bottom of the blocked page each time a site is blocked.</p>
+                    <p>To use your own quotes, type them one per line in the <strong>Custom quotes</strong> textarea and save. Leave the textarea empty to use the built-in quote collection.</p>
+                </div>
+            </details>
+
+            <!-- ── Stats ── -->
+            <details class="doc-section">
+                <summary>Stats dashboard — see which sites you tried to visit most</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x1F4CA; Stats tab</div>
+                    <p>The Stats tab shows blocking activity for the <strong>current week</strong> (resets every Monday):</p>
+                    <ul>
+                        <li><strong>Today</strong> — how many redirects happened today</li>
+                        <li><strong>This week</strong> — total redirects this week</li>
+                        <li><strong>Top blocked site</strong> — the rule that fired the most</li>
+                        <li><strong>Bar chart</strong> — daily redirect counts for the last 7 days</li>
+                        <li><strong>Top 5 list</strong> — your most-blocked sites this week</li>
+                    </ul>
+                    <p>Hit counts per rule also appear as a small badge on each rule row. Click <strong>Reset hit counts</strong> at the bottom of the Rules tab to zero them all.</p>
+                </div>
+            </details>
+
+            <!-- ── Security ── -->
+            <details class="doc-section">
+                <summary>PIN lock — password-protect the settings page</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x1F512; Advanced tab → Security — PIN Lock</div>
+                    <p>Set a PIN or passphrase. From then on, anyone who opens the Easy Redirect options page must enter it to view or change anything. The PIN is stored as a salted PBKDF2-SHA256 hash — the raw value is never saved.</p>
+                    <ul>
+                        <li><strong>Change password</strong> — expand the "Change password" section inside the active-lock panel</li>
+                        <li><strong>Remove lock</strong> — click Remove and confirm with your current password</li>
+                        <li>After 10 wrong attempts the screen locks for 60 seconds</li>
+                    </ul>
+                </div>
+            </details>
+
+            <details class="doc-section">
+                <summary>Add-rule friction code — force slow, deliberate rule changes</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x1F512; Advanced tab → Add-Rule Friction Code</div>
+                    <p>When enabled, adding any new rule requires you to <strong>manually type</strong> a randomly generated code (32–256 characters, no paste allowed). This makes impulsive "just unblock it real quick" much harder.</p>
+                    <p>Use the length slider to increase the difficulty. Longer codes take more time to type.</p>
+                </div>
+            </details>
+
+            <!-- ── Import/Export ── -->
+            <details class="doc-section">
+                <summary>Import &amp; Export — back up or share your rule list</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x1F4CB; Rules tab → Import / Export (scroll down)</div>
+                    <p><strong>Export JSON</strong> saves all your rules, groups, settings, and theme as a JSON file. <strong>Export text</strong> saves one pattern per line for use with other tools.</p>
+                    <p><strong>Import JSON</strong> — merge mode adds new rules without overwriting existing ones (duplicates are skipped). Replace mode requires typing <code>REPLACE</code> to confirm, then swaps your entire rule list.</p>
+                    <p><strong>Import text</strong> — paste plain domains/patterns one per line.</p>
+                </div>
+            </details>
+
+            <!-- ── Other ── -->
+            <details class="doc-section">
+                <summary>Allowlist mode — block everything except your list</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x2699;&#xFE0F; Settings tab → Mode</div>
+                    <p>Switch from <strong>Blocklist</strong> (default) to <strong>Allowlist</strong>. In allowlist mode every website is redirected <em>except</em> the ones on your list. Your list now means "these sites are allowed through". Everything else gets blocked.</p>
+                    <p>Use this when you want to allow only a small set of sites (e.g. work tools) and block everything else.</p>
+                    <div class="doc-tip">&#x1F4A1; Switching modes never deletes your rules — they just change meaning.</div>
+                </div>
+            </details>
+
+            <details class="doc-section">
+                <summary>Always-allowed list — sites that bypass blocking in both modes</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x2699;&#xFE0F; Settings tab → Always Allowed</div>
+                    <p>Add patterns here that should <strong>never</strong> be redirected regardless of mode or rules. The extension's own options page is always in this list automatically.</p>
+                </div>
+            </details>
+
+            <details class="doc-section">
+                <summary>Sub-resource blocking — block iframes too</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x2699;&#xFE0F; Settings tab → Block Sub-resources</div>
+                    <p>By default, only top-level page navigations are blocked. Enable <strong>Block sub-resources</strong> to also block iframes (embedded pages) that load a blocked domain — useful for preventing embedded social feeds or video players from loading.</p>
+                </div>
+            </details>
+
+            <details class="doc-section">
+                <summary>Redirect notification — get a toast when a site is blocked</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x2699;&#xFE0F; Settings tab → Redirect Notification</div>
+                    <p>Tick <strong>Show notification on redirect</strong> to display a Chrome desktop notification each time a rule fires. The throttle setting prevents notification spam — e.g. set to 5 seconds to show at most one notification every 5 seconds.</p>
+                </div>
+            </details>
+
+            <details class="doc-section">
+                <summary>Incognito support</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x2699;&#xFE0F; Settings tab → Incognito</div>
+                    <p>Choose <strong>Block in incognito</strong> (default) or <strong>Allow in incognito</strong>. Block mode requires you to also enable "Allow in Incognito" for the extension at <code>chrome://extensions</code> — there is a direct link in this section to do so.</p>
+                </div>
+            </details>
+
+            <details class="doc-section">
+                <summary>Profile name — label this Chrome profile's rule set</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x2699;&#xFE0F; Settings tab → Profile</div>
+                    <p>Give this profile a display name (e.g. "Work" or "Personal"). The name appears in the page title and in the JSON export filename so backups from different Chrome profiles don't collide on disk.</p>
+                </div>
+            </details>
+
+            <details class="doc-section">
+                <summary>Uninstall feedback URL</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x1F512; Advanced tab → Uninstall URL</div>
+                    <p>Optionally set a URL that Chrome opens when the extension is uninstalled. Leave blank to use the default feedback form.</p>
+                </div>
+            </details>
+
+            <details class="doc-section">
+                <summary>Keyboard shortcuts</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x1F512; Advanced tab → Keyboard Shortcuts  ·  also: sidebar footer</div>
+                    <ul>
+                        <li><code>Ctrl+Shift+B</code> — open this options page from anywhere</li>
+                        <li><code>Ctrl+Shift+Y</code> — toggle the extension on/off</li>
+                        <li><code>/</code> — on the Rules tab, focus the search box</li>
+                        <li><code>Esc</code> — clear the search box</li>
+                    </ul>
+                    <p>Click <strong>Customise shortcuts</strong> (sidebar footer) or go to <code>chrome://extensions/shortcuts</code> to change the key bindings.</p>
+                </div>
+            </details>
+
+            <details class="doc-section">
+                <summary>Search &amp; sort your rule list</summary>
+                <div class="doc-body">
+                    <div class="doc-where">&#x1F4CB; Rules tab → search box &amp; sort controls</div>
+                    <p>Type in the search box to instantly filter rules by pattern or group name. The sort dropdown lets you order by <strong>Newest, Oldest, A→Z, Z→A, or Most blocked</strong>. The ↑↓ button reverses direction.</p>
+                    <p>Press <code>/</code> anywhere on the Rules tab to jump to the search box without clicking.</p>
+                </div>
+            </details>
+
+            <details class="doc-section">
+                <summary>Context menu — block a site with right-click</summary>
+                <div class="doc-body">
+                    <div class="doc-where">Right-click any page → Easy Redirect</div>
+                    <p>Right-click anywhere on a page to see the <strong>Easy Redirect</strong> context menu. Choose <strong>Block this site</strong> (blocks the whole domain) or <strong>Block this URL</strong> (blocks the exact path). A submenu lets you add it directly to a specific group.</p>
+                    <p>A desktop notification confirms the rule was added.</p>
+                </div>
+            </details>
+
+            <details class="doc-section">
+                <summary>Dark mode / Light mode / Auto theme</summary>
+                <div class="doc-body">
+                    <div class="doc-where">Sidebar → bottom-left toggle</div>
+                    <p>Three options at the bottom of the sidebar: <strong>Auto</strong> follows your OS dark/light preference, <strong>Light</strong> forces the light theme, <strong>Dark</strong> forces the dark theme. Your choice is saved and applied immediately.</p>
+                </div>
+            </details>
+
+        </div><!-- /#tab-docs -->
+
     <!-- Per-group schedule editor modal (feature #8) -->
     <div id="scheduleModal" role="dialog" aria-modal="true" aria-labelledby="scheduleModalTitle">
         <div id="scheduleBox">
