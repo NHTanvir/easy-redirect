@@ -342,6 +342,35 @@
             gap: 10px;
         }
 
+        /* ─── Cards ───────────────────────────────────────────────────── */
+        .card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 22px 24px;
+            margin-bottom: 18px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.05);
+            border: 1px solid var(--border);
+        }
+        .card-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text);
+            margin: 0 0 14px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+        .card-title::before {
+            content: '';
+            display: inline-block;
+            width: 3px; height: 14px;
+            background: var(--accent);
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+
         .remove-btn {
             background: #f44336;
             padding: 4px 10px;
