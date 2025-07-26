@@ -630,6 +630,19 @@ document.addEventListener('DOMContentLoaded', function() {
                         '</span><div class="stats-bar" style="width:' + pct + 'px"></div><span>' + count + '</span></div>';
                 }).join('');
         }
+
+        // Render top-5 blocked sites list in #statsTopList.
+        const topList = document.getElementById('statsTopList');
+        if (topList && sorted.length > 0) {
+            topList.innerHTML = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Top blocked sites (this week)</div>' +
+                sorted.map(([ruleId, count]) => {
+                    const pattern = ruleMap[ruleId] || ruleId;
+                    return '<div class="stats-bar-row"><span style="flex:1;word-break:break-all">' + pattern +
+                        '</span><span style="font-weight:600">' + count + '</span></div>';
+                }).join('');
+        } else if (topList) {
+            topList.innerHTML = '<div style="font-size:13px;color:var(--text-muted)">No data yet — stats populate as sites are blocked.</div>';
+        }
     }
 
     // ---------------------------------------------------------------------------
