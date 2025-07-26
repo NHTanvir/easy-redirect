@@ -626,10 +626,10 @@ document.addEventListener('DOMContentLoaded', function() {
             barChart.innerHTML = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Last 7 days</div>' +
                 days.map(day => {
                     const count = (stats.days[day] || {}).total || 0;
-                    const pct = Math.round((count / maxVal) * 160);
+                    const pct = count > 0 ? Math.max(4, Math.round((count / maxVal) * 100)) : 0;
                     const label = day.slice(5).replace('-', '/');
                     return '<div class="stats-bar-row"><span style="width:36px;color:var(--text-muted)">'  + label +
-                        '</span><div class="stats-bar" style="width:' + pct + 'px"></div><span>' + count + '</span></div>';
+                        '</span><div class="stats-bar-track"><div class="stats-bar" style="width:' + pct + '%"></div></div><span style="width:24px;text-align:right">' + count + '</span></div>';
                 }).join('');
         }
 
