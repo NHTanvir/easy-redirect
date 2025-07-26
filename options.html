@@ -1265,19 +1265,54 @@
             <button id="cancelDisableBtn" class="btn-warning" style="margin-top:0;padding:5px 12px;font-size:12px;">Cancel</button>
         </div>
 
-    <div class="section mode-section">
-        <div class="mode-copy">
-            <h3 style="margin: 0;">Matching mode</h3>
-            <div class="help-text">
-                <strong>Blocklist</strong> redirects the listed sites and leaves everything else alone.
-                <strong>Allowlist</strong> inverts that: every site is redirected except the ones you list.
+        <!-- ══════════════════ TAB: RULES ══════════════════ -->
+        <div class="tab-panel active" id="tab-rules">
+            <div class="panel-heading" id="rulesHeading">Block Rules</div>
+
+            <!-- Add rule card -->
+            <div class="card" id="addRuleCard">
+                <div class="card-title">Block a Website</div>
+                <div class="inline-row" style="align-items:flex-start;gap:8px;">
+                    <input type="text" id="newWebsite"
+                           placeholder="Enter website, e.g. facebook.com or reddit.com/r/funny"
+                           style="flex:1;">
+                    <button id="addWebsite" style="margin-top:0;white-space:nowrap;">+ Block</button>
+                </div>
+                <details class="help-details">
+                    <summary class="help-summary">Advanced formats (wildcards, keywords, regex…)</summary>
+                    <p class="help-text" style="margin-top:6px;">
+                        Plain domains (e.g. <code>facebook.com</code>) block all subdomains automatically.<br>
+                        Add a path to block a section: <code>reddit.com/r/funny</code><br>
+                        Use <code>*</code> for wildcards: <code>*.example.com/*</code><br>
+                        Prefix <code>kw:</code> to block by keyword in the URL: <code>kw:gambling</code><br>
+                        Prefix <code>r/</code> for regex: <code>r/social(media)?\.com</code> (max 10 active)
+                    </p>
+                </details>
+
+                <!-- Access-code challenge -->
+                <div id="accessCodeChallenge">
+                    <p class="help-text" style="margin-bottom:8px;">Type the code below exactly (paste disabled):</p>
+                    <div id="accessCodeDisplay"></div>
+                    <input type="text" id="accessCodeInput" placeholder="Type the code here…"
+                           autocomplete="off" autocorrect="off" spellcheck="false"
+                           style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;letter-spacing:1px;margin-bottom:8px;">
+                    <div class="btn-row" style="margin-top:0;">
+                        <button id="accessCodeConfirmBtn">Confirm</button>
+                        <button id="accessCodeCancelBtn" class="btn-secondary">Cancel</button>
+                    </div>
+                    <div id="accessCodeError" class="field-status" style="color:var(--red);"></div>
+                </div>
+
+                <!-- Regex tester -->
+                <div id="regexTestRow">
+                    <label class="field-label" style="margin-top:10px;">Test regex against a URL</label>
+                    <div class="inline-row">
+                        <input type="text" id="regexTestUrl" placeholder="https://example.com/page" style="flex:1;">
+                        <button id="regexTestBtn" style="margin-top:0;white-space:nowrap;">Test</button>
+                    </div>
+                    <div id="regexTestResult" class="help-text"></div>
+                </div>
             </div>
-        </div>
-        <div class="mode-toggle" role="group" aria-label="Matching mode">
-            <button id="modeBlocklistBtn" data-mode="blocklist">Blocklist</button>
-            <button id="modeAllowlistBtn" data-mode="allowlist">Allowlist</button>
-        </div>
-    </div>
 
     <div class="section" id="profileSection">
         <h3>Profile</h3>
