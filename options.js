@@ -198,12 +198,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const theme = btn.dataset.theme;
             await chrome.storage.sync.set({ theme });
             applyTheme(theme);
-            document.querySelectorAll('.theme-btn').forEach(b => {
-                b.style.background = 'var(--bg-section)';
-                b.style.color = 'var(--text)';
-            });
-            btn.style.background = 'var(--btn-blue)';
-            btn.style.color = '#fff';
+            document.querySelectorAll('.theme-btn').forEach(b => b.classList.toggle('active', b.dataset.theme === theme));
         });
     });
 
@@ -514,15 +509,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Apply saved theme preference, highlighting the active toggle button.
             const theme = result.theme || 'auto';
             applyTheme(theme);
-            document.querySelectorAll('.theme-btn').forEach(b => {
-                if (b.dataset.theme === theme) {
-                    b.style.background = 'var(--btn-blue)';
-                    b.style.color = '#fff';
-                } else {
-                    b.style.background = 'var(--bg-section)';
-                    b.style.color = 'var(--text)';
-                }
-            });
+            document.querySelectorAll('.theme-btn').forEach(b => b.classList.toggle('active', b.dataset.theme === theme));
         renderCategories();
         loadSecuritySection();
         // Populate access code settings (feature #18).
