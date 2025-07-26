@@ -571,3 +571,26 @@ language is just a `_locales/<lang>/messages.json` file with the same keys.
 - `blocked.js` and `countdown.js` apply the same `[data-i18n]` pass on
   load. `blocked.js`'s fallback strings call `chrome.i18n.getMessage`
   before the hard-coded English defaults.
+
+### Stats dashboard (feature #28)
+
+A stats dashboard section in options.html showing blocking activity for the current week.
+
+**Storage** — `weeklyStats` in `chrome.storage.local` (not sync):
+- Shape: `{ weekStart: "YYYY-MM-DD", days: { "YYYY-MM-DD": { total: N, byRule: { ruleId: N } } } }`
+- `weekStart` is the Monday of the current week (`getWeekStart()` helper). Data auto-resets when a new week begins.
+
+**background.js**:
+- `getWeekStart(date)` — returns the Monday of the week containing `date` as a YYYY-MM-DD string.
+- `getWeeklyStats()` — reads `weeklyStats` from `chrome.storage.local`; returns a fresh empty object if the stored `weekStart` does not match the current Monday.
+- `recordHit(ruleId)` — increments the day's total and the per-rule count in `weeklyStats`, then persists. Called by the `onRuleMatchedDebug` listener after updating daily counts.
+- `clearStats()` — removes the `weeklyStats` key from `chrome.storage.local`.
+- Message actions: `getWeeklyStats` (returns `{ stats }`) and `clearStats` (returns `{ ok: true }`).
+
+**options.html / options.js**:
+- `#statsSection` — section placed after the Redirect URL section, before Add Block Rule.
+- Three stat cards (`#statToday`, `#statWeek`, `#statTopSite`) showing today's redirects, weekly total, and top blocked site pattern.
+- `#statsBarChart` — 7-day horizontal bar chart; each day's bar width proportional to its count relative to the week maximum.
+- `#statsTopList` — ordered list of up to 5 rules with the highest redirect counts for the current week.
+- `#clearStatsBtn` — prompts for confirmation then sends `clearStats` to background and re-renders the dashboard.
+- `loadStats()` — async function called from `loadData()` (non-blocking via `.catch(() => {})`). Fetches `weeklyStats` via message, reads `rules` from sync storage to map rule IDs to patterns, and updates all dashboard elements.
