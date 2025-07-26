@@ -480,162 +480,132 @@
         .check-row:hover { background: var(--bg); }
         .check-row span { font-size: 13px; font-weight: 500; }
 
-        .remove-btn {
-            background: #f44336;
-            padding: 4px 10px;
-            font-size: 12px;
-            margin-left: 10px;
-            margin-top: 0;
+        /* ─── Badges ──────────────────────────────────────────────────── */
+        .badge {
+            display: inline-block;
+            padding: 2px 7px;
+            border-radius: 9px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #fff;
+            flex-shrink: 0;
         }
+        .badge-domain   { background: #1E88E5; }
+        .badge-wildcard { background: #7B1FA2; }
+        .badge-path     { background: #E65100; }
+        .badge-keyword  { background: #C62828; }
+        .badge-regex    { background: #37474F; }
 
-        .remove-btn:hover {
-            background: #da190b;
-        }
-
+        /* ─── Rule list ───────────────────────────────────────────────── */
         .website-list {
-            max-height: 320px;
-            overflow-y: auto;
-            margin-top: 10px;
+            margin-top: 8px;
         }
 
         .website-item {
-            background: var(--bg);
-            padding: 10px 12px;
-            margin: 6px 0;
-            border-radius: 4px;
-            border: 1px solid var(--border-light);
+            background: var(--bg-card);
+            padding: 10px 14px;
+            margin: 4px 0;
+            border-radius: 8px;
+            border: 1px solid var(--border);
             display: flex;
             flex-direction: column;
-            font-size: 14px;
+            font-size: 13px;
+            transition: border-color .15s, box-shadow .15s;
         }
+        .website-item:hover { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-light); }
+        .website-item.rule-expanded { border-color: var(--accent); }
 
         .rule-main-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 8px;
+            min-height: 28px;
+        }
+        .rule-actions  { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
+        .rule-meta     { display: flex; align-items: center; gap: 7px; min-width: 0; flex: 1; }
+        .rule-pattern  {
+            font-family: ui-monospace, Menlo, Consolas, monospace;
+            word-break: break-all;
+            font-size: 13px;
+            font-weight: 500;
         }
 
-        .rule-actions {
-            display: flex;
+        /* Collapsible rule details */
+        .rule-details {
+            display: none;
+            flex-direction: column;
             gap: 6px;
-            align-items: center;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border);
         }
+        .rule-details.open { display: flex; }
 
-        .add-exception-btn {
-            background: #78909c;
-            color: #fff;
-            padding: 3px 8px;
-            font-size: 11px;
-            margin-top: 0;
-        }
-
-        .add-exception-btn:hover {
-            background: #546e7a;
-        }
-
-        .exception-list {
-            margin-top: 6px;
+        .rule-details-row {
             display: flex;
-            flex-wrap: wrap;
-            gap: 4px;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-muted);
         }
+        .rule-details-row label { white-space: nowrap; min-width: 80px; }
 
+        /* Expand/more button */
+        .rule-expand-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 2px 7px;
+            border-radius: 5px;
+            font-size: 13px;
+            cursor: pointer;
+            margin-top: 0;
+            line-height: 1;
+        }
+        .rule-expand-btn:hover { background: var(--border); color: var(--text); }
+        .rule-expand-btn.open { background: var(--accent-light); color: var(--accent); border-color: var(--accent); }
+
+        .rule-toggle-btn {
+            background: var(--green-bg);
+            color: var(--green-text);
+            padding: 3px 8px; font-size: 11px; margin-top: 0; border-radius: 5px;
+        }
+        .rule-toggle-btn:hover { background: #C8E6C9; }
+        .rule-toggle-btn.rule-disabled-btn { background: var(--bg); color: var(--text-muted); }
+        .rule-toggle-btn.rule-disabled-btn:hover { background: var(--border); }
+
+        .remove-btn, .remove-rule-btn {
+            background: transparent;
+            color: var(--red);
+            border: 1px solid transparent;
+            padding: 3px 8px; font-size: 11px; margin-top: 0; border-radius: 5px;
+        }
+        .remove-btn:hover, .remove-rule-btn:hover { border-color: var(--red); background: var(--red-bg); }
+
+        .website-item.rule-disabled { opacity: .5; }
+        .rule-enabled-cb { accent-color: var(--accent); }
+
+        .exception-list { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
         .exception-tag {
             background: var(--exception-bg);
             border: 1px solid var(--exception-border);
-            border-radius: 10px;
-            padding: 2px 6px;
+            border-radius: 9px;
+            padding: 2px 7px;
             font-size: 11px;
             color: var(--exception-text);
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
+            display: inline-flex; align-items: center; gap: 4px;
         }
-
         .remove-exception-btn {
-            background: transparent;
-            border: none;
-            color: #c62828;
-            cursor: pointer;
-            font-size: 13px;
-            padding: 0;
-            margin: 0;
-            line-height: 1;
+            background: transparent; border: none;
+            color: #c62828; cursor: pointer; font-size: 13px;
+            padding: 0; margin: 0; line-height: 1;
         }
-
-        .rule-meta {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            min-width: 0;
+        .add-exception-btn {
+            background: #78909C; color: #fff;
+            padding: 2px 7px; font-size: 11px; margin-top: 0; border-radius: 5px;
         }
-
-        .rule-pattern {
-            font-family: ui-monospace, Menlo, Consolas, monospace;
-            word-break: break-all;
-        }
-
-        .badge {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: 11px;
-            font-weight: 600;
-            letter-spacing: 0.4px;
-            color: #fff;
-            flex-shrink: 0;
-        }
-
-        .badge-domain {
-            background: #2196F3;
-        }
-
-        .badge-wildcard {
-            background: #9c27b0;
-        }
-
-        .badge-path {
-            background: #f57c00;
-        }
-
-        .badge-keyword {
-            background: #e53935;
-        }
-
-        .badge-regex {
-            background: #37474f;
-        }
-
-        .help-text {
-            color: var(--text-muted);
-            font-size: 12px;
-            margin-top: 6px;
-        }
-
-        .status {
-            margin-top: 16px;
-            padding: 10px;
-            border-radius: 4px;
-            text-align: center;
-            font-size: 13px;
-        }
-
-        .success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-
-        .error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-
-        .toggle-section {
-            text-align: center;
-            margin-bottom: 20px;
-        }
+        .add-exception-btn:hover { background: #546E7A; }
 
         .toggle-btn {
             background: #2196F3;
