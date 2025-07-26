@@ -1186,19 +1186,38 @@
     </style>
 </head>
 <body>
-    <!-- Lock screen overlay — shown when a PIN/password is set (feature #17) -->
-    <div id="lockOverlay" role="dialog" aria-modal="true" aria-labelledby="lockTitle">
-        <div id="lockBox">
-            <div class="lock-icon" aria-hidden="true">&#128274;</div>
-            <h2 id="lockTitle">Easy Redirect is locked</h2>
-            <p class="help-text">Enter your PIN or password to access settings.</p>
-            <input type="password" id="lockPinInput" placeholder="Enter PIN / password"
-                   autocomplete="current-password" autocorrect="off" spellcheck="false">
-            <button id="lockSubmitBtn">Unlock</button>
-            <div id="lockError" role="alert"></div>
-            <div id="lockAttemptsLeft"></div>
-        </div>
+
+<!-- ── Lock screen overlay ── -->
+<div id="lockOverlay" role="dialog" aria-modal="true" aria-labelledby="lockTitle">
+    <div id="lockBox">
+        <div class="lock-icon" aria-hidden="true">&#128274;</div>
+        <h2 id="lockTitle">Easy Redirect is locked</h2>
+        <p class="help-text">Enter your PIN or password to access settings.</p>
+        <input type="password" id="lockPinInput" placeholder="Enter PIN / password"
+               autocomplete="current-password" autocorrect="off" spellcheck="false">
+        <button id="lockSubmitBtn">Unlock</button>
+        <div id="lockError" role="alert"></div>
+        <div id="lockAttemptsLeft"></div>
     </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="app">
+
+    <!-- ── Sidebar ── -->
+    <aside id="sidebar">
+        <div class="sidebar-header">
+        </div>
+
+        <nav class="sidebar-nav">
+        </nav>
+
+        <div class="sidebar-footer">
+        </div>
+    </aside>
+
+    <!-- ── Main content ── -->
+    <main id="main-content">
 
     <h1 data-i18n="optionsHeading">Easy Redirect — Settings</h1>
 
@@ -1778,7 +1797,11 @@
         </div>
     </div>
 
-    <script src="categories.js"></script>
-    <script src="options.js"></script>
+    </main><!-- /#main-content -->
+</div><!-- /#app -->
+
+<script src="tabs.js"></script>
+<script src="categories.js"></script>
+<script src="options.js"></script>
 </body>
 </html>
