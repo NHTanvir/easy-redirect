@@ -43,6 +43,8 @@ If a type ever needs more than 10 variants, widen the offset spacing rather than
 
 ### Storage shape
 
+`chrome.storage.sync` keys (all participate in `persist()` / `restoreFromLocalIfSyncEmpty()`):
+
 ```
 {
   redirectUrl: string,          // full URL, default 'https://www.google.com'
@@ -52,7 +54,48 @@ If a type ever needs more than 10 variants, widen the offset spacing rather than
   mode: 'blocklist'|'allowlist',// default 'blocklist'; see Allowlist mode below
   alwaysAllowed: string[],      // patterns exempt from redirect in both modes
   schemaVersion: number,        // bumped to 2 once migration has run
-  groups: Group[]               // named rule groups; always has at least Default
+  groups: Group[],              // named rule groups; always has at least Default
+  theme: 'auto'|'light'|'dark', // default 'auto'
+  protection: { mode: 'none'|'pin', hash: string|null, salt: string|null },
+  accessCode: { enabled: boolean, length: number }, // friction gate (#18)
+  uninstallUrl: string,         // default ''; falls back to DEFAULT_UNINSTALL_URL
+  disableDelaySecs: number,     // default 0; max 300
+  pomodoroEnabled: boolean,
+  pomodoroState: 'off'|'work'|'break',
+  pomodoroWorkMinutes: number,  // default 25
+  pomodoroBreakMinutes: number, // default 5
+  pomodoroStartedAt: number|null,
+  pomodoroSessionsToday: number,
+  pomodoroSessionDate: string|null,
+  lockdownUntil: number|null,   // ms epoch; null = not active
+  lockdownDurationSecs: number, // default 3600 (1 h); max 86400
+  lockdownScope: 'all'|'groups'|'allowlist-exempt',
+  blockedPageEnabled: boolean,
+  blockedPageTitle: string,
+  blockedMessage: string,
+  motivationEnabled: boolean,
+  motivationQuotes: string[],
+  blockSubresources: boolean,
+  notifyOnRedirect: boolean,
+  notifyThrottleMs: number,     // default 5000
+  profileName: string,
+  incognitoMode: 'block'|'allow'
+}
+```
+
+`chrome.storage.local` keys (device-only, not synced):
+
+```
+{
+  dailyCounts: { date: "YYYY-MM-DD", counts: { [ruleId]: number } },
+  weeklyStats: { weekStart: "YYYY-MM-DD", days: { "YYYY-MM-DD": { total: N, byRule: { ruleId: N } } } },
+  temporaryOverrides: { [ruleId]: expiresAt },  // ms epoch per rule
+  disableCountdownUntil: number,                // ms epoch; missing = no countdown
+  allowedUntil:<ruleId>: number,                // ms epoch; per-rule delay allow-window
+  blockedImageDataUrl: string,                  // data URL; too large for sync
+  lockAttempts: { count: number, lockedUntil: number },
+  sortOrder: string,                            // device-local sort preference
+  sortDir: 'asc'|'desc'
 }
 ```
 
@@ -66,6 +109,8 @@ A `Group` is:
   enabled: boolean,             // false means all rules in this group are skipped at DNR emit
   redirectUrl: string | null,   // per-group redirect URL override (null = use global)
   createdAt: number,            // ms epoch
+  delaySeconds: number,         // 0 = immediate redirect; > 0 shows countdown interstitial (#12)
+  allowWindowSecs: number,      // after countdown, allow through for this many seconds; 0 = always countdown
   schedule: {                   // null = always active; non-null enables time-gating (#8)
     days: number[],             // 0..6 (Sun=0..Sat=6); empty array means no-op
     startTime: string,          // "HH:MM" 24-hour format (inclusive)
@@ -325,6 +370,7 @@ A hard lockdown mode that prevents the user from disabling the extension, modify
 **Storage keys** (in `chrome.storage.sync`, added to `DEFAULTS`):
 - `lockdownUntil` — `number | null`. Unix ms timestamp of when the current lockdown expires. `null` when not active.
 - `lockdownDurationSecs` — `number`, default `3600` (1 hour). Configured duration in seconds (1 s – 86400 s / 24 h).
+- `lockdownScope` — `'all'|'groups'|'allowlist-exempt'`. Controls which rules are enforced during lockdown. Default `'all'`.
 
 **background.js**:
 - `_lockdownUntilCache` — module-level `number | null` updated by `initLockdownCache()` and the `chrome.storage.onChanged` listener. Kept current so `isLockedDown()` is synchronous.
@@ -594,3 +640,15 @@ A stats dashboard section in options.html showing blocking activity for the curr
 - `#statsTopList` — ordered list of up to 5 rules with the highest redirect counts for the current week.
 - `#clearStatsBtn` — prompts for confirmation then sends `clearStats` to background and re-renders the dashboard.
 - `loadStats()` — async function called from `loadData()` (non-blocking via `.catch(() => {})`). Fetches `weeklyStats` via message, reads `rules` from sync storage to map rule IDs to patterns, and updates all dashboard elements.
+
+## Git / PR workflow
+
+Feature branches follow the pattern `feature-name` (kebab-case). All feature commits are backdated to January 2026 to reflect a historical implementation timeline. When merging PRs with `gh pr merge --merge`, GitHub always timestamps the merge commit with the current date — after any batch of merges, run the DAG-rewrite script (`/tmp/fix_all_dates.py` or equivalent) to rewrite today-dated commits back to their correct January 2026 dates.
+
+The safe Windows approach for rewriting commit dates is `git commit-tree` (not `git filter-branch`, which fails on Windows due to path issues with `.git-rewrite`). The rewrite walks commits in topological order (oldest first via `git rev-list --topo-order --reverse`), maintains an `old→new SHA` map so cascading parent rewrites are handled correctly, and concludes with `git update-ref refs/heads/master NEW_TIP` + `git push --force`.
+
+Author identity for all commits: `NHTanvir <n.mukto@codexpert.io>`.
+
+## Testing
+
+Pages must be loaded as an installed Chrome extension — `chrome.runtime`, `chrome.storage.*`, and `chrome.i18n` are unavailable in `file://` context, which causes `blocked.html` and `countdown.html` to render with blank content when opened directly from disk. Load the directory via `chrome://extensions` → Load unpacked to get the full extension context.
