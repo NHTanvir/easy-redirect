@@ -371,6 +371,115 @@
             flex-shrink: 0;
         }
 
+        /* ─── Forms ───────────────────────────────────────────────────── */
+        input[type="text"],
+        input[type="number"],
+        input[type="password"],
+        input[type="time"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 8px 11px;
+            border: 1px solid var(--input-border);
+            border-radius: 6px;
+            font-size: 13px;
+            background: var(--input-bg);
+            color: var(--text);
+            font-family: inherit;
+            transition: border-color .15s, box-shadow .15s;
+            outline: none;
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--border-focus);
+            box-shadow: 0 0 0 3px rgba(92,107,192,.15);
+        }
+        input[type="range"] { width: 100%; accent-color: var(--accent); }
+        input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent); }
+        input[type="radio"]    { accent-color: var(--accent); }
+        input[type="file"]     { font-size: 12px; color: var(--text-muted); }
+
+        label.field-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 5px;
+        }
+        .field-group { margin-bottom: 14px; }
+
+        /* ─── Buttons ─────────────────────────────────────────────────── */
+        button {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 8px 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            font-family: inherit;
+            background: var(--btn-primary);
+            color: #fff;
+            margin-top: 4px;
+            transition: background .13s, opacity .13s;
+        }
+        button:hover { background: var(--btn-primary-hover); }
+        button:disabled { opacity: .5; cursor: not-allowed; }
+
+        .btn-secondary {
+            background: var(--bg-card);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        .btn-secondary:hover { background: var(--bg); }
+
+        .btn-danger  { background: var(--red) !important; }
+        .btn-danger:hover { background: #C62828 !important; }
+
+        .btn-warning { background: var(--orange) !important; }
+        .btn-warning:hover { background: #E65100 !important; }
+
+        .btn-success { background: var(--green) !important; }
+        .btn-success:hover { background: #2E7D32 !important; }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+        }
+        .btn-ghost:hover { background: var(--bg); color: var(--text); }
+
+        .btn-sm { padding: 4px 10px; font-size: 12px; }
+        .btn-xs { padding: 2px 7px; font-size: 11px; margin-top: 0; }
+
+        .btn-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+
+        /* ─── Helpers ─────────────────────────────────────────────────── */
+        .help-text { font-size: 12px; color: var(--text-muted); margin-top: 4px; line-height: 1.55; }
+        .help-text a { color: var(--accent); text-decoration: none; }
+        .help-text a:hover { text-decoration: underline; }
+        .help-details { margin-top: 6px; }
+        .help-summary {
+            font-size: 12px; color: var(--accent); cursor: pointer;
+            user-select: none; list-style: none;
+            display: inline-flex; align-items: center; gap: 4px;
+        }
+        .help-summary::before { content: '▸'; font-size: 10px; transition: transform .15s; }
+        details[open] .help-summary::before { transform: rotate(90deg); }
+        .field-status { min-height: 16px; font-size: 12px; margin-top: 6px; font-weight: 500; }
+        .field-status:not(:empty) { padding: 5px 8px; border-radius: 5px; }
+
+        .inline-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .check-row {
+            display: flex; align-items: center; gap: 10px;
+            cursor: pointer; margin-bottom: 8px;
+            padding: 8px 10px; border-radius: 8px;
+            transition: background .12s;
+        }
+        .check-row:hover { background: var(--bg); }
+        .check-row span { font-size: 13px; font-weight: 500; }
+
         .remove-btn {
             background: #f44336;
             padding: 4px 10px;
