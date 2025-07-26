@@ -2023,29 +2023,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
         websiteListDiv.innerHTML = html;
 
-        // Wire select-all and per-row checkboxes for bulk operations.
-        const selectAll = document.getElementById('selectAllRules');
-        const rowCheckboxes = websiteListDiv.querySelectorAll('.rule-select-checkbox');
-        if (selectAll) {
-            selectAll.checked = false;
-            selectAll.addEventListener('change', () => {
-                rowCheckboxes.forEach(cb => { cb.checked = selectAll.checked; });
-            });
-        }
-        rowCheckboxes.forEach(cb => {
-            cb.addEventListener('change', () => {
-                if (selectAll) selectAll.checked = [...rowCheckboxes].every(ch => ch.checked);
+        // Wire expand/collapse ⋯ buttons to toggle the details section.
+        websiteListDiv.querySelectorAll('.rule-expand-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const ruleId = btn.dataset.ruleId;
+                const item = websiteListDiv.querySelector(`.website-item[data-rule-id="${CSS.escape(ruleId)}"]`);
+                const details = websiteListDiv.querySelector(`.rule-details[data-rule-id="${CSS.escape(ruleId)}"]`);
+                if (!details) return;
+                const isOpen = details.classList.toggle('open');
+                btn.classList.toggle('open', isOpen);
+                if (item) item.classList.toggle('rule-expanded', isOpen);
             });
         });
-        // Wire bulk enable / disable buttons.
-        const bulkEnableBtn = document.getElementById('bulkEnableBtn');
-        const bulkDisableBtn = document.getElementById('bulkDisableBtn');
-        if (bulkEnableBtn) {
-            bulkEnableBtn.onclick = () => bulkSetEnabled(rules, true);
-        }
-        if (bulkDisableBtn) {
-            bulkDisableBtn.onclick = () => bulkSetEnabled(rules, false);
-        }
         websiteListDiv.querySelectorAll('.rule-toggle-btn').forEach(btn => {
             btn.addEventListener('click', () => toggleRule(btn.dataset.ruleId));
         });
