@@ -574,6 +574,23 @@
             min-width: 4px;
             transition: width 0.3s;
         }
+        /* Pomodoro countdown colours (feature #10) */
+        #pomodoroCountdown.pomo-work {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        #pomodoroCountdown.pomo-break {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+        [data-theme="dark"] #pomodoroCountdown.pomo-work {
+            background: #1b3a1d;
+            color: #81c784;
+        }
+        [data-theme="dark"] #pomodoroCountdown.pomo-break {
+            background: #0d2a45;
+            color: #64b5f6;
+        }
     </style>
 </head>
 <body>
@@ -715,6 +732,35 @@
         <div id="statsTopList" style="margin-bottom:12px;"></div>
         <button id="clearStatsBtn" style="background:#b71c1c;">Clear stats</button>
         <div id="statsStatus" style="min-height:18px;font-size:13px;margin-top:8px;"></div>
+    </div>
+
+    <!-- Pomodoro timer (feature #10) -->
+    <div class="section" id="pomodoroSection">
+        <h3>Pomodoro Timer</h3>
+        <div class="help-text" style="margin-bottom:12px;">
+            Alternate between focused work sessions (rules active) and breaks (rules suspended).
+            The timer keeps running in the background even when this page is closed.
+        </div>
+        <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:14px;align-items:center;">
+            <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                Work
+                <input type="number" id="pomodoroWorkInput" min="1" max="120" step="1" value="25"
+                       style="width:60px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);text-align:right;">
+                min
+            </label>
+            <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                Break
+                <input type="number" id="pomodoroBreakInput" min="1" max="60" step="1" value="5"
+                       style="width:60px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);text-align:right;">
+                min
+            </label>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+            <button id="pomodoroStartBtn" style="background:#43a047;">&#9654; Start timer</button>
+            <button id="pomodoroStopBtn" style="display:none;background:#e53935;">&#9632; Stop timer</button>
+            <span id="pomodoroCountdown" style="display:none;font-variant-numeric:tabular-nums;font-weight:700;font-size:20px;letter-spacing:1px;padding:4px 10px;border-radius:6px;"></span>
+        </div>
+        <div id="pomodoroStatus" style="min-height:18px;font-size:13px;color:var(--text-muted);"></div>
     </div>
 
     <div class="section">

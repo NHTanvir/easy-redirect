@@ -1514,14 +1514,14 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
                 const filterTail = tail || '/';
                 dnrRules.push({
                     id: offset,
-                    priority: 1,
-                    action: { type: 'redirect', redirect: { url: redirectUrl } },
+                    priority: PRIORITY_RULE,
+                    action: ruleAction,
                     condition: { urlFilter: `*://${host}${filterTail}*`, resourceTypes: ['main_frame'] }
                 });
                 dnrRules.push({
                     id: offset + 1,
-                    priority: 1,
-                    action: { type: 'redirect', redirect: { url: redirectUrl } },
+                    priority: PRIORITY_RULE,
+                    action: ruleAction,
                     condition: { urlFilter: `*://www.${host}${filterTail}*`, resourceTypes: ['main_frame'] }
                 });
             } else if (rule.type === 'keyword') {
@@ -1538,9 +1538,13 @@ async function createRedirectRules(rules, redirectUrl, opts = {}) {
                 const offset = baseId + DNR_TYPE_OFFSETS.keyword;
                 dnrRules.push({
                     id: offset,
-                    priority: 1,
-                    action: { type: 'redirect', redirect: { url: redirectUrl } },
-                    condition: { urlFilter: `*${keyword}*`, resourceTypes: ['main_frame'] }
+                    priority: PRIORITY_RULE,
+                    action: ruleAction,
+                    condition: {
+                        urlFilter: `*${keyword}*`,
+                        resourceTypes: ['main_frame'],
+                        isUrlFilterCaseSensitive: rule.caseSensitive === true
+                    }
                 });
             } else if (rule.type === 'regex') {
                 // Regex rules use DNR's native regexFilter field. Each source
