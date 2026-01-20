@@ -1129,14 +1129,12 @@ async function stopLockdown() {
 
 // Pomodoro timer helpers (feature #10)
 async function startPomodoro() {
-    const r = await chrome.storage.sync.get(['pomodoroWorkMinutes', 'pomodoroBreakMinutes']);
+    const r = await chrome.storage.sync.get(['pomodoroWorkMinutes']);
     const workMins = (typeof r.pomodoroWorkMinutes === 'number' && r.pomodoroWorkMinutes > 0)
         ? r.pomodoroWorkMinutes : 25;
-    const breakMins = (typeof r.pomodoroBreakMinutes === 'number' && r.pomodoroBreakMinutes > 0)
-        ? r.pomodoroBreakMinutes : 5;
     await chrome.alarms.clear('pomodoroWork');
     await chrome.alarms.clear('pomodoroBreak');
-    await persist({ pomodoroEnabled: true, pomodoroState: 'work', pomodoroStartedAt: Date.now(), pomodoroWorkMinutes: workMins, pomodoroBreakMinutes: breakMins });
+    await persist({ pomodoroEnabled: true, pomodoroState: 'work', pomodoroStartedAt: Date.now() });
     chrome.alarms.create('pomodoroWork', { delayInMinutes: workMins });
     await updateRedirectRules();
     console.log(`[pomodoro] Started — ${workMins}-min work session.`);

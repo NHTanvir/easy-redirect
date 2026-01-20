@@ -925,32 +925,27 @@ document.addEventListener('DOMContentLoaded', function() {
     // ---------------------------------------------------------------------------
 
     // Save work/break durations to chrome.storage.sync whenever they change.
-    function _savePomodoroDurations() {
+    function _savePomodoroDurations(callback) {
         const workEl = document.getElementById('pomodoroWorkInput');
         const breakEl = document.getElementById('pomodoroBreakInput');
         const workMins = workEl ? Math.max(1, Math.min(120, parseInt(workEl.value, 10) || 25)) : 25;
         const breakMins = breakEl ? Math.max(1, Math.min(60, parseInt(breakEl.value, 10) || 5)) : 5;
-        chrome.storage.sync.set({ pomodoroWorkMinutes: workMins, pomodoroBreakMinutes: breakMins });
+        chrome.storage.sync.set({ pomodoroWorkMinutes: workMins, pomodoroBreakMinutes: breakMins }, callback);
     }
 
     const pomWorkInput = document.getElementById('pomodoroWorkInput');
     const pomBreakInput = document.getElementById('pomodoroBreakInput');
-    if (pomWorkInput) {
-        pomWorkInput.addEventListener('change', _savePomodoroDurations);
-        pomWorkInput.addEventListener('input', _savePomodoroDurations);
-    }
-    if (pomBreakInput) {
-        pomBreakInput.addEventListener('change', _savePomodoroDurations);
-        pomBreakInput.addEventListener('input', _savePomodoroDurations);
-    }
+    if (pomWorkInput) pomWorkInput.addEventListener('change', () => _savePomodoroDurations());
+    if (pomBreakInput) pomBreakInput.addEventListener('change', () => _savePomodoroDurations());
 
     // Start button — persist durations first so background picks them up.
     const pomStartBtn = document.getElementById('pomodoroStartBtn');
     if (pomStartBtn) {
         pomStartBtn.addEventListener('click', () => {
-            _savePomodoroDurations();
-            chrome.runtime.sendMessage({ action: 'startPomodoro' }, () => {
-                initPomodoroUi(); // refresh UI immediately
+            _savePomodoroDurations(() => {
+                chrome.runtime.sendMessage({ action: 'startPomodoro' }, () => {
+                    initPomodoroUi(); // refresh UI immediately
+                });
             });
         });
     }
@@ -971,21 +966,10 @@ document.addEventListener('DOMContentLoaded', function() {
         pomToggleBtn.addEventListener('click', () => {
             chrome.storage.sync.get(['pomodoroEnabled'], result => {
                 const newEnabled = !result.pomodoroEnabled;
-                const updates = newEnabled
-                    ? { pomodoroEnabled: true }
-                    : { pomodoroEnabled: false, pomodoroState: 'off', pomodoroStartedAt: null };
-                chrome.storage.sync.set(updates, () => {
-                    const se = document.getElementById('pomodoroStatus');
-                    if (!newEnabled) {
-                        chrome.alarms.clear('pomodoroWork');
-                        chrome.alarms.clear('pomodoroBreak');
-                        if (se) se.textContent = 'Pomodoro feature disabled.';
-                    } else {
-                        if (se) se.textContent = 'Pomodoro feature enabled.';
-                    }
-                    chrome.runtime.sendMessage({ action: 'updateRules' }).catch(() => {});
-                    chrome.runtime.sendMessage({ action: 'setPomodoroEnabled', enabled: newEnabled }).catch(() => {});
-                    setTimeout(initPomodoroUi, 100);
+                // Background owns the write (persist() mirrors to local), alarm
+                // cleanup and rule rebuild.
+                chrome.runtime.sendMessage({ action: 'setPomodoroEnabled', enabled: newEnabled }, () => {
+                    initPomodoroUi();
                 });
             });
         });
