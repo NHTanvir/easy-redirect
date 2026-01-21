@@ -1814,40 +1814,86 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Focus Guard: the toggle starts a timed pause in the background, or
+    // resumes blocking early. All pause rules are enforced by background.js.
     async function toggleExtension() {
         try {
-            // Check lockdown state (feature #11) before allowing disable.
-            const ldResult = await chrome.storage.sync.get(['lockdownUntil']);
-            const lockdownUntil = ldResult.lockdownUntil;
-            if (typeof lockdownUntil === 'number' && lockdownUntil > Date.now()) {
-                showStatus('Cannot disable during lockdown.', 'error');
+            const result = await chrome.storage.sync.get(['extensionEnabled']);
+            if (result.extensionEnabled === false) {
+                await chrome.runtime.sendMessage({ action: 'resumeBlocking' });
+                showStatus('Blocking resumed.', 'success');
                 return;
             }
-
-            const result = await chrome.storage.sync.get(['extensionEnabled']);
-            const isEnabled = result.extensionEnabled !== false;
-            const newState = !isEnabled;
-
-            // Only flip the enabled flag — rules and redirectUrl are
-            // intentionally preserved so the user's list survives a disable cycle.
-            await chrome.storage.sync.set({ extensionEnabled: newState });
-            await updateRedirectRules();
-            updateToggleButton(newState);
-
-            showStatus(newState ? 'Extension enabled!' : 'Extension disabled!', 'success');
+            const resp = await chrome.runtime.sendMessage({ action: 'requestPause' });
+            if (!resp || !resp.ok) {
+                showStatus((resp && resp.error) || 'Could not pause blocking.', 'error');
+                return;
+            }
+            showStatus('Blocking paused. It switches back on automatically.', 'success');
         } catch (error) {
             showStatus('Error toggling extension: ' + error.message, 'error');
         }
     }
 
     function updateToggleButton(isEnabled) {
-        if (isEnabled) {
-            toggleBtn.textContent = 'Disable Redirector';
-            toggleBtn.classList.remove('disabled');
-        } else {
-            toggleBtn.textContent = 'Enable Redirector';
-            toggleBtn.classList.add('disabled');
+        toggleBtn.textContent = isEnabled ? 'Pause blocking' : 'Resume blocking';
+        toggleBtn.classList.toggle('disabled', !isEnabled);
+        refreshFocusGuard();
+    }
+
+    // Re-render everything Focus Guard shows: the sidebar pause countdown and
+    // the settings card. Called on load and whenever extensionEnabled changes.
+    let _pauseTick = null;
+    let _focusRenderToken = 0;
+    async function refreshFocusGuard() {
+        const token = ++_focusRenderToken;
+        let state;
+        try {
+            state = await chrome.runtime.sendMessage({ action: 'getFocusState' });
+        } catch (_) { return; }
+        if (!state || token !== _focusRenderToken) return;
+
+        const pauseMinsEl = document.getElementById('pauseMinutesInput');
+        if (pauseMinsEl && document.activeElement !== pauseMinsEl) pauseMinsEl.value = state.settings.pauseMinutes;
+
+        const infoEl = document.getElementById('pauseInfo');
+        if (_pauseTick) { clearInterval(_pauseTick); _pauseTick = null; }
+        if (!infoEl) return;
+        if (state.enabled || !state.pause) { infoEl.textContent = ''; return; }
+        const endsAt = state.pause.endsAt;
+        const tick = () => {
+            const ms = Math.max(0, endsAt - Date.now());
+            const m = Math.floor(ms / 60000);
+            const sec = Math.floor((ms % 60000) / 1000);
+            infoEl.textContent = `Resumes in ${m}:${String(sec).padStart(2, '0')}`;
+        };
+        tick();
+        _pauseTick = setInterval(tick, 1000);
+    }
+
+    // The pause can end from the background (alarm, shortcut), so follow the
+    // stored flag instead of assuming the page made the change.
+    chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === 'sync' && 'extensionEnabled' in changes) {
+            updateToggleButton(changes.extensionEnabled.newValue !== false);
         }
+    });
+
+    const saveFocusSettingsBtn = document.getElementById('saveFocusSettingsBtn');
+    if (saveFocusSettingsBtn) {
+        saveFocusSettingsBtn.addEventListener('click', async () => {
+            const statusEl = document.getElementById('focusSettingsStatus');
+            const settings = {
+                pauseMinutes: parseInt(document.getElementById('pauseMinutesInput').value, 10)
+            };
+            const resp = await chrome.runtime.sendMessage({ action: 'saveFocusSettings', settings });
+            if (statusEl) {
+                statusEl.textContent = resp && resp.ok ? 'Saved.' : ((resp && resp.error) || 'Could not save.');
+                statusEl.style.color = resp && resp.ok ? '#2e7d32' : '#c62828';
+                setTimeout(() => { statusEl.textContent = ''; }, 2500);
+            }
+            refreshFocusGuard();
+        });
     }
 
     function escapeHtml(str) {

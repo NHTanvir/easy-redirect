@@ -132,6 +132,10 @@ const DEFAULTS = {
     // Number of seconds to count down before the extension actually disables
     // (feature #20). 0 means disable immediately (legacy behaviour). Max 300 s.
     disableDelaySecs: 0,
+    // Focus Guard pause length in minutes. The Disable button starts a timed
+    // pause instead of turning blocking off for good; blocking resumes on its
+    // own after this many minutes. Clamped to 1..PAUSE_MINUTES_MAX.
+    pauseMinutes: 5,
     // Pomodoro timer state (feature #10). pomodoroEnabled toggles the feature;
     // pomodoroState tracks the current phase ('off'|'work'|'break');
     // pomodoroWorkMinutes and pomodoroBreakMinutes set session lengths (defaults
@@ -282,6 +286,16 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     if (alarm.name.startsWith(TEMP_OVERRIDE_ALARM_PREFIX)) {
         const ruleId = alarm.name.slice(TEMP_OVERRIDE_ALARM_PREFIX.length);
         await clearTemporaryOverride(ruleId);
+        return;
+    }
+
+    if (alarm.name === FOCUS_PAUSE_ALARM) {
+        await resumeBlocking();
+        chrome.notifications.create(`pause-end-${Date.now()}`, {
+            type: 'basic', iconUrl: 'icons/icon-48.png',
+            title: 'Easy Redirect — Pause over',
+            message: 'Blocking is back on. Back to work!'
+        });
         return;
     }
 
@@ -728,6 +742,125 @@ async function resumeCountdownIfPending() {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Focus Guard: timed pauses instead of a permanent off switch
+// ---------------------------------------------------------------------------
+// Turning the extension off always goes through requestPause(), which records
+// the pause in chrome.storage.local as `focusPause` and schedules the
+// FOCUS_PAUSE_ALARM to switch blocking back on after pauseMinutes. The
+// storage.onChanged guard reverts any extensionEnabled=false write that has
+// no matching focusPause record, so there is no way to stay off indefinitely.
+//
+//   focusPause: { startedAt, endsAt, delayMs, reason, kind } | null
+//
+// delayMs is the disable-delay countdown (feature #20) that runs before the
+// pause takes effect; endsAt already includes it.
+
+const FOCUS_PAUSE_ALARM = 'focusPauseEnd';
+const PAUSE_MINUTES_MAX = 30;
+
+function clampPauseMinutes(v) {
+    const n = typeof v === 'number' && v > 0 ? v : DEFAULTS.pauseMinutes;
+    return Math.max(1, Math.min(PAUSE_MINUTES_MAX, Math.round(n)));
+}
+
+async function isLockdownActiveNow() {
+    const r = await chrome.storage.sync.get(['lockdownUntil']);
+    return typeof r.lockdownUntil === 'number' && Date.now() < r.lockdownUntil;
+}
+
+// Start a timed pause. Returns { ok, pause } or { ok: false, error }.
+async function requestPause(opts = {}) {
+    if (await isLockdownActiveNow()) return { ok: false, error: 'Cannot pause during lockdown.' };
+    const sync = await chrome.storage.sync.get(['extensionEnabled', 'pauseMinutes', 'disableDelaySecs']);
+    if (sync.extensionEnabled === false) return { ok: false, error: 'Blocking is already paused.' };
+
+    const mins = clampPauseMinutes(sync.pauseMinutes);
+    const delaySecs = typeof sync.disableDelaySecs === 'number'
+        ? Math.max(0, Math.min(DISABLE_DELAY_MAX, sync.disableDelaySecs)) : 0;
+    const now = Date.now();
+    const pause = {
+        startedAt: now,
+        endsAt: now + delaySecs * 1000 + mins * 60 * 1000,
+        delayMs: delaySecs * 1000,
+        reason: typeof opts.reason === 'string' ? opts.reason.slice(0, 500) : '',
+        kind: 'pause'
+    };
+    // Record the pause before flipping the flag so the onChanged guard sees it.
+    await chrome.storage.local.set({ focusPause: pause });
+    await chrome.alarms.create(FOCUS_PAUSE_ALARM, { when: pause.endsAt });
+    await persist({ extensionEnabled: false });
+    console.log(`[focus-guard] Paused for ${mins} min (resumes ${new Date(pause.endsAt).toISOString()}).`);
+    return { ok: true, pause };
+}
+
+// Switch blocking back on. The onChanged listener then calls finishPause().
+async function resumeBlocking() {
+    await cancelPendingCountdownState();
+    await persist({ extensionEnabled: true });
+}
+
+// A disable-delay countdown that is still running would otherwise disable the
+// extension again when it fires; drop it when the pause is resumed early.
+async function cancelPendingCountdownState() {
+    if (_countdownTimer) { clearTimeout(_countdownTimer); _countdownTimer = null; }
+    stopBadgeTick();
+    await _clearCountdownState();
+}
+
+// Close out the active pause record. Idempotent.
+async function finishPause() {
+    await chrome.alarms.clear(FOCUS_PAUSE_ALARM);
+    const { focusPause } = await chrome.storage.local.get(['focusPause']);
+    if (!focusPause) return;
+    await chrome.storage.local.remove('focusPause');
+    console.log('[focus-guard] Pause finished; blocking active again.');
+}
+
+// Snapshot for the options page: active pause plus the Focus Guard settings.
+async function getFocusState() {
+    const [sync, local] = await Promise.all([
+        chrome.storage.sync.get(['extensionEnabled', 'pauseMinutes']),
+        chrome.storage.local.get(['focusPause'])
+    ]);
+    return {
+        enabled: sync.extensionEnabled !== false,
+        pause: local.focusPause || null,
+        settings: { pauseMinutes: clampPauseMinutes(sync.pauseMinutes) }
+    };
+}
+
+// Validate and persist Focus Guard settings. Locked while a lockdown runs so
+// the limits can't be loosened mid-session.
+async function saveFocusSettings(input) {
+    if (await isLockdownActiveNow()) return { ok: false, error: 'Focus Guard settings are locked during lockdown.' };
+    const updates = {};
+    if ('pauseMinutes' in input) updates.pauseMinutes = clampPauseMinutes(Number(input.pauseMinutes));
+    await persist(updates);
+    return { ok: true };
+}
+
+// Startup / install reconciliation: a pause that expired while the browser
+// was closed ends now, and a disabled state with no pause record (e.g. from
+// before Focus Guard existed) is switched back on.
+async function reconcilePause() {
+    const [sync, local] = await Promise.all([
+        chrome.storage.sync.get(['extensionEnabled']),
+        chrome.storage.local.get(['focusPause'])
+    ]);
+    const pause = local.focusPause;
+    if (sync.extensionEnabled !== false) {
+        if (pause) await finishPause();
+        return;
+    }
+    if (!pause || pause.endsAt <= Date.now()) {
+        await resumeBlocking();
+        await finishPause();
+    } else {
+        await chrome.alarms.create(FOCUS_PAUSE_ALARM, { when: pause.endsAt });
+    }
+}
+
 // Read the stored uninstall URL (may be customised by the user) and call
 // chrome.runtime.setUninstallURL. Must be called on both onInstalled and
 // onStartup because Chrome resets the URL on browser restart.
@@ -760,6 +893,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     await ensureKeywordContentScriptRegistered();
     await ensureScheduleAlarm();
     await initLockdownCache(); // warm cache so isLockedDown() is accurate immediately
+    await reconcilePause();
     updateRedirectRules();
     registerContextMenus();
     scheduleMidnightAlarm();
@@ -922,6 +1056,7 @@ chrome.runtime.onStartup.addListener(async () => {
     await resumeCountdownIfPending(); // Resume any countdown that was running before worker shutdown.
     await initLockdownCache(); // warm cache so isLockedDown() is accurate immediately
     await restorePomodoroAlarm(); // Re-arm Pomodoro alarm if a session was active at shutdown.
+    await reconcilePause();
     updateRedirectRules();
     registerContextMenus();
     scheduleMidnightAlarm();
@@ -1070,6 +1205,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     if (request.action === 'stopPomodoro') {
         stopPomodoro().then(() => sendResponse({ ok: true }));
+        return true;
+    }
+    if (request.action === 'requestPause') {
+        requestPause({ reason: request.reason }).then(sendResponse);
+        return true;
+    }
+    if (request.action === 'resumeBlocking') {
+        resumeBlocking().then(() => sendResponse({ ok: true }));
+        return true;
+    }
+    if (request.action === 'getFocusState') {
+        getFocusState().then(sendResponse);
+        return true;
+    }
+    if (request.action === 'saveFocusSettings') {
+        saveFocusSettings(request.settings || {}).then(sendResponse);
         return true;
     }
     if (request.action === 'setPomodoroEnabled') {
@@ -1791,6 +1942,22 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
         return; // no need to update rules — they are already active
     }
 
+    // Focus Guard: extensionEnabled=false is only allowed as part of a pause
+    // started by requestPause(); anything else is reverted. Turning back on
+    // closes out the pause record.
+    if ('extensionEnabled' in changes) {
+        if (changes.extensionEnabled.newValue === false) {
+            chrome.storage.local.get(['focusPause'], r => {
+                if (!r.focusPause) {
+                    console.log('[focus-guard] Reverted disable without a pause record.');
+                    persist({ extensionEnabled: true });
+                }
+            });
+        } else {
+            finishPause();
+        }
+    }
+
     const mirror = {};
     for (const k of relevant) {
         if (changes[k].newValue !== undefined) {
@@ -1867,12 +2034,14 @@ chrome.commands.onCommand.addListener(async (command) => {
             console.log('[lockdown] Toggle-extension blocked — lockdown active.');
             return;
         }
+        // Focus Guard: the shortcut can resume blocking, but pausing has to go
+        // through the settings page so the pause rules apply.
         const result = await chrome.storage.sync.get(['extensionEnabled']);
-        const isEnabled = result.extensionEnabled !== false;
-        const newState = !isEnabled;
-        await persist({ extensionEnabled: newState });
-        setActionIcon(newState);
-        updateRedirectRules();
+        if (result.extensionEnabled === false) {
+            await resumeBlocking();
+        } else {
+            chrome.runtime.openOptionsPage();
+        }
     }
 });
 

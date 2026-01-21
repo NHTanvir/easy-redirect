@@ -200,6 +200,8 @@
         }
         #toggleBtn.disabled::before { content: '○'; }
         #toggleBtn:hover { opacity: .85; }
+        #pauseInfo { font-size: 11px; color: var(--sidebar-text); text-align: center; margin-top: 6px; }
+        #pauseInfo:empty { display: none; }
 
         /* Nav links */
         .sidebar-nav {
@@ -1219,7 +1221,8 @@
         </div>
 
         <div class="sidebar-toggle">
-            <button id="toggleBtn">Enable Redirector</button>
+            <button id="toggleBtn">Pause blocking</button>
+            <div id="pauseInfo"></div>
         </div>
 
         <nav class="sidebar-nav">
@@ -1518,6 +1521,26 @@
         <!-- ══════════════════ TAB: FOCUS & TIMER ══════════════════ -->
         <div class="tab-panel" id="tab-focus">
             <div class="panel-heading">Focus &amp; Timer</div>
+
+            <!-- Focus Guard -->
+            <div class="card" id="focusGuardSection">
+                <div class="card-title">Focus Guard</div>
+                <p class="help-text" style="margin-bottom:14px;">
+                    <strong>Pause blocking</strong> never turns blocking off for good. It switches
+                    itself back on after the pause length below.
+                </p>
+                <div class="inline-row">
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Pause length
+                        <input type="number" id="pauseMinutesInput" min="1" max="30" step="1" value="5" style="width:70px;text-align:right;">
+                        min
+                    </label>
+                </div>
+                <div class="btn-row">
+                    <button id="saveFocusSettingsBtn">Save</button>
+                </div>
+                <div id="focusSettingsStatus" class="field-status"></div>
+            </div>
 
             <!-- Pomodoro -->
             <div class="card" id="pomodoroSection">
