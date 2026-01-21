@@ -136,6 +136,9 @@ const DEFAULTS = {
     // pause instead of turning blocking off for good; blocking resumes on its
     // own after this many minutes. Clamped to 1..PAUSE_MINUTES_MAX.
     pauseMinutes: 5,
+    // Total minutes of pausing allowed per local calendar day (0..120). Once
+    // used up, the Pause button refuses until midnight.
+    dailyPauseBudgetMins: 30,
     // Pomodoro timer state (feature #10). pomodoroEnabled toggles the feature;
     // pomodoroState tracks the current phase ('off'|'work'|'break');
     // pomodoroWorkMinutes and pomodoroBreakMinutes set session lengths (defaults
@@ -752,12 +755,48 @@ async function resumeCountdownIfPending() {
 // no matching focusPause record, so there is no way to stay off indefinitely.
 //
 //   focusPause: { startedAt, endsAt, delayMs, reason, kind } | null
+//   pauseLog:   [{ date, startedAt, endedAt, usedMs, reason, kind }]  (35 days)
 //
 // delayMs is the disable-delay countdown (feature #20) that runs before the
 // pause takes effect; endsAt already includes it.
 
 const FOCUS_PAUSE_ALARM = 'focusPauseEnd';
 const PAUSE_MINUTES_MAX = 30;
+const PAUSE_BUDGET_MAX = 120;
+const PAUSE_LOG_KEEP_DAYS = 35;
+
+// Local calendar date (YYYY-MM-DD). Focus Guard budgets follow the user's own
+// midnight rather than UTC, unlike the daily quota counters.
+function todayLocal(d = new Date()) {
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function clampPauseBudget(v) {
+    const n = typeof v === 'number' && v >= 0 ? v : DEFAULTS.dailyPauseBudgetMins;
+    return Math.max(0, Math.min(PAUSE_BUDGET_MAX, Math.round(n)));
+}
+
+// Milliseconds a pause actually kept blocking off, up to `now`.
+function pauseUsedMs(pause, now = Date.now()) {
+    return Math.max(0, Math.min(now, pause.endsAt) - pause.startedAt - (pause.delayMs || 0));
+}
+
+async function getPauseLog() {
+    const r = await chrome.storage.local.get(['pauseLog']);
+    return Array.isArray(r.pauseLog) ? r.pauseLog : [];
+}
+
+// Budget minutes already spent today, including the pause that is running now.
+async function getPauseUsedTodayMs() {
+    const today = todayLocal();
+    const [log, local] = await Promise.all([getPauseLog(), chrome.storage.local.get(['focusPause'])]);
+    let used = log.filter(e => e.date === today && e.kind === 'pause')
+        .reduce((sum, e) => sum + (e.usedMs || 0), 0);
+    const p = local.focusPause;
+    if (p && p.kind === 'pause' && todayLocal(new Date(p.startedAt)) === today) used += pauseUsedMs(p);
+    return used;
+}
 
 function clampPauseMinutes(v) {
     const n = typeof v === 'number' && v > 0 ? v : DEFAULTS.pauseMinutes;
@@ -772,16 +811,22 @@ async function isLockdownActiveNow() {
 // Start a timed pause. Returns { ok, pause } or { ok: false, error }.
 async function requestPause(opts = {}) {
     if (await isLockdownActiveNow()) return { ok: false, error: 'Cannot pause during lockdown.' };
-    const sync = await chrome.storage.sync.get(['extensionEnabled', 'pauseMinutes', 'disableDelaySecs']);
+    const sync = await chrome.storage.sync.get(['extensionEnabled', 'pauseMinutes', 'disableDelaySecs', 'dailyPauseBudgetMins']);
     if (sync.extensionEnabled === false) return { ok: false, error: 'Blocking is already paused.' };
 
-    const mins = clampPauseMinutes(sync.pauseMinutes);
+    // The pause is cut short to whatever is left of today's budget.
+    const budgetMs = clampPauseBudget(sync.dailyPauseBudgetMins) * 60 * 1000;
+    const remainingMs = budgetMs - await getPauseUsedTodayMs();
+    if (remainingMs < 60 * 1000) {
+        return { ok: false, error: `Today's pause budget (${clampPauseBudget(sync.dailyPauseBudgetMins)} min) is used up. It resets at midnight.` };
+    }
+    const pauseMs = Math.min(clampPauseMinutes(sync.pauseMinutes) * 60 * 1000, remainingMs);
     const delaySecs = typeof sync.disableDelaySecs === 'number'
         ? Math.max(0, Math.min(DISABLE_DELAY_MAX, sync.disableDelaySecs)) : 0;
     const now = Date.now();
     const pause = {
         startedAt: now,
-        endsAt: now + delaySecs * 1000 + mins * 60 * 1000,
+        endsAt: now + delaySecs * 1000 + pauseMs,
         delayMs: delaySecs * 1000,
         reason: typeof opts.reason === 'string' ? opts.reason.slice(0, 500) : '',
         kind: 'pause'
@@ -790,7 +835,7 @@ async function requestPause(opts = {}) {
     await chrome.storage.local.set({ focusPause: pause });
     await chrome.alarms.create(FOCUS_PAUSE_ALARM, { when: pause.endsAt });
     await persist({ extensionEnabled: false });
-    console.log(`[focus-guard] Paused for ${mins} min (resumes ${new Date(pause.endsAt).toISOString()}).`);
+    console.log(`[focus-guard] Paused for ${Math.round(pauseMs / 60000)} min (resumes ${new Date(pause.endsAt).toISOString()}).`);
     return { ok: true, pause };
 }
 
@@ -808,25 +853,40 @@ async function cancelPendingCountdownState() {
     await _clearCountdownState();
 }
 
-// Close out the active pause record. Idempotent.
+// Close out the active pause record and append it to pauseLog. Idempotent.
 async function finishPause() {
     await chrome.alarms.clear(FOCUS_PAUSE_ALARM);
     const { focusPause } = await chrome.storage.local.get(['focusPause']);
     if (!focusPause) return;
+    const now = Date.now();
+    const cutoff = todayLocal(new Date(now - PAUSE_LOG_KEEP_DAYS * 86400000));
+    const log = (await getPauseLog()).filter(e => e.date >= cutoff);
+    log.push({
+        date: todayLocal(new Date(focusPause.startedAt)),
+        startedAt: focusPause.startedAt,
+        endedAt: Math.min(now, focusPause.endsAt),
+        usedMs: pauseUsedMs(focusPause, now),
+        reason: focusPause.reason || '',
+        kind: focusPause.kind
+    });
+    await chrome.storage.local.set({ pauseLog: log });
     await chrome.storage.local.remove('focusPause');
     console.log('[focus-guard] Pause finished; blocking active again.');
 }
 
 // Snapshot for the options page: active pause plus the Focus Guard settings.
 async function getFocusState() {
-    const [sync, local] = await Promise.all([
-        chrome.storage.sync.get(['extensionEnabled', 'pauseMinutes']),
-        chrome.storage.local.get(['focusPause'])
+    const [sync, local, usedMs] = await Promise.all([
+        chrome.storage.sync.get(['extensionEnabled', 'pauseMinutes', 'dailyPauseBudgetMins']),
+        chrome.storage.local.get(['focusPause']),
+        getPauseUsedTodayMs()
     ]);
+    const budgetMins = clampPauseBudget(sync.dailyPauseBudgetMins);
     return {
         enabled: sync.extensionEnabled !== false,
         pause: local.focusPause || null,
-        settings: { pauseMinutes: clampPauseMinutes(sync.pauseMinutes) }
+        budget: { totalMins: budgetMins, usedMs, remainingMs: Math.max(0, budgetMins * 60000 - usedMs) },
+        settings: { pauseMinutes: clampPauseMinutes(sync.pauseMinutes), dailyPauseBudgetMins: budgetMins }
     };
 }
 
@@ -836,6 +896,7 @@ async function saveFocusSettings(input) {
     if (await isLockdownActiveNow()) return { ok: false, error: 'Focus Guard settings are locked during lockdown.' };
     const updates = {};
     if ('pauseMinutes' in input) updates.pauseMinutes = clampPauseMinutes(Number(input.pauseMinutes));
+    if ('dailyPauseBudgetMins' in input) updates.dailyPauseBudgetMins = clampPauseBudget(Number(input.dailyPauseBudgetMins));
     await persist(updates);
     return { ok: true };
 }

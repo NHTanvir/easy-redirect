@@ -1853,13 +1853,26 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (_) { return; }
         if (!state || token !== _focusRenderToken) return;
 
-        const pauseMinsEl = document.getElementById('pauseMinutesInput');
-        if (pauseMinsEl && document.activeElement !== pauseMinsEl) pauseMinsEl.value = state.settings.pauseMinutes;
+        const setInput = (id, v) => {
+            const el = document.getElementById(id);
+            if (el && document.activeElement !== el) el.value = v;
+        };
+        setInput('pauseMinutesInput', state.settings.pauseMinutes);
+        setInput('pauseBudgetInput', state.settings.dailyPauseBudgetMins);
+
+        const leftMins = Math.floor(state.budget.remainingMs / 60000);
+        const budgetEl = document.getElementById('pauseBudgetLine');
+        if (budgetEl) {
+            budgetEl.innerHTML = `Pause budget left today: <strong>${leftMins} of ${state.budget.totalMins} min</strong>`;
+        }
 
         const infoEl = document.getElementById('pauseInfo');
         if (_pauseTick) { clearInterval(_pauseTick); _pauseTick = null; }
         if (!infoEl) return;
-        if (state.enabled || !state.pause) { infoEl.textContent = ''; return; }
+        if (state.enabled || !state.pause) {
+            infoEl.textContent = leftMins > 0 ? `${leftMins} min of pausing left today` : 'Pause budget used up today';
+            return;
+        }
         const endsAt = state.pause.endsAt;
         const tick = () => {
             const ms = Math.max(0, endsAt - Date.now());
@@ -1884,7 +1897,8 @@ document.addEventListener('DOMContentLoaded', function() {
         saveFocusSettingsBtn.addEventListener('click', async () => {
             const statusEl = document.getElementById('focusSettingsStatus');
             const settings = {
-                pauseMinutes: parseInt(document.getElementById('pauseMinutesInput').value, 10)
+                pauseMinutes: parseInt(document.getElementById('pauseMinutesInput').value, 10),
+                dailyPauseBudgetMins: parseInt(document.getElementById('pauseBudgetInput').value, 10)
             };
             const resp = await chrome.runtime.sendMessage({ action: 'saveFocusSettings', settings });
             if (statusEl) {
