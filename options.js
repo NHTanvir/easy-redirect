@@ -1866,11 +1866,30 @@ document.addEventListener('DOMContentLoaded', function() {
             budgetEl.innerHTML = `Pause budget left today: <strong>${leftMins} of ${state.budget.totalMins} min</strong>`;
         }
 
+        const wh = state.settings.workHours;
+        const whEnabledEl = document.getElementById('workHoursEnabled');
+        if (whEnabledEl) whEnabledEl.checked = wh.enabled;
+        document.querySelectorAll('#workHoursDays input').forEach(cb => {
+            cb.checked = wh.days.includes(Number(cb.value));
+        });
+        setInput('workHoursStart', wh.startTime);
+        setInput('workHoursEnd', wh.endTime);
+        const whLine = document.getElementById('workHoursLine');
+        if (whLine) {
+            whLine.innerHTML = state.workHoursActive
+                ? `&#x1F512; Work hours now. Pausing is locked until <strong>${escapeHtml(wh.endTime)}</strong>.`
+                : '';
+        }
+        document.querySelectorAll('#focusGuardSection input, #saveFocusSettingsBtn').forEach(el => {
+            el.disabled = state.workHoursActive;
+        });
+
         const infoEl = document.getElementById('pauseInfo');
         if (_pauseTick) { clearInterval(_pauseTick); _pauseTick = null; }
         if (!infoEl) return;
         if (state.enabled || !state.pause) {
-            infoEl.textContent = leftMins > 0 ? `${leftMins} min of pausing left today` : 'Pause budget used up today';
+            infoEl.textContent = state.workHoursActive ? 'Work hours: pausing locked'
+                : leftMins > 0 ? `${leftMins} min of pausing left today` : 'Pause budget used up today';
             return;
         }
         const endsAt = state.pause.endsAt;
@@ -1898,7 +1917,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const statusEl = document.getElementById('focusSettingsStatus');
             const settings = {
                 pauseMinutes: parseInt(document.getElementById('pauseMinutesInput').value, 10),
-                dailyPauseBudgetMins: parseInt(document.getElementById('pauseBudgetInput').value, 10)
+                dailyPauseBudgetMins: parseInt(document.getElementById('pauseBudgetInput').value, 10),
+                workHours: {
+                    enabled: document.getElementById('workHoursEnabled').checked,
+                    days: [...document.querySelectorAll('#workHoursDays input:checked')].map(cb => Number(cb.value)),
+                    startTime: document.getElementById('workHoursStart').value,
+                    endTime: document.getElementById('workHoursEnd').value
+                }
             };
             const resp = await chrome.runtime.sendMessage({ action: 'saveFocusSettings', settings });
             if (statusEl) {

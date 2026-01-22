@@ -202,6 +202,11 @@
         #toggleBtn:hover { opacity: .85; }
         #pauseInfo { font-size: 11px; color: var(--sidebar-text); text-align: center; margin-top: 6px; }
         #pauseInfo:empty { display: none; }
+        .day-chip {
+            display: inline-flex; align-items: center; gap: 4px;
+            font-size: 12px; padding: 4px 8px; cursor: pointer;
+            border: 1px solid var(--border); border-radius: 6px;
+        }
 
         /* Nav links */
         .sidebar-nav {
@@ -1543,6 +1548,27 @@
                         min
                     </label>
                 </div>
+                <hr class="divider">
+                <label class="check-row" style="margin-bottom:8px;">
+                    <input type="checkbox" id="workHoursEnabled">
+                    <span style="font-size:14px;">Lock pausing during work hours</span>
+                </label>
+                <div class="inline-row" id="workHoursDays" style="gap:6px;margin-bottom:10px;">
+                    <label class="day-chip"><input type="checkbox" value="0"> Sun</label>
+                    <label class="day-chip"><input type="checkbox" value="1"> Mon</label>
+                    <label class="day-chip"><input type="checkbox" value="2"> Tue</label>
+                    <label class="day-chip"><input type="checkbox" value="3"> Wed</label>
+                    <label class="day-chip"><input type="checkbox" value="4"> Thu</label>
+                    <label class="day-chip"><input type="checkbox" value="5"> Fri</label>
+                    <label class="day-chip"><input type="checkbox" value="6"> Sat</label>
+                </div>
+                <div class="inline-row">
+                    <input type="time" id="workHoursStart" value="09:00" style="width:auto;">
+                    <span class="text-muted" style="font-size:13px;">to</span>
+                    <input type="time" id="workHoursEnd" value="18:00" style="width:auto;">
+                </div>
+                <p class="help-text">While work hours are on, Pause is refused, a running pause ends, and these settings can't be changed.</p>
+                <div id="workHoursLine" style="font-size:13px;margin-top:8px;"></div>
                 <div class="btn-row">
                     <button id="saveFocusSettingsBtn">Save</button>
                 </div>

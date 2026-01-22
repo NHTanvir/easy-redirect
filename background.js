@@ -139,6 +139,10 @@ const DEFAULTS = {
     // Total minutes of pausing allowed per local calendar day (0..120). Once
     // used up, the Pause button refuses until midnight.
     dailyPauseBudgetMins: 30,
+    // Work-hours lock. While enabled and inside the window, pausing and
+    // changing Focus Guard settings are refused, and a running pause ends.
+    // Same shape and midnight-wrap rules as a group schedule (feature #8).
+    workHours: { enabled: false, days: [0, 1, 2, 3, 4], startTime: '09:00', endTime: '18:00' },
     // Pomodoro timer state (feature #10). pomodoroEnabled toggles the feature;
     // pomodoroState tracks the current phase ('off'|'work'|'break');
     // pomodoroWorkMinutes and pomodoroBreakMinutes set session lengths (defaults
@@ -803,6 +807,42 @@ function clampPauseMinutes(v) {
     return Math.max(1, Math.min(PAUSE_MINUTES_MAX, Math.round(n)));
 }
 
+function normalizeWorkHours(v) {
+    const d = DEFAULTS.workHours;
+    const w = v && typeof v === 'object' ? v : {};
+    const hhmm = /^([01]\d|2[0-3]):[0-5]\d$/;
+    return {
+        enabled: w.enabled === true,
+        days: Array.isArray(w.days) ? [...new Set(w.days.filter(n => Number.isInteger(n) && n >= 0 && n <= 6))].sort() : d.days.slice(),
+        startTime: hhmm.test(w.startTime) ? w.startTime : d.startTime,
+        endTime: hhmm.test(w.endTime) ? w.endTime : d.endTime
+    };
+}
+
+function isWithinWorkHours(workHours) {
+    const w = normalizeWorkHours(workHours);
+    if (!w.enabled || w.days.length === 0 || w.startTime === w.endTime) return false;
+    return isGroupScheduleActive({ schedule: w });
+}
+
+async function isWorkHoursNow() {
+    const r = await chrome.storage.sync.get(['workHours']);
+    return isWithinWorkHours(r.workHours);
+}
+
+// Called every minute by the schedule alarm: a pause that is still running
+// when work hours begin is ended on the spot.
+async function enforceWorkHours() {
+    const { focusPause } = await chrome.storage.local.get(['focusPause']);
+    if (!focusPause || focusPause.kind !== 'pause' || !(await isWorkHoursNow())) return;
+    await resumeBlocking();
+    chrome.notifications.create(`work-hours-${Date.now()}`, {
+        type: 'basic', iconUrl: 'icons/icon-48.png',
+        title: 'Easy Redirect — Work hours',
+        message: 'Work hours started, so your pause has ended.'
+    });
+}
+
 async function isLockdownActiveNow() {
     const r = await chrome.storage.sync.get(['lockdownUntil']);
     return typeof r.lockdownUntil === 'number' && Date.now() < r.lockdownUntil;
@@ -811,6 +851,7 @@ async function isLockdownActiveNow() {
 // Start a timed pause. Returns { ok, pause } or { ok: false, error }.
 async function requestPause(opts = {}) {
     if (await isLockdownActiveNow()) return { ok: false, error: 'Cannot pause during lockdown.' };
+    if (await isWorkHoursNow()) return { ok: false, error: 'Pausing is locked during work hours.' };
     const sync = await chrome.storage.sync.get(['extensionEnabled', 'pauseMinutes', 'disableDelaySecs', 'dailyPauseBudgetMins']);
     if (sync.extensionEnabled === false) return { ok: false, error: 'Blocking is already paused.' };
 
@@ -877,7 +918,7 @@ async function finishPause() {
 // Snapshot for the options page: active pause plus the Focus Guard settings.
 async function getFocusState() {
     const [sync, local, usedMs] = await Promise.all([
-        chrome.storage.sync.get(['extensionEnabled', 'pauseMinutes', 'dailyPauseBudgetMins']),
+        chrome.storage.sync.get(['extensionEnabled', 'pauseMinutes', 'dailyPauseBudgetMins', 'workHours']),
         chrome.storage.local.get(['focusPause']),
         getPauseUsedTodayMs()
     ]);
@@ -886,7 +927,12 @@ async function getFocusState() {
         enabled: sync.extensionEnabled !== false,
         pause: local.focusPause || null,
         budget: { totalMins: budgetMins, usedMs, remainingMs: Math.max(0, budgetMins * 60000 - usedMs) },
-        settings: { pauseMinutes: clampPauseMinutes(sync.pauseMinutes), dailyPauseBudgetMins: budgetMins }
+        workHoursActive: isWithinWorkHours(sync.workHours),
+        settings: {
+            pauseMinutes: clampPauseMinutes(sync.pauseMinutes),
+            dailyPauseBudgetMins: budgetMins,
+            workHours: normalizeWorkHours(sync.workHours)
+        }
     };
 }
 
@@ -894,9 +940,11 @@ async function getFocusState() {
 // the limits can't be loosened mid-session.
 async function saveFocusSettings(input) {
     if (await isLockdownActiveNow()) return { ok: false, error: 'Focus Guard settings are locked during lockdown.' };
+    if (await isWorkHoursNow()) return { ok: false, error: 'Focus Guard settings are locked during work hours.' };
     const updates = {};
     if ('pauseMinutes' in input) updates.pauseMinutes = clampPauseMinutes(Number(input.pauseMinutes));
     if ('dailyPauseBudgetMins' in input) updates.dailyPauseBudgetMins = clampPauseBudget(Number(input.dailyPauseBudgetMins));
+    if ('workHours' in input) updates.workHours = normalizeWorkHours(input.workHours);
     await persist(updates);
     return { ok: true };
 }
@@ -2041,6 +2089,7 @@ if (chrome.alarms) {
     chrome.alarms.onAlarm.addListener((alarm) => {
         if (alarm.name === SCHEDULE_ALARM_NAME) {
             updateRedirectRules();
+            enforceWorkHours();
         }
     });
 }
