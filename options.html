@@ -202,6 +202,8 @@
         #toggleBtn:hover { opacity: .85; }
         #pauseInfo { font-size: 11px; color: var(--sidebar-text); text-align: center; margin-top: 6px; }
         #pauseInfo:empty { display: none; }
+        #sidebarStreak { font-size: 12px; font-weight: 700; color: var(--orange); text-align: center; margin-top: 6px; }
+        #sidebarStreak:empty { display: none; }
         .day-chip {
             display: inline-flex; align-items: center; gap: 4px;
             font-size: 12px; padding: 4px 8px; cursor: pointer;
@@ -1228,6 +1230,7 @@
         <div class="sidebar-toggle">
             <button id="toggleBtn">Pause blocking</button>
             <div id="pauseInfo"></div>
+            <div id="sidebarStreak"></div>
         </div>
 
         <nav class="sidebar-nav">
@@ -1535,6 +1538,16 @@
                     itself back on after the pause length below, and all pauses together can't go
                     over the daily budget.
                 </p>
+                <div class="stat-cards" id="focusStatCards">
+                    <div class="stat-card">
+                        <div class="stat-value" id="focusStreakValue">—</div>
+                        <div class="stat-label">Focus streak</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="focusBestStreakValue">—</div>
+                        <div class="stat-label">Best streak</div>
+                    </div>
+                </div>
                 <div id="pauseBudgetLine" style="font-size:13px;margin-bottom:12px;"></div>
                 <div class="inline-row" style="gap:20px;">
                     <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">

@@ -1860,6 +1860,17 @@ document.addEventListener('DOMContentLoaded', function() {
         setInput('pauseMinutesInput', state.settings.pauseMinutes);
         setInput('pauseBudgetInput', state.settings.dailyPauseBudgetMins);
 
+        const days = n => `${n} day${n === 1 ? '' : 's'}`;
+        const streakEl = document.getElementById('focusStreakValue');
+        if (streakEl) streakEl.textContent = `\u{1F525} ${state.streak.current}`;
+        const bestEl = document.getElementById('focusBestStreakValue');
+        if (bestEl) bestEl.textContent = state.streak.best;
+        const sideStreak = document.getElementById('sidebarStreak');
+        if (sideStreak) {
+            sideStreak.textContent = state.streak.current > 0
+                ? `\u{1F525} ${days(state.streak.current)} without pausing` : 'Streak reset today';
+        }
+
         const leftMins = Math.floor(state.budget.remainingMs / 60000);
         const budgetEl = document.getElementById('pauseBudgetLine');
         if (budgetEl) {

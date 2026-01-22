@@ -49,6 +49,14 @@
         }
     }
 
+    // Focus streak: a reminder of what a pause would cost.
+    chrome.runtime.sendMessage({ action: 'getFocusState' }, state => {
+        const el = document.getElementById('focusStreak');
+        if (chrome.runtime.lastError || !el || !state || !state.streak.current) return;
+        const n = state.streak.current;
+        el.textContent = `\u{1F525} ${n}-day focus streak. Don't break it.`;
+    });
+
     // Load all display settings from chrome.storage.sync + local.
     chrome.storage.sync.get(
         ['blockedPageTitle', 'blockedMessage', 'motivationEnabled', 'motivationQuotes'],

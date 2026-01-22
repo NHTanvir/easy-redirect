@@ -760,6 +760,7 @@ async function resumeCountdownIfPending() {
 //
 //   focusPause: { startedAt, endsAt, delayMs, reason, kind } | null
 //   pauseLog:   [{ date, startedAt, endedAt, usedMs, reason, kind }]  (35 days)
+//   focusStats: { since, lastPauseDate, bestStreak }
 //
 // delayMs is the disable-delay countdown (feature #20) that runs before the
 // pause takes effect; endsAt already includes it.
@@ -789,6 +790,44 @@ function pauseUsedMs(pause, now = Date.now()) {
 async function getPauseLog() {
     const r = await chrome.storage.local.get(['pauseLog']);
     return Array.isArray(r.pauseLog) ? r.pauseLog : [];
+}
+
+// Whole days from one YYYY-MM-DD to another, in local time.
+function daysBetween(from, to) {
+    const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+    return Math.round((parse(to) - parse(from)) / 86400000);
+}
+
+// focusStats is created on first read, which starts the streak clock.
+async function getFocusStats() {
+    const r = await chrome.storage.local.get(['focusStats']);
+    const stats = Object.assign({ since: null, lastPauseDate: null, bestStreak: 0 }, r.focusStats);
+    if (!stats.since) {
+        stats.since = todayLocal();
+        await chrome.storage.local.set({ focusStats: stats });
+    }
+    return stats;
+}
+
+// Consecutive days, ending today, without a regular pause. Today counts as
+// soon as it starts; a pause today drops the streak to 0.
+function currentStreak(stats, today = todayLocal()) {
+    if (stats.lastPauseDate === today) return 0;
+    let start = stats.since;
+    if (stats.lastPauseDate) {
+        const [y, m, d] = stats.lastPauseDate.split('-').map(Number);
+        const next = todayLocal(new Date(y, m - 1, d + 1));
+        if (next > start) start = next;
+    }
+    return Math.max(0, daysBetween(start, today) + 1);
+}
+
+// A regular pause breaks the streak; remember the best run first.
+async function breakStreak() {
+    const stats = await getFocusStats();
+    stats.bestStreak = Math.max(stats.bestStreak || 0, currentStreak(stats));
+    stats.lastPauseDate = todayLocal();
+    await chrome.storage.local.set({ focusStats: stats });
 }
 
 // Budget minutes already spent today, including the pause that is running now.
@@ -876,6 +915,7 @@ async function requestPause(opts = {}) {
     await chrome.storage.local.set({ focusPause: pause });
     await chrome.alarms.create(FOCUS_PAUSE_ALARM, { when: pause.endsAt });
     await persist({ extensionEnabled: false });
+    await breakStreak();
     console.log(`[focus-guard] Paused for ${Math.round(pauseMs / 60000)} min (resumes ${new Date(pause.endsAt).toISOString()}).`);
     return { ok: true, pause };
 }
@@ -917,17 +957,20 @@ async function finishPause() {
 
 // Snapshot for the options page: active pause plus the Focus Guard settings.
 async function getFocusState() {
-    const [sync, local, usedMs] = await Promise.all([
+    const [sync, local, usedMs, stats] = await Promise.all([
         chrome.storage.sync.get(['extensionEnabled', 'pauseMinutes', 'dailyPauseBudgetMins', 'workHours']),
         chrome.storage.local.get(['focusPause']),
-        getPauseUsedTodayMs()
+        getPauseUsedTodayMs(),
+        getFocusStats()
     ]);
+    const streak = currentStreak(stats);
     const budgetMins = clampPauseBudget(sync.dailyPauseBudgetMins);
     return {
         enabled: sync.extensionEnabled !== false,
         pause: local.focusPause || null,
         budget: { totalMins: budgetMins, usedMs, remainingMs: Math.max(0, budgetMins * 60000 - usedMs) },
         workHoursActive: isWithinWorkHours(sync.workHours),
+        streak: { current: streak, best: Math.max(stats.bestStreak || 0, streak) },
         settings: {
             pauseMinutes: clampPauseMinutes(sync.pauseMinutes),
             dailyPauseBudgetMins: budgetMins,
