@@ -1871,6 +1871,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 ? `\u{1F525} ${days(state.streak.current)} without pausing` : 'Streak reset today';
         }
 
+        const pts = state.points;
+        const ptsEl = document.getElementById('focusPointsValue');
+        if (ptsEl) ptsEl.textContent = pts.total;
+        const lvlLabel = document.getElementById('focusLevelLabel');
+        if (lvlLabel) lvlLabel.textContent = `Points · Lv ${pts.level} ${pts.name}`;
+        const lvlLine = document.getElementById('focusLevelLine');
+        if (lvlLine) {
+            lvlLine.textContent = (pts.nextAt === null
+                ? 'Top level reached.'
+                : `${pts.nextAt - pts.total} points to the next level.`) +
+                ' +1 per redirect, +10 per Pomodoro session, \u221215 per pause.';
+        }
+
         const earnedEl = document.getElementById('focusEarnedValue');
         if (earnedEl) earnedEl.textContent = state.earnedMins;
         const earnedBtn = document.getElementById('takeEarnedBreakBtn');

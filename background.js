@@ -762,6 +762,7 @@ async function resumeCountdownIfPending() {
 //   focusPause: { startedAt, endsAt, delayMs, reason, kind } | null
 //   pauseLog:   [{ date, startedAt, endedAt, usedMs, reason, kind }]  (35 days)
 //   focusStats: { since, lastPauseDate, bestStreak, earnedMins }
+//   focusPoints: number   (own key: written on every redirect)
 //
 // kind is 'pause' (counts against the daily budget, breaks the streak,
 // refused during work hours) or 'earned' (paid for with minutes earned by
@@ -776,6 +777,39 @@ const PAUSE_BUDGET_MAX = 120;
 const PAUSE_LOG_KEEP_DAYS = 35;
 const EARNED_MINS_PER_SESSION = 5;
 const EARNED_MINS_MAX = 60;
+
+// Points: +1 per redirect (a visit you didn't make), +10 per finished
+// Pomodoro work session, -15 per regular pause. Never below 0.
+const POINTS_PER_REDIRECT = 1;
+const POINTS_PER_SESSION = 10;
+const POINTS_PER_PAUSE = -15;
+const FOCUS_LEVELS = [
+    { at: 0, name: 'Beginner' },
+    { at: 50, name: 'Apprentice' },
+    { at: 150, name: 'Focused' },
+    { at: 300, name: 'Disciplined' },
+    { at: 600, name: 'Deep Worker' },
+    { at: 1000, name: 'Master' },
+    { at: 2000, name: 'Legend' }
+];
+
+// Serialise point updates so bursts of redirects don't lose increments.
+let _pointsQueue = Promise.resolve();
+function addPoints(delta) {
+    _pointsQueue = _pointsQueue.then(async () => {
+        const r = await chrome.storage.local.get(['focusPoints']);
+        const next = Math.max(0, (typeof r.focusPoints === 'number' ? r.focusPoints : 0) + delta);
+        await chrome.storage.local.set({ focusPoints: next });
+    }).catch(err => console.error('[focus-guard] addPoints failed:', err));
+    return _pointsQueue;
+}
+
+function levelForPoints(points) {
+    let i = 0;
+    while (i + 1 < FOCUS_LEVELS.length && points >= FOCUS_LEVELS[i + 1].at) i++;
+    const next = FOCUS_LEVELS[i + 1];
+    return { level: i + 1, name: FOCUS_LEVELS[i].name, nextAt: next ? next.at : null };
+}
 
 // Local calendar date (YYYY-MM-DD). Focus Guard budgets follow the user's own
 // midnight rather than UTC, unlike the daily quota counters.
@@ -842,6 +876,7 @@ async function awardPomodoroSession() {
     const stats = await getFocusStats();
     stats.earnedMins = Math.min(EARNED_MINS_MAX, (stats.earnedMins || 0) + EARNED_MINS_PER_SESSION);
     await chrome.storage.local.set({ focusStats: stats });
+    await addPoints(POINTS_PER_SESSION);
 }
 
 // Budget minutes already spent today, including the pause that is running now.
@@ -945,6 +980,7 @@ async function requestPause(opts = {}) {
         await chrome.storage.local.set({ focusStats: stats });
     } else {
         await breakStreak();
+        await addPoints(POINTS_PER_PAUSE);
     }
     console.log(`[focus-guard] ${kind} for ${pauseMs / 60000} min (resumes ${new Date(pause.endsAt).toISOString()}).`);
     return { ok: true, pause };
@@ -998,7 +1034,7 @@ async function finishPause() {
 async function getFocusState() {
     const [sync, local, usedMs, stats] = await Promise.all([
         chrome.storage.sync.get(['extensionEnabled', 'pauseMinutes', 'dailyPauseBudgetMins', 'workHours']),
-        chrome.storage.local.get(['focusPause']),
+        chrome.storage.local.get(['focusPause', 'focusPoints']),
         getPauseUsedTodayMs(),
         getFocusStats()
     ]);
@@ -1011,6 +1047,7 @@ async function getFocusState() {
         workHoursActive: isWithinWorkHours(sync.workHours),
         streak: { current: streak, best: Math.max(stats.bestStreak || 0, streak) },
         earnedMins: Math.floor(stats.earnedMins || 0),
+        points: Object.assign({ total: local.focusPoints || 0 }, levelForPoints(local.focusPoints || 0)),
         settings: {
             pauseMinutes: clampPauseMinutes(sync.pauseMinutes),
             dailyPauseBudgetMins: budgetMins,
@@ -1427,6 +1464,7 @@ async function handleKeywordHit(sender, request) {
     if (settings.extensionEnabled === false) return;
     const target = settings.redirectUrl || 'https://www.google.com';
     await chrome.tabs.update(sender.tab.id, { url: target });
+    addPoints(POINTS_PER_REDIRECT);
 }
 
 // Maximum lockdown duration in seconds (24 hours). User values above this cap
@@ -1633,6 +1671,7 @@ if (chrome.declarativeNetRequest && chrome.declarativeNetRequest.onRuleMatchedDe
 
         // Record the hit in weekly stats for the stats dashboard (feature #28).
         await recordHit(rule.id);
+        addPoints(POINTS_PER_REDIRECT);
 
         if (rule.quota === null || rule.quota === undefined) return; // no quota set
 
