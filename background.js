@@ -354,12 +354,13 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
                 pomodoroSessionsToday: sessionsToday,
                 pomodoroSessionDate: today
             });
+            await awardPomodoroSession();
             await updateRedirectRules(); // suspends DNR rules during break
             chrome.alarms.create('pomodoroBreak', { delayInMinutes: breakMins });
             chrome.notifications.create(`pomo-break-${Date.now()}`, {
                 type: 'basic', iconUrl: 'icons/icon-48.png',
                 title: 'Easy Redirect — Pomodoro',
-                message: `Work session complete (#${sessionsToday} today)! Take a ${breakMins}-min break.`
+                message: `Work session complete (#${sessionsToday} today)! Take a ${breakMins}-min break. +${EARNED_MINS_PER_SESSION} min earned break time.`
             });
             console.log(`[pomodoro] Break started (${breakMins} min). Sessions today: ${sessionsToday}`);
         } else {
@@ -760,7 +761,11 @@ async function resumeCountdownIfPending() {
 //
 //   focusPause: { startedAt, endsAt, delayMs, reason, kind } | null
 //   pauseLog:   [{ date, startedAt, endedAt, usedMs, reason, kind }]  (35 days)
-//   focusStats: { since, lastPauseDate, bestStreak }
+//   focusStats: { since, lastPauseDate, bestStreak, earnedMins }
+//
+// kind is 'pause' (counts against the daily budget, breaks the streak,
+// refused during work hours) or 'earned' (paid for with minutes earned by
+// finishing Pomodoro work sessions; none of those restrictions apply).
 //
 // delayMs is the disable-delay countdown (feature #20) that runs before the
 // pause takes effect; endsAt already includes it.
@@ -769,6 +774,8 @@ const FOCUS_PAUSE_ALARM = 'focusPauseEnd';
 const PAUSE_MINUTES_MAX = 30;
 const PAUSE_BUDGET_MAX = 120;
 const PAUSE_LOG_KEEP_DAYS = 35;
+const EARNED_MINS_PER_SESSION = 5;
+const EARNED_MINS_MAX = 60;
 
 // Local calendar date (YYYY-MM-DD). Focus Guard budgets follow the user's own
 // midnight rather than UTC, unlike the daily quota counters.
@@ -801,7 +808,7 @@ function daysBetween(from, to) {
 // focusStats is created on first read, which starts the streak clock.
 async function getFocusStats() {
     const r = await chrome.storage.local.get(['focusStats']);
-    const stats = Object.assign({ since: null, lastPauseDate: null, bestStreak: 0 }, r.focusStats);
+    const stats = Object.assign({ since: null, lastPauseDate: null, bestStreak: 0, earnedMins: 0 }, r.focusStats);
     if (!stats.since) {
         stats.since = todayLocal();
         await chrome.storage.local.set({ focusStats: stats });
@@ -827,6 +834,13 @@ async function breakStreak() {
     const stats = await getFocusStats();
     stats.bestStreak = Math.max(stats.bestStreak || 0, currentStreak(stats));
     stats.lastPauseDate = todayLocal();
+    await chrome.storage.local.set({ focusStats: stats });
+}
+
+// A finished Pomodoro work session banks break minutes.
+async function awardPomodoroSession() {
+    const stats = await getFocusStats();
+    stats.earnedMins = Math.min(EARNED_MINS_MAX, (stats.earnedMins || 0) + EARNED_MINS_PER_SESSION);
     await chrome.storage.local.set({ focusStats: stats });
 }
 
@@ -888,19 +902,29 @@ async function isLockdownActiveNow() {
 }
 
 // Start a timed pause. Returns { ok, pause } or { ok: false, error }.
+// opts.kind 'earned' spends banked Pomodoro minutes instead of the budget.
 async function requestPause(opts = {}) {
+    const kind = opts.kind === 'earned' ? 'earned' : 'pause';
     if (await isLockdownActiveNow()) return { ok: false, error: 'Cannot pause during lockdown.' };
-    if (await isWorkHoursNow()) return { ok: false, error: 'Pausing is locked during work hours.' };
+    if (kind === 'pause' && await isWorkHoursNow()) return { ok: false, error: 'Pausing is locked during work hours.' };
     const sync = await chrome.storage.sync.get(['extensionEnabled', 'pauseMinutes', 'disableDelaySecs', 'dailyPauseBudgetMins']);
     if (sync.extensionEnabled === false) return { ok: false, error: 'Blocking is already paused.' };
 
-    // The pause is cut short to whatever is left of today's budget.
-    const budgetMs = clampPauseBudget(sync.dailyPauseBudgetMins) * 60 * 1000;
-    const remainingMs = budgetMs - await getPauseUsedTodayMs();
-    if (remainingMs < 60 * 1000) {
-        return { ok: false, error: `Today's pause budget (${clampPauseBudget(sync.dailyPauseBudgetMins)} min) is used up. It resets at midnight.` };
+    // The pause is cut short to whatever is left of today's budget, or of the
+    // earned minutes for an earned break.
+    const stats = await getFocusStats();
+    let remainingMs;
+    if (kind === 'earned') {
+        remainingMs = (stats.earnedMins || 0) * 60 * 1000;
+        if (remainingMs < 60 * 1000) return { ok: false, error: 'No earned break time yet. Finish a Pomodoro work session to earn some.' };
+    } else {
+        const budgetMs = clampPauseBudget(sync.dailyPauseBudgetMins) * 60 * 1000;
+        remainingMs = budgetMs - await getPauseUsedTodayMs();
+        if (remainingMs < 60 * 1000) {
+            return { ok: false, error: `Today's pause budget (${clampPauseBudget(sync.dailyPauseBudgetMins)} min) is used up. It resets at midnight.` };
+        }
     }
-    const pauseMs = Math.min(clampPauseMinutes(sync.pauseMinutes) * 60 * 1000, remainingMs);
+    const pauseMs = Math.floor(Math.min(clampPauseMinutes(sync.pauseMinutes) * 60 * 1000, remainingMs) / 60000) * 60000;
     const delaySecs = typeof sync.disableDelaySecs === 'number'
         ? Math.max(0, Math.min(DISABLE_DELAY_MAX, sync.disableDelaySecs)) : 0;
     const now = Date.now();
@@ -909,14 +933,20 @@ async function requestPause(opts = {}) {
         endsAt: now + delaySecs * 1000 + pauseMs,
         delayMs: delaySecs * 1000,
         reason: typeof opts.reason === 'string' ? opts.reason.slice(0, 500) : '',
-        kind: 'pause'
+        kind
     };
     // Record the pause before flipping the flag so the onChanged guard sees it.
     await chrome.storage.local.set({ focusPause: pause });
     await chrome.alarms.create(FOCUS_PAUSE_ALARM, { when: pause.endsAt });
     await persist({ extensionEnabled: false });
-    await breakStreak();
-    console.log(`[focus-guard] Paused for ${Math.round(pauseMs / 60000)} min (resumes ${new Date(pause.endsAt).toISOString()}).`);
+    if (kind === 'earned') {
+        // Spend the whole slot now; finishPause() refunds what goes unused.
+        stats.earnedMins = Math.max(0, (stats.earnedMins || 0) - pauseMs / 60000);
+        await chrome.storage.local.set({ focusStats: stats });
+    } else {
+        await breakStreak();
+    }
+    console.log(`[focus-guard] ${kind} for ${pauseMs / 60000} min (resumes ${new Date(pause.endsAt).toISOString()}).`);
     return { ok: true, pause };
 }
 
@@ -952,6 +982,15 @@ async function finishPause() {
     });
     await chrome.storage.local.set({ pauseLog: log });
     await chrome.storage.local.remove('focusPause');
+    if (focusPause.kind === 'earned') {
+        const plannedMs = focusPause.endsAt - focusPause.startedAt - (focusPause.delayMs || 0);
+        const unusedMins = Math.floor((plannedMs - pauseUsedMs(focusPause, now)) / 60000);
+        if (unusedMins > 0) {
+            const stats = await getFocusStats();
+            stats.earnedMins = Math.min(EARNED_MINS_MAX, (stats.earnedMins || 0) + unusedMins);
+            await chrome.storage.local.set({ focusStats: stats });
+        }
+    }
     console.log('[focus-guard] Pause finished; blocking active again.');
 }
 
@@ -971,6 +1010,7 @@ async function getFocusState() {
         budget: { totalMins: budgetMins, usedMs, remainingMs: Math.max(0, budgetMins * 60000 - usedMs) },
         workHoursActive: isWithinWorkHours(sync.workHours),
         streak: { current: streak, best: Math.max(stats.bestStreak || 0, streak) },
+        earnedMins: Math.floor(stats.earnedMins || 0),
         settings: {
             pauseMinutes: clampPauseMinutes(sync.pauseMinutes),
             dailyPauseBudgetMins: budgetMins,
@@ -1360,7 +1400,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     }
     if (request.action === 'requestPause') {
-        requestPause({ reason: request.reason }).then(sendResponse);
+        requestPause({ reason: request.reason, kind: request.kind }).then(sendResponse);
         return true;
     }
     if (request.action === 'resumeBlocking') {

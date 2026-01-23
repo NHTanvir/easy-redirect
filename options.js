@@ -1871,6 +1871,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 ? `\u{1F525} ${days(state.streak.current)} without pausing` : 'Streak reset today';
         }
 
+        const earnedEl = document.getElementById('focusEarnedValue');
+        if (earnedEl) earnedEl.textContent = state.earnedMins;
+        const earnedBtn = document.getElementById('takeEarnedBreakBtn');
+        if (earnedBtn) earnedBtn.disabled = !state.enabled || state.earnedMins < 1;
+
         const leftMins = Math.floor(state.budget.remainingMs / 60000);
         const budgetEl = document.getElementById('pauseBudgetLine');
         if (budgetEl) {
@@ -1921,6 +1926,18 @@ document.addEventListener('DOMContentLoaded', function() {
             updateToggleButton(changes.extensionEnabled.newValue !== false);
         }
     });
+
+    const takeEarnedBreakBtn = document.getElementById('takeEarnedBreakBtn');
+    if (takeEarnedBreakBtn) {
+        takeEarnedBreakBtn.addEventListener('click', async () => {
+            const resp = await chrome.runtime.sendMessage({ action: 'requestPause', kind: 'earned' });
+            if (!resp || !resp.ok) {
+                showStatus((resp && resp.error) || 'Could not start the break.', 'error');
+                return;
+            }
+            showStatus('Enjoy your earned break. Blocking switches back on automatically.', 'success');
+        });
+    }
 
     const saveFocusSettingsBtn = document.getElementById('saveFocusSettingsBtn');
     if (saveFocusSettingsBtn) {
