@@ -1855,7 +1855,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const statsResp = await chrome.runtime.sendMessage({ action: 'getWeeklyStats' }).catch(() => null);
         const todayKey = new Date().toISOString().slice(0, 10);
         const redirects = (statsResp && statsResp.stats && statsResp.stats.days[todayKey] || {}).total || 0;
-        const code = null;
+        const acResult = await chrome.storage.sync.get(['accessCode']);
+        const ac = acResult.accessCode || { enabled: false, length: 64 };
+        const code = ac.enabled ? _generateCode(ac.length || 64) : null;
 
         const modal = document.getElementById('reflectModal');
         const reasonEl = document.getElementById('reflectReason');
