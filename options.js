@@ -1824,7 +1824,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 showStatus('Blocking resumed.', 'success');
                 return;
             }
-            const resp = await chrome.runtime.sendMessage({ action: 'requestPause' });
+            const reason = await _showReflection();
+            if (reason === null) {
+                showStatus('Good choice. Stay focused!', 'success');
+                return;
+            }
+            const resp = await chrome.runtime.sendMessage({ action: 'requestPause', reason });
             if (!resp || !resp.ok) {
                 showStatus((resp && resp.error) || 'Could not pause blocking.', 'error');
                 return;
@@ -1833,6 +1838,84 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             showStatus('Error toggling extension: ' + error.message, 'error');
         }
+    }
+
+    // Reflection prompt shown before every regular pause. Shows today's
+    // numbers, asks for a written reason, waits REFLECT_WAIT_SECS and, when the
+    // access code is enabled, asks for that too. Resolves to the reason, or
+    // null when the user stays focused. Refusals that need no reflection
+    // (work hours, budget used up) resolve straight away so the background
+    // can report them.
+    const REFLECT_MIN_CHARS = 15;
+    const REFLECT_WAIT_SECS = 10;
+    async function _showReflection() {
+        const state = await chrome.runtime.sendMessage({ action: 'getFocusState' });
+        if (state.workHoursActive || state.budget.remainingMs < 60000) return '';
+
+        const statsResp = await chrome.runtime.sendMessage({ action: 'getWeeklyStats' }).catch(() => null);
+        const todayKey = new Date().toISOString().slice(0, 10);
+        const redirects = (statsResp && statsResp.stats && statsResp.stats.days[todayKey] || {}).total || 0;
+        const code = null;
+
+        const modal = document.getElementById('reflectModal');
+        const reasonEl = document.getElementById('reflectReason');
+        const hintEl = document.getElementById('reflectReasonHint');
+        const codeRow = document.getElementById('reflectCodeRow');
+        const codeInput = document.getElementById('reflectCodeInput');
+        const pauseBtn = document.getElementById('reflectPauseBtn');
+        const stayBtn = document.getElementById('reflectStayBtn');
+        const pauseMins = Math.min(state.settings.pauseMinutes, Math.floor(state.budget.remainingMs / 60000));
+
+        const streakNote = state.streak.current > 0
+            ? `<strong>\u{1F525} ${state.streak.current}-day streak</strong> will reset to 0`
+            : 'Your streak is already 0 today';
+        document.getElementById('reflectStats').innerHTML = [
+            `\u{1F6AB} <strong>${redirects}</strong> distraction${redirects === 1 ? '' : 's'} blocked today`,
+            streakNote,
+            `\u2B50 <strong>${state.points.total}</strong> points (\u221215 if you pause)`,
+            `\u23F3 <strong>${Math.floor(state.budget.remainingMs / 60000)} min</strong> of pause budget left today`
+        ].map(li => `<li>${li}</li>`).join('');
+        reasonEl.value = '';
+        codeInput.value = '';
+        codeRow.style.display = code ? 'block' : 'none';
+        if (code) document.getElementById('reflectCode').textContent = code;
+        modal.classList.add('visible');
+        stayBtn.focus();
+
+        const openedAt = Date.now();
+        return new Promise(resolve => {
+            function update() {
+                const len = reasonEl.value.trim().length;
+                const waitLeft = Math.max(0, REFLECT_WAIT_SECS - Math.floor((Date.now() - openedAt) / 1000));
+                const codeOk = !code || codeInput.value === code;
+                hintEl.textContent = len < REFLECT_MIN_CHARS ? `${REFLECT_MIN_CHARS - len} more characters needed.` : '';
+                pauseBtn.disabled = len < REFLECT_MIN_CHARS || waitLeft > 0 || !codeOk;
+                pauseBtn.textContent = waitLeft > 0 ? `Pause (wait ${waitLeft}s)` : `Pause for ${pauseMins} min`;
+            }
+            const timer = setInterval(update, 250);
+            function noPaste(e) { e.preventDefault(); }
+            function done(value) {
+                clearInterval(timer);
+                modal.classList.remove('visible');
+                reasonEl.removeEventListener('input', update);
+                codeInput.removeEventListener('input', update);
+                codeInput.removeEventListener('paste', noPaste);
+                pauseBtn.removeEventListener('click', onPause);
+                stayBtn.removeEventListener('click', onStay);
+                document.removeEventListener('keydown', onKey);
+                resolve(value);
+            }
+            function onPause() { if (!pauseBtn.disabled) done(reasonEl.value.trim()); }
+            function onStay() { done(null); }
+            function onKey(e) { if (e.key === 'Escape') done(null); }
+            reasonEl.addEventListener('input', update);
+            codeInput.addEventListener('input', update);
+            codeInput.addEventListener('paste', noPaste);
+            pauseBtn.addEventListener('click', onPause);
+            stayBtn.addEventListener('click', onStay);
+            document.addEventListener('keydown', onKey);
+            update();
+        });
     }
 
     function updateToggleButton(isEnabled) {
