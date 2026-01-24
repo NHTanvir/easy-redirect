@@ -776,6 +776,10 @@ const PAUSE_MINUTES_MAX = 30;
 const PAUSE_BUDGET_MAX = 120;
 const PAUSE_LOG_KEEP_DAYS = 35;
 const EARNED_MINS_PER_SESSION = 5;
+// A regular pause needs a written reason of at least this many characters
+// (the reflection prompt in options.js). Checked here too so the message
+// can't be sent without one.
+const PAUSE_REASON_MIN_CHARS = 15;
 const EARNED_MINS_MAX = 60;
 
 // Points: +1 per redirect (a visit you didn't make), +10 per finished
@@ -959,6 +963,9 @@ async function requestPause(opts = {}) {
             return { ok: false, error: `Today's pause budget (${clampPauseBudget(sync.dailyPauseBudgetMins)} min) is used up. It resets at midnight.` };
         }
     }
+    if (kind === 'pause' && (typeof opts.reason !== 'string' || opts.reason.trim().length < PAUSE_REASON_MIN_CHARS)) {
+        return { ok: false, error: `Write a reason of at least ${PAUSE_REASON_MIN_CHARS} characters to pause.` };
+    }
     const pauseMs = Math.floor(Math.min(clampPauseMinutes(sync.pauseMinutes) * 60 * 1000, remainingMs) / 60000) * 60000;
     const delaySecs = typeof sync.disableDelaySecs === 'number'
         ? Math.max(0, Math.min(DISABLE_DELAY_MAX, sync.disableDelaySecs)) : 0;
@@ -967,7 +974,7 @@ async function requestPause(opts = {}) {
         startedAt: now,
         endsAt: now + delaySecs * 1000 + pauseMs,
         delayMs: delaySecs * 1000,
-        reason: typeof opts.reason === 'string' ? opts.reason.slice(0, 500) : '',
+        reason: typeof opts.reason === 'string' ? opts.reason.trim().slice(0, 500) : '',
         kind
     };
     // Record the pause before flipping the flag so the onChanged guard sees it.
