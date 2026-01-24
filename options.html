@@ -796,6 +796,34 @@
             background: var(--accent); color: #fff; border-color: var(--accent);
         }
 
+        /* ─── Pause reflection modal ──────────────────────────────────── */
+        #reflectModal {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,.55);
+            z-index: 1000;
+            align-items: center; justify-content: center;
+        }
+        #reflectModal.visible { display: flex; }
+        #reflectBox {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 26px 28px;
+            max-width: 460px; width: 92%;
+            box-shadow: 0 8px 32px rgba(0,0,0,.25);
+        }
+        #reflectBox h3 { margin: 0 0 6px; font-size: 17px; }
+        #reflectStats { margin: 12px 0 14px; padding: 0; list-style: none; font-size: 13px; }
+        #reflectStats li { padding: 5px 0; border-bottom: 1px solid var(--border); }
+        #reflectStats li:last-child { border-bottom: none; }
+        #reflectCode {
+            font-family: ui-monospace, Menlo, Consolas, monospace;
+            font-size: 12px; word-break: break-all; user-select: none;
+            padding: 8px; border: 1px solid var(--border); border-radius: 5px;
+            background: var(--bg); margin: 4px 0 6px; line-height: 1.6;
+        }
+
         /* ─── Delay modal ─────────────────────────────────────────────── */
         #delayModal {
             display: none;
@@ -1212,6 +1240,29 @@
             <button id="cancelDelayBtn" class="btn-ghost">Cancel</button>
         </div>
         <div id="delayStatus" class="field-status"></div>
+    </div>
+</div>
+
+<!-- Pause reflection modal (Focus Guard) -->
+<div id="reflectModal" role="dialog" aria-modal="true" aria-labelledby="reflectTitle">
+    <div id="reflectBox">
+        <h3 id="reflectTitle">Before you pause&hellip;</h3>
+        <p class="help-text" style="margin:0;">Take a breath. Here's what you've done today.</p>
+        <ul id="reflectStats"></ul>
+        <label class="field-label" for="reflectReason">Why do you need a break right now?</label>
+        <textarea id="reflectReason" rows="3" maxlength="500" style="resize:vertical;"
+                  placeholder="Be honest with yourself&hellip;"></textarea>
+        <div id="reflectReasonHint" class="help-text"></div>
+        <div id="reflectCodeRow" style="display:none;margin-top:10px;">
+            <label class="field-label" for="reflectCodeInput">Type this code exactly (paste disabled):</label>
+            <div id="reflectCode"></div>
+            <input type="text" id="reflectCodeInput" autocomplete="off" spellcheck="false"
+                   style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;">
+        </div>
+        <div class="btn-row" style="margin-top:14px;">
+            <button id="reflectStayBtn" class="btn-success">Stay focused</button>
+            <button id="reflectPauseBtn" class="btn-ghost" disabled>Pause</button>
+        </div>
     </div>
 </div>
 
