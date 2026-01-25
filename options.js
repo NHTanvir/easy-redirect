@@ -2068,6 +2068,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (area === 'sync' && 'extensionEnabled' in changes) {
             updateToggleButton(changes.extensionEnabled.newValue !== false);
         }
+        // finishPause() writes the log after the flag flips, so refresh then.
+        if (area === 'local' && ('pauseLog' in changes || 'focusPause' in changes)) {
+            loadFocusReport().catch(() => {});
+        }
     });
 
     const takeEarnedBreakBtn = document.getElementById('takeEarnedBreakBtn');
