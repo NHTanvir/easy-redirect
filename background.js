@@ -1063,6 +1063,39 @@ async function getFocusState() {
     };
 }
 
+// Last 7 local days for the Stats tab: per-day pauses, minutes paused,
+// earned breaks and redirects, plus the most recent pauses with reasons.
+// Redirect counts come from weeklyStats, which is keyed by UTC date and only
+// holds the current week, so older days show 0 there.
+async function getFocusReport() {
+    const [log, weekly, local] = await Promise.all([
+        getPauseLog(), getWeeklyStats(), chrome.storage.local.get(['focusPause'])
+    ]);
+    const entries = log.slice();
+    if (local.focusPause) {
+        const p = local.focusPause;
+        entries.push({ date: todayLocal(new Date(p.startedAt)), startedAt: p.startedAt, endedAt: null,
+            usedMs: pauseUsedMs(p), reason: p.reason || '', kind: p.kind });
+    }
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const date = todayLocal(d);
+        const dayEntries = entries.filter(e => e.date === date);
+        const pauses = dayEntries.filter(e => e.kind === 'pause');
+        days.push({
+            date,
+            pauses: pauses.length,
+            pausedMins: Math.round(pauses.reduce((sum, e) => sum + (e.usedMs || 0), 0) / 60000),
+            earnedBreaks: dayEntries.length - pauses.length,
+            redirects: (weekly.days[date] && weekly.days[date].total) || 0
+        });
+    }
+    const recent = entries.sort((a, b) => b.startedAt - a.startedAt).slice(0, 15);
+    return { days, recent };
+}
+
 // Validate and persist Focus Guard settings. Locked while a lockdown runs so
 // the limits can't be loosened mid-session.
 async function saveFocusSettings(input) {
@@ -1453,6 +1486,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     if (request.action === 'getFocusState') {
         getFocusState().then(sendResponse);
+        return true;
+    }
+    if (request.action === 'getFocusReport') {
+        getFocusReport().then(sendResponse);
         return true;
     }
     if (request.action === 'saveFocusSettings') {
