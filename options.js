@@ -593,6 +593,27 @@ document.addEventListener('DOMContentLoaded', function() {
         let tfoot = table.querySelector('tfoot');
         if (!tfoot) { tfoot = document.createElement('tfoot'); table.appendChild(tfoot); }
         tfoot.innerHTML = `<tr><td>7-day total</td>${totals.map(t => `<td>${t}</td>`).join('')}</tr>`;
+        renderPauseHistory(report.recent);
+    }
+
+    // Most recent pauses: when, how long, what kind and the reason given.
+    function renderPauseHistory(entries) {
+        const list = document.getElementById('pauseHistoryList');
+        if (!list) return;
+        if (!entries.length) {
+            list.innerHTML = '<div class="help-text">No pauses yet. Keep it that way!</div>';
+            return;
+        }
+        list.innerHTML = entries.map(e => {
+            const when = new Date(e.startedAt).toLocaleString(undefined, {
+                weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+            });
+            const mins = Math.round((e.usedMs || 0) / 60000);
+            const kind = e.kind === 'earned' ? '\u2615 Earned break' : '\u23F8 Pause';
+            const length = e.endedAt === null ? 'running now' : `${mins} min`;
+            const reason = e.reason ? `<div class="pause-reason">\u201C${escapeHtml(e.reason)}\u201D</div>` : '';
+            return `<div class="pause-entry"><div class="pause-meta">${kind} · ${escapeHtml(when)} · ${length}</div>${reason}</div>`;
+        }).join('');
     }
 
     // ---------------------------------------------------------------------------
