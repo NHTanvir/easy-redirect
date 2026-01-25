@@ -932,6 +932,15 @@
         .stat-value { font-size: 32px; font-weight: 800; color: var(--accent); letter-spacing: -1px; }
         .stat-label { font-size: 11px; font-weight: 600; color: var(--text-muted); margin-top: 4px; text-transform: uppercase; letter-spacing: .5px; }
 
+        .focus-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .focus-table th, .focus-table td { padding: 7px 8px; text-align: right; border-bottom: 1px solid var(--border); }
+        .focus-table th:first-child, .focus-table td:first-child { text-align: left; }
+        .focus-table th { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .4px; }
+        .focus-table tfoot td { font-weight: 700; border-bottom: none; }
+        .pause-entry { padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+        .pause-entry:last-child { border-bottom: none; }
+        .pause-entry .pause-meta { font-size: 12px; color: var(--text-muted); }
+        .pause-entry .pause-reason { margin-top: 3px; font-style: italic; }
         .stats-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: 12px; }
         .stats-bar-track { flex: 1; background: var(--border); border-radius: 3px; height: 10px; overflow: hidden; }
         .stats-bar { height: 10px; background: var(--accent); border-radius: 3px; min-width: 0; transition: width .3s; }
@@ -1839,6 +1848,17 @@
                     <button id="clearStatsBtn" class="btn-danger">Clear stats</button>
                 </div>
                 <div id="statsStatus" class="field-status"></div>
+            </div>
+
+            <div class="card" id="focusReportSection">
+                <div class="card-title">Focus Report (last 7 days)</div>
+                <p class="help-text" style="margin-bottom:12px;">Pauses, earned breaks and blocked visits per day. Stored locally on this device.</p>
+                <table class="focus-table" id="focusReportTable">
+                    <thead><tr><th>Day</th><th>Pauses</th><th>Min paused</th><th>Earned breaks</th><th>Blocked</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+                <div class="card-title" style="margin-top:20px;">Pause History</div>
+                <div id="pauseHistoryList"></div>
             </div>
         </div>
 
