@@ -569,6 +569,30 @@ document.addEventListener('DOMContentLoaded', function() {
         if (typeof refreshLockdownUi === 'function') refreshLockdownUi();
         // Refresh stats dashboard (feature #28).
         loadStats().catch(() => {}); // non-blocking; errors are silently ignored
+        loadFocusReport().catch(() => {});
+    }
+
+    // Fill the Focus Report table: one row per day for the last 7 days, plus
+    // a totals row.
+    async function loadFocusReport() {
+        const report = await chrome.runtime.sendMessage({ action: 'getFocusReport' });
+        if (!report) return;
+        const table = document.getElementById('focusReportTable');
+        if (!table) return;
+        const today = report.days[report.days.length - 1].date;
+        const dayLabel = date => {
+            if (date === today) return 'Today';
+            const [y, m, d] = date.split('-').map(Number);
+            return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+        };
+        const cols = ['pauses', 'pausedMins', 'earnedBreaks', 'redirects'];
+        table.querySelector('tbody').innerHTML = report.days.slice().reverse().map(day =>
+            `<tr><td>${escapeHtml(dayLabel(day.date))}</td>${cols.map(c => `<td>${day[c]}</td>`).join('')}</tr>`
+        ).join('');
+        const totals = cols.map(c => report.days.reduce((sum, day) => sum + day[c], 0));
+        let tfoot = table.querySelector('tfoot');
+        if (!tfoot) { tfoot = document.createElement('tfoot'); table.appendChild(tfoot); }
+        tfoot.innerHTML = `<tr><td>7-day total</td>${totals.map(t => `<td>${t}</td>`).join('')}</tr>`;
     }
 
     // ---------------------------------------------------------------------------
