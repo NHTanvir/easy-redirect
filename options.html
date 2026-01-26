@@ -1998,11 +1998,11 @@
             </details>
 
             <details class="doc-section">
-                <summary>Enable / Disable the extension <span class="doc-badge">CORE</span></summary>
+                <summary>Pause / Resume blocking <span class="doc-badge">CORE</span></summary>
                 <div class="doc-body">
                     <div class="doc-where">&#x1F4CB; Sidebar — green/red button at the top</div>
-                    <p>The big button at the top of the sidebar toggles blocking on and off. When disabled, all redirect rules are removed from Chrome — sites load normally. Your rule list is kept; re-enabling restores everything instantly.</p>
-                    <p>Keyboard shortcut: <code>Ctrl+Shift+Y</code> (customisable in Advanced → Keyboard Shortcuts).</p>
+                    <p>The button at the top of the sidebar <strong>pauses</strong> blocking. There is no permanent off switch: a pause always ends on its own (see <strong>Focus Guard</strong> below). While paused, the button says <strong>Resume blocking</strong> and shows the time left. Your rule list is never touched.</p>
+                    <p>Keyboard shortcut: <code>Ctrl+Shift+Y</code> resumes blocking. If blocking is on, it opens this page instead, because pausing needs the reflection prompt.</p>
                 </div>
             </details>
 
@@ -2124,7 +2124,7 @@
                 <summary>Disable delay — add a countdown before the extension turns off</summary>
                 <div class="doc-body">
                     <div class="doc-where">&#x2699;&#xFE0F; Settings tab → Disable Delay</div>
-                    <p>Set a number of seconds (up to 300). When you hit the Disable button, blocking stays active for that long before actually turning off. An orange badge on the toolbar counts down. Click <strong>Cancel</strong> in the options banner to abort.</p>
+                    <p>Set a number of seconds (up to 300). When you start a pause, blocking stays active for that long before the pause takes effect. An orange badge on the toolbar counts down. Click <strong>Cancel</strong> in the options banner to abort.</p>
                 </div>
             </details>
 
@@ -2188,7 +2188,7 @@
                 <summary>Add-rule friction code — force slow, deliberate rule changes</summary>
                 <div class="doc-body">
                     <div class="doc-where">&#x1F512; Advanced tab → Add-Rule Friction Code</div>
-                    <p>When enabled, adding any new rule requires you to <strong>manually type</strong> a randomly generated code (32–256 characters, no paste allowed). This makes impulsive "just unblock it real quick" much harder.</p>
+                    <p>When enabled, adding any new rule or pausing blocking requires you to <strong>manually type</strong> a randomly generated code (32–256 characters, no paste allowed). This makes impulsive "just unblock it real quick" much harder.</p>
                     <p>Use the length slider to increase the difficulty. Longer codes take more time to type.</p>
                 </div>
             </details>
@@ -2269,7 +2269,7 @@
                     <div class="doc-where">&#x1F512; Advanced tab → Keyboard Shortcuts  ·  also: sidebar footer</div>
                     <ul>
                         <li><code>Ctrl+Shift+B</code> — open this options page from anywhere</li>
-                        <li><code>Ctrl+Shift+Y</code> — toggle the extension on/off</li>
+                        <li><code>Ctrl+Shift+Y</code> — resume blocking (opens this page when blocking is on)</li>
                         <li><code>/</code> — on the Rules tab, focus the search box</li>
                         <li><code>Esc</code> — clear the search box</li>
                     </ul>
