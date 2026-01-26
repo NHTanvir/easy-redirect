@@ -66,6 +66,9 @@ Redirect URL precedence: `rule.redirectUrl` > `group.redirectUrl` > global `redi
   accessCode: { enabled: boolean, length: number },
   uninstallUrl: string,
   disableDelaySecs: number,      // 0–300
+  pauseMinutes: number,          // Focus Guard pause length; default 5, 1–30
+  dailyPauseBudgetMins: number,  // default 30, 0–120
+  workHours: { enabled: boolean, days: number[], startTime: "HH:MM", endTime: "HH:MM" },
   pomodoroEnabled: boolean,
   pomodoroState: 'off'|'work'|'break',
   pomodoroWorkMinutes: number,   // default 25
@@ -101,7 +104,11 @@ Redirect URL precedence: `rule.redirectUrl` > `group.redirectUrl` > global `redi
   blockedImageDataUrl: string,
   lockAttempts: { count: number, lockedUntil: number },
   sortOrder: string,
-  sortDir: 'asc'|'desc'
+  sortDir: 'asc'|'desc',
+  focusPause: { startedAt, endsAt, delayMs, reason, kind: 'pause'|'earned' } | null,
+  pauseLog: [{ date, startedAt, endedAt, usedMs, reason, kind }],  // local dates, 35 days kept
+  focusStats: { since, lastPauseDate, bestStreak, earnedMins },
+  focusPoints: number
 }
 ```
 
@@ -144,6 +151,17 @@ Redirect URL precedence: `rule.redirectUrl` > `group.redirectUrl` > global `redi
   } | null
 }
 ```
+
+### Focus Guard (pause instead of disable)
+
+There is no permanent off switch. The sidebar toggle and `Ctrl+Shift+Y` go through `requestPause()` / `resumeBlocking()` in background.js:
+
+- `requestPause()` checks lockdown, work hours, the daily budget and a 15+ char reason, writes `focusPause` to local **before** setting `extensionEnabled: false`, and schedules the `focusPauseEnd` alarm.
+- The `storage.onChanged` guard reverts any `extensionEnabled: false` with no `focusPause` record. Turning back on calls `finishPause()`, which appends to `pauseLog`.
+- `reconcilePause()` runs on install/startup and switches back on when a pause expired while Chrome was closed (or a legacy disabled state has no record).
+- Kind `'earned'` pauses spend `focusStats.earnedMins` (+5 per finished Pomodoro work session) and skip the budget, streak and work-hours checks.
+- Budget, streak and report use **local** dates (`todayLocal()`); `dailyCounts` and `weeklyStats` still use UTC.
+- Settings are saved through the `saveFocusSettings` message, which refuses during lockdown or work hours.
 
 ### Durability invariant — DO NOT REGRESS
 
