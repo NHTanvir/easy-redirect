@@ -26,14 +26,6 @@
 
 ## Focus tools
 - **Pause / Resume blocking** — the main button only pauses blocking; there is no permanent off switch.
-- **Auto re-enable** — a pause ends by itself after the pause length (default 5 min).
-- **Daily pause budget** — caps total pausing per day (default 30 min).
-- **Work-hours lock** — no pausing and no Focus Guard setting changes during chosen work hours.
-- **Focus streak** — counts days in a row without pausing, with your best streak.
-- **Earned breaks** — each finished Pomodoro work session earns 5 min of break that doesn't cost budget or streak.
-- **Points & levels** — earns points for blocked visits and Pomodoro sessions, loses them for pauses, and levels you up.
-- **Reflection prompt** — before pausing, shows today's stats and makes you write a reason and wait 10 seconds.
-- **Focus report & pause history** — 7-day table of pauses, minutes paused, earned breaks and blocked visits, plus your recent pause reasons.
 - **Pomodoro timer** — runs work/break cycles in the background with notifications.
 - **Lockdown mode** — blocks pausing and rule changes for a fixed time, up to 24 hours.
 - **Disable delay** — makes a pause wait up to 5 minutes before it takes effect.
@@ -57,3 +49,13 @@
 - **Keyboard shortcuts** — `Ctrl+Shift+B` opens settings, `Ctrl+Shift+Y` resumes blocking.
 - **Theme** — Auto, Light or Dark mode.
 - **Sync & backup** — settings sync across your Chrome devices and are mirrored locally so they can't vanish.
+
+## Focus Guard (new)
+- **Auto re-enable** — a pause ends by itself after the pause length (default 5 min).
+- **Daily pause budget** — caps total pausing per day (default 30 min).
+- **Work-hours lock** — no pausing and no Focus Guard setting changes during chosen work hours.
+- **Focus streak** — counts days in a row without pausing, with your best streak.
+- **Earned breaks** — each finished Pomodoro work session earns 5 min of break that doesn't cost budget or streak.
+- **Points & levels** — earns points for blocked visits and Pomodoro sessions, loses them for pauses, and levels you up.
+- **Reflection prompt** — before pausing, shows today's stats and makes you write a reason and wait 10 seconds.
+- **Focus report & pause history** — 7-day table of pauses, minutes paused, earned breaks and blocked visits, plus your recent pause reasons.
