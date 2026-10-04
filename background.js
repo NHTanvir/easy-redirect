@@ -1072,6 +1072,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         stopPomodoro().then(() => sendResponse({ ok: true }));
         return true;
     }
+    if (request.action === 'setPomodoroEnabled') {
+        setPomodoroEnabled(!!request.enabled).then(() => sendResponse({ ok: true }));
+        return true;
+    }
 });
 
 async function handleKeywordHit(sender, request) {
@@ -1125,12 +1129,14 @@ async function stopLockdown() {
 
 // Pomodoro timer helpers (feature #10)
 async function startPomodoro() {
-    const r = await chrome.storage.sync.get(['pomodoroWorkMinutes']);
+    const r = await chrome.storage.sync.get(['pomodoroWorkMinutes', 'pomodoroBreakMinutes']);
     const workMins = (typeof r.pomodoroWorkMinutes === 'number' && r.pomodoroWorkMinutes > 0)
         ? r.pomodoroWorkMinutes : 25;
+    const breakMins = (typeof r.pomodoroBreakMinutes === 'number' && r.pomodoroBreakMinutes > 0)
+        ? r.pomodoroBreakMinutes : 5;
     await chrome.alarms.clear('pomodoroWork');
     await chrome.alarms.clear('pomodoroBreak');
-    await persist({ pomodoroEnabled: true, pomodoroState: 'work', pomodoroStartedAt: Date.now() });
+    await persist({ pomodoroEnabled: true, pomodoroState: 'work', pomodoroStartedAt: Date.now(), pomodoroWorkMinutes: workMins, pomodoroBreakMinutes: breakMins });
     chrome.alarms.create('pomodoroWork', { delayInMinutes: workMins });
     await updateRedirectRules();
     console.log(`[pomodoro] Started — ${workMins}-min work session.`);
@@ -1139,9 +1145,23 @@ async function startPomodoro() {
 async function stopPomodoro() {
     await chrome.alarms.clear('pomodoroWork');
     await chrome.alarms.clear('pomodoroBreak');
-    await persist({ pomodoroEnabled: false, pomodoroState: 'off', pomodoroStartedAt: null });
+    // Keep pomodoroEnabled (feature flag) as-is; only end the active session.
+    await persist({ pomodoroState: 'off', pomodoroStartedAt: null });
     await updateRedirectRules();
-    console.log('[pomodoro] Stopped.');
+    console.log('[pomodoro] Timer stopped.');
+}
+
+async function setPomodoroEnabled(enabled) {
+    if (enabled) {
+        await persist({ pomodoroEnabled: true });
+        console.log('[pomodoro] Feature enabled.');
+    } else {
+        await chrome.alarms.clear('pomodoroWork');
+        await chrome.alarms.clear('pomodoroBreak');
+        await persist({ pomodoroEnabled: false, pomodoroState: 'off', pomodoroStartedAt: null });
+        await updateRedirectRules();
+        console.log('[pomodoro] Feature disabled.');
+    }
 }
 
 async function restorePomodoroAlarm() {
