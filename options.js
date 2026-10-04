@@ -2910,7 +2910,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (lockdownActivateBtn) {
         lockdownActivateBtn.addEventListener('click', () => {
-            if (lockdownConfirmPanel) lockdownConfirmPanel.style.display = '';
+            if (lockdownConfirmPanel) lockdownConfirmPanel.style.display = 'block';
             if (lockdownConfirmInput) { lockdownConfirmInput.value = ''; lockdownConfirmInput.focus(); }
             if (lockdownConfirmBtn) lockdownConfirmBtn.disabled = true;
         });
