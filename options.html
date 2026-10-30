@@ -1289,6 +1289,9 @@
             <a class="nav-item active" data-tab="rules">
                 <span class="nav-icon">&#x26D4;</span> Rules
             </a>
+            <a class="nav-item" data-tab="focus-guard">
+                <span class="nav-icon">&#x1F6E1;&#xFE0F;</span> Focus Guard
+            </a>
             <a class="nav-item" data-tab="settings">
                 <span class="nav-icon">&#x2699;&#xFE0F;</span> Settings
             </a>
@@ -1463,6 +1466,81 @@
         </div>
 
         <!-- ══════════════════ TAB: SETTINGS ══════════════════ -->
+        <div class="tab-panel" id="tab-focus-guard">
+            <div class="panel-heading">Focus Guard</div>
+
+            <!-- Focus Guard -->
+            <div class="card" id="focusGuardSection">
+                <div class="card-title">Focus Guard</div>
+                <p class="help-text" style="margin-bottom:14px;">
+                    <strong>Pause blocking</strong> never turns blocking off for good. It switches
+                    itself back on after the pause length below, and all pauses together can't go
+                    over the daily budget.
+                </p>
+                <div class="stat-cards" id="focusStatCards">
+                    <div class="stat-card">
+                        <div class="stat-value" id="focusStreakValue">—</div>
+                        <div class="stat-label">Focus streak</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="focusBestStreakValue">—</div>
+                        <div class="stat-label">Best streak</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="focusEarnedValue">—</div>
+                        <div class="stat-label">Earned break (min)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="focusPointsValue">—</div>
+                        <div class="stat-label" id="focusLevelLabel">Level</div>
+                    </div>
+                </div>
+                <div id="focusLevelLine" class="help-text" style="margin:-8px 0 14px;"></div>
+                <div class="btn-row" style="margin:-6px 0 14px;">
+                    <button id="takeEarnedBreakBtn" class="btn-success">&#x2615; Take earned break</button>
+                    <span class="help-text" style="margin-top:0;">Each finished Pomodoro work session earns 5 min. Earned breaks don't use the budget, don't break the streak and work during work hours.</span>
+                </div>
+                <div id="pauseBudgetLine" style="font-size:13px;margin-bottom:12px;"></div>
+                <div class="inline-row" style="gap:20px;">
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Pause length
+                        <input type="number" id="pauseMinutesInput" min="1" max="30" step="1" value="5" style="width:70px;text-align:right;">
+                        min
+                    </label>
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Daily budget
+                        <input type="number" id="pauseBudgetInput" min="0" max="120" step="1" value="30" style="width:70px;text-align:right;">
+                        min
+                    </label>
+                </div>
+                <hr class="divider">
+                <label class="check-row" style="margin-bottom:8px;">
+                    <input type="checkbox" id="workHoursEnabled">
+                    <span style="font-size:14px;">Lock pausing during work hours</span>
+                </label>
+                <div class="inline-row" id="workHoursDays" style="gap:6px;margin-bottom:10px;">
+                    <label class="day-chip"><input type="checkbox" value="0"> Sun</label>
+                    <label class="day-chip"><input type="checkbox" value="1"> Mon</label>
+                    <label class="day-chip"><input type="checkbox" value="2"> Tue</label>
+                    <label class="day-chip"><input type="checkbox" value="3"> Wed</label>
+                    <label class="day-chip"><input type="checkbox" value="4"> Thu</label>
+                    <label class="day-chip"><input type="checkbox" value="5"> Fri</label>
+                    <label class="day-chip"><input type="checkbox" value="6"> Sat</label>
+                </div>
+                <div class="inline-row">
+                    <input type="time" id="workHoursStart" value="09:00" style="width:auto;">
+                    <span class="text-muted" style="font-size:13px;">to</span>
+                    <input type="time" id="workHoursEnd" value="18:00" style="width:auto;">
+                </div>
+                <p class="help-text">While work hours are on, Pause is refused, a running pause ends, and these settings can't be changed.</p>
+                <div id="workHoursLine" style="font-size:13px;margin-top:8px;"></div>
+                <div class="btn-row">
+                    <button id="saveFocusSettingsBtn">Save</button>
+                </div>
+                <div id="focusSettingsStatus" class="field-status"></div>
+            </div>
+        </div>
+
         <div class="tab-panel" id="tab-settings">
             <div class="panel-heading">Settings</div>
 
@@ -1573,77 +1651,6 @@
         <!-- ══════════════════ TAB: FOCUS & TIMER ══════════════════ -->
         <div class="tab-panel" id="tab-focus">
             <div class="panel-heading">Focus &amp; Timer</div>
-
-            <!-- Focus Guard -->
-            <div class="card" id="focusGuardSection">
-                <div class="card-title">Focus Guard</div>
-                <p class="help-text" style="margin-bottom:14px;">
-                    <strong>Pause blocking</strong> never turns blocking off for good. It switches
-                    itself back on after the pause length below, and all pauses together can't go
-                    over the daily budget.
-                </p>
-                <div class="stat-cards" id="focusStatCards">
-                    <div class="stat-card">
-                        <div class="stat-value" id="focusStreakValue">—</div>
-                        <div class="stat-label">Focus streak</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="focusBestStreakValue">—</div>
-                        <div class="stat-label">Best streak</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="focusEarnedValue">—</div>
-                        <div class="stat-label">Earned break (min)</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="focusPointsValue">—</div>
-                        <div class="stat-label" id="focusLevelLabel">Level</div>
-                    </div>
-                </div>
-                <div id="focusLevelLine" class="help-text" style="margin:-8px 0 14px;"></div>
-                <div class="btn-row" style="margin:-6px 0 14px;">
-                    <button id="takeEarnedBreakBtn" class="btn-success">&#x2615; Take earned break</button>
-                    <span class="help-text" style="margin-top:0;">Each finished Pomodoro work session earns 5 min. Earned breaks don't use the budget, don't break the streak and work during work hours.</span>
-                </div>
-                <div id="pauseBudgetLine" style="font-size:13px;margin-bottom:12px;"></div>
-                <div class="inline-row" style="gap:20px;">
-                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
-                        Pause length
-                        <input type="number" id="pauseMinutesInput" min="1" max="30" step="1" value="5" style="width:70px;text-align:right;">
-                        min
-                    </label>
-                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
-                        Daily budget
-                        <input type="number" id="pauseBudgetInput" min="0" max="120" step="1" value="30" style="width:70px;text-align:right;">
-                        min
-                    </label>
-                </div>
-                <hr class="divider">
-                <label class="check-row" style="margin-bottom:8px;">
-                    <input type="checkbox" id="workHoursEnabled">
-                    <span style="font-size:14px;">Lock pausing during work hours</span>
-                </label>
-                <div class="inline-row" id="workHoursDays" style="gap:6px;margin-bottom:10px;">
-                    <label class="day-chip"><input type="checkbox" value="0"> Sun</label>
-                    <label class="day-chip"><input type="checkbox" value="1"> Mon</label>
-                    <label class="day-chip"><input type="checkbox" value="2"> Tue</label>
-                    <label class="day-chip"><input type="checkbox" value="3"> Wed</label>
-                    <label class="day-chip"><input type="checkbox" value="4"> Thu</label>
-                    <label class="day-chip"><input type="checkbox" value="5"> Fri</label>
-                    <label class="day-chip"><input type="checkbox" value="6"> Sat</label>
-                </div>
-                <div class="inline-row">
-                    <input type="time" id="workHoursStart" value="09:00" style="width:auto;">
-                    <span class="text-muted" style="font-size:13px;">to</span>
-                    <input type="time" id="workHoursEnd" value="18:00" style="width:auto;">
-                </div>
-                <p class="help-text">While work hours are on, Pause is refused, a running pause ends, and these settings can't be changed.</p>
-                <div id="workHoursLine" style="font-size:13px;margin-top:8px;"></div>
-                <div class="btn-row">
-                    <button id="saveFocusSettingsBtn">Save</button>
-                </div>
-                <div id="focusSettingsStatus" class="field-status"></div>
-            </div>
 
             <!-- Pomodoro -->
             <div class="card" id="pomodoroSection">
