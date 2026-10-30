@@ -925,26 +925,27 @@ document.addEventListener('DOMContentLoaded', function() {
     // ---------------------------------------------------------------------------
 
     // Save work/break durations to chrome.storage.sync whenever they change.
-    function _savePomodoroDurations() {
+    function _savePomodoroDurations(callback) {
         const workEl = document.getElementById('pomodoroWorkInput');
         const breakEl = document.getElementById('pomodoroBreakInput');
         const workMins = workEl ? Math.max(1, Math.min(120, parseInt(workEl.value, 10) || 25)) : 25;
         const breakMins = breakEl ? Math.max(1, Math.min(60, parseInt(breakEl.value, 10) || 5)) : 5;
-        chrome.storage.sync.set({ pomodoroWorkMinutes: workMins, pomodoroBreakMinutes: breakMins });
+        chrome.storage.sync.set({ pomodoroWorkMinutes: workMins, pomodoroBreakMinutes: breakMins }, callback);
     }
 
     const pomWorkInput = document.getElementById('pomodoroWorkInput');
     const pomBreakInput = document.getElementById('pomodoroBreakInput');
-    if (pomWorkInput) pomWorkInput.addEventListener('change', _savePomodoroDurations);
-    if (pomBreakInput) pomBreakInput.addEventListener('change', _savePomodoroDurations);
+    if (pomWorkInput) pomWorkInput.addEventListener('change', () => _savePomodoroDurations());
+    if (pomBreakInput) pomBreakInput.addEventListener('change', () => _savePomodoroDurations());
 
     // Start button — persist durations first so background picks them up.
     const pomStartBtn = document.getElementById('pomodoroStartBtn');
     if (pomStartBtn) {
         pomStartBtn.addEventListener('click', () => {
-            _savePomodoroDurations();
-            chrome.runtime.sendMessage({ action: 'startPomodoro' }, () => {
-                initPomodoroUi(); // refresh UI immediately
+            _savePomodoroDurations(() => {
+                chrome.runtime.sendMessage({ action: 'startPomodoro' }, () => {
+                    initPomodoroUi(); // refresh UI immediately
+                });
             });
         });
     }
@@ -959,8 +960,23 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Master feature toggle — enable/disable Pomodoro without starting a timer.
+    const pomToggleBtn = document.getElementById('pomodoroToggleBtn');
+    if (pomToggleBtn) {
+        pomToggleBtn.addEventListener('click', () => {
+            chrome.storage.sync.get(['pomodoroEnabled'], result => {
+                const newEnabled = !result.pomodoroEnabled;
+                // Background owns the write (persist() mirrors to local), alarm
+                // cleanup and rule rebuild.
+                chrome.runtime.sendMessage({ action: 'setPomodoroEnabled', enabled: newEnabled }, () => {
+                    initPomodoroUi();
+                });
+            });
+        });
+    }
+
     // Read the current pomodoro state from storage and update the UI.
-    // Called on page load and after start/stop actions.
+    // Called on page load and after start/stop/toggle actions.
     let _pomodoroTickInterval = null;
 
     function initPomodoroUi() {
@@ -972,11 +988,36 @@ document.addEventListener('DOMContentLoaded', function() {
                 const stopBtn = document.getElementById('pomodoroStopBtn');
                 const statusEl = document.getElementById('pomodoroStatus');
                 const countdownEl = document.getElementById('pomodoroCountdown');
+                const toggleBtn = document.getElementById('pomodoroToggleBtn');
 
-                const enabled = !!result.pomodoroEnabled;
+                const featureEnabled = !!result.pomodoroEnabled;
                 const state = result.pomodoroState || 'off';
 
-                if (!enabled || state === 'off') {
+                // Master toggle button label / style
+                if (toggleBtn) {
+                    if (featureEnabled) {
+                        toggleBtn.textContent = 'Disable Pomodoro';
+                        toggleBtn.classList.remove('btn-success');
+                        toggleBtn.classList.add('btn-danger');
+                    } else {
+                        toggleBtn.textContent = 'Enable Pomodoro';
+                        toggleBtn.classList.remove('btn-danger');
+                        toggleBtn.classList.add('btn-success');
+                    }
+                }
+
+                // Feature off — hide session controls entirely.
+                if (!featureEnabled) {
+                    if (startBtn) startBtn.style.display = 'none';
+                    if (stopBtn) stopBtn.style.display = 'none';
+                    if (statusEl) statusEl.textContent = 'Pomodoro feature is turned off.';
+                    if (countdownEl) { countdownEl.style.display = 'none'; countdownEl.textContent = ''; }
+                    if (_pomodoroTickInterval) { clearInterval(_pomodoroTickInterval); _pomodoroTickInterval = null; }
+                    return;
+                }
+
+                // Feature on, timer not running.
+                if (state === 'off') {
                     if (startBtn) startBtn.style.display = '';
                     if (stopBtn) stopBtn.style.display = 'none';
                     if (statusEl) statusEl.textContent = 'Timer not running.';
@@ -985,6 +1026,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
 
+                // Feature on, session active.
                 if (startBtn) startBtn.style.display = 'none';
                 if (stopBtn) stopBtn.style.display = '';
 
