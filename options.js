@@ -569,6 +569,51 @@ document.addEventListener('DOMContentLoaded', function() {
         if (typeof refreshLockdownUi === 'function') refreshLockdownUi();
         // Refresh stats dashboard (feature #28).
         loadStats().catch(() => {}); // non-blocking; errors are silently ignored
+        loadFocusReport().catch(() => {});
+    }
+
+    // Fill the Focus Report table: one row per day for the last 7 days, plus
+    // a totals row.
+    async function loadFocusReport() {
+        const report = await chrome.runtime.sendMessage({ action: 'getFocusReport' });
+        if (!report) return;
+        const table = document.getElementById('focusReportTable');
+        if (!table) return;
+        const today = report.days[report.days.length - 1].date;
+        const dayLabel = date => {
+            if (date === today) return 'Today';
+            const [y, m, d] = date.split('-').map(Number);
+            return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+        };
+        const cols = ['pauses', 'pausedMins', 'earnedBreaks', 'redirects'];
+        table.querySelector('tbody').innerHTML = report.days.slice().reverse().map(day =>
+            `<tr><td>${escapeHtml(dayLabel(day.date))}</td>${cols.map(c => `<td>${day[c]}</td>`).join('')}</tr>`
+        ).join('');
+        const totals = cols.map(c => report.days.reduce((sum, day) => sum + day[c], 0));
+        let tfoot = table.querySelector('tfoot');
+        if (!tfoot) { tfoot = document.createElement('tfoot'); table.appendChild(tfoot); }
+        tfoot.innerHTML = `<tr><td>7-day total</td>${totals.map(t => `<td>${t}</td>`).join('')}</tr>`;
+        renderPauseHistory(report.recent);
+    }
+
+    // Most recent pauses: when, how long, what kind and the reason given.
+    function renderPauseHistory(entries) {
+        const list = document.getElementById('pauseHistoryList');
+        if (!list) return;
+        if (!entries.length) {
+            list.innerHTML = '<div class="help-text">No pauses yet. Keep it that way!</div>';
+            return;
+        }
+        list.innerHTML = entries.map(e => {
+            const when = new Date(e.startedAt).toLocaleString(undefined, {
+                weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+            });
+            const mins = Math.round((e.usedMs || 0) / 60000);
+            const kind = e.kind === 'earned' ? '\u2615 Earned break' : '\u23F8 Pause';
+            const length = e.endedAt === null ? 'running now' : `${mins} min`;
+            const reason = e.reason ? `<div class="pause-reason">\u201C${escapeHtml(e.reason)}\u201D</div>` : '';
+            return `<div class="pause-entry"><div class="pause-meta">${kind} · ${escapeHtml(when)} · ${length}</div>${reason}</div>`;
+        }).join('');
     }
 
     // ---------------------------------------------------------------------------
@@ -1814,40 +1859,255 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Focus Guard: the toggle starts a timed pause in the background, or
+    // resumes blocking early. All pause rules are enforced by background.js.
     async function toggleExtension() {
         try {
-            // Check lockdown state (feature #11) before allowing disable.
-            const ldResult = await chrome.storage.sync.get(['lockdownUntil']);
-            const lockdownUntil = ldResult.lockdownUntil;
-            if (typeof lockdownUntil === 'number' && lockdownUntil > Date.now()) {
-                showStatus('Cannot disable during lockdown.', 'error');
+            const result = await chrome.storage.sync.get(['extensionEnabled']);
+            if (result.extensionEnabled === false) {
+                await chrome.runtime.sendMessage({ action: 'resumeBlocking' });
+                showStatus('Blocking resumed.', 'success');
                 return;
             }
-
-            const result = await chrome.storage.sync.get(['extensionEnabled']);
-            const isEnabled = result.extensionEnabled !== false;
-            const newState = !isEnabled;
-
-            // Only flip the enabled flag — rules and redirectUrl are
-            // intentionally preserved so the user's list survives a disable cycle.
-            await chrome.storage.sync.set({ extensionEnabled: newState });
-            await updateRedirectRules();
-            updateToggleButton(newState);
-
-            showStatus(newState ? 'Extension enabled!' : 'Extension disabled!', 'success');
+            const reason = await _showReflection();
+            if (reason === null) {
+                showStatus('Good choice. Stay focused!', 'success');
+                return;
+            }
+            const resp = await chrome.runtime.sendMessage({ action: 'requestPause', reason });
+            if (!resp || !resp.ok) {
+                showStatus((resp && resp.error) || 'Could not pause blocking.', 'error');
+                return;
+            }
+            showStatus('Blocking paused. It switches back on automatically.', 'success');
         } catch (error) {
             showStatus('Error toggling extension: ' + error.message, 'error');
         }
     }
 
+    // Reflection prompt shown before every regular pause. Shows today's
+    // numbers, asks for a written reason, waits REFLECT_WAIT_SECS and, when the
+    // access code is enabled, asks for that too. Resolves to the reason, or
+    // null when the user stays focused. Refusals that need no reflection
+    // (work hours, budget used up) resolve straight away so the background
+    // can report them.
+    const REFLECT_MIN_CHARS = 15;
+    const REFLECT_WAIT_SECS = 10;
+    async function _showReflection() {
+        const state = await chrome.runtime.sendMessage({ action: 'getFocusState' });
+        if (state.workHoursActive || state.budget.remainingMs < 60000) return '';
+
+        const statsResp = await chrome.runtime.sendMessage({ action: 'getWeeklyStats' }).catch(() => null);
+        const todayKey = new Date().toISOString().slice(0, 10);
+        const redirects = (statsResp && statsResp.stats && statsResp.stats.days[todayKey] || {}).total || 0;
+        const acResult = await chrome.storage.sync.get(['accessCode']);
+        const ac = acResult.accessCode || { enabled: false, length: 64 };
+        const code = ac.enabled ? _generateCode(ac.length || 64) : null;
+
+        const modal = document.getElementById('reflectModal');
+        const reasonEl = document.getElementById('reflectReason');
+        const hintEl = document.getElementById('reflectReasonHint');
+        const codeRow = document.getElementById('reflectCodeRow');
+        const codeInput = document.getElementById('reflectCodeInput');
+        const pauseBtn = document.getElementById('reflectPauseBtn');
+        const stayBtn = document.getElementById('reflectStayBtn');
+        const pauseMins = Math.min(state.settings.pauseMinutes, Math.floor(state.budget.remainingMs / 60000));
+
+        const streakNote = state.streak.current > 0
+            ? `<strong>\u{1F525} ${state.streak.current}-day streak</strong> will reset to 0`
+            : 'Your streak is already 0 today';
+        document.getElementById('reflectStats').innerHTML = [
+            `\u{1F6AB} <strong>${redirects}</strong> distraction${redirects === 1 ? '' : 's'} blocked today`,
+            streakNote,
+            `\u2B50 <strong>${state.points.total}</strong> points (\u221215 if you pause)`,
+            `\u23F3 <strong>${Math.floor(state.budget.remainingMs / 60000)} min</strong> of pause budget left today`
+        ].map(li => `<li>${li}</li>`).join('');
+        reasonEl.value = '';
+        codeInput.value = '';
+        codeRow.style.display = code ? 'block' : 'none';
+        if (code) document.getElementById('reflectCode').textContent = code;
+        modal.classList.add('visible');
+        stayBtn.focus();
+
+        const openedAt = Date.now();
+        return new Promise(resolve => {
+            function update() {
+                const len = reasonEl.value.trim().length;
+                const waitLeft = Math.max(0, REFLECT_WAIT_SECS - Math.floor((Date.now() - openedAt) / 1000));
+                const codeOk = !code || codeInput.value === code;
+                hintEl.textContent = len < REFLECT_MIN_CHARS ? `${REFLECT_MIN_CHARS - len} more characters needed.` : '';
+                pauseBtn.disabled = len < REFLECT_MIN_CHARS || waitLeft > 0 || !codeOk;
+                pauseBtn.textContent = waitLeft > 0 ? `Pause (wait ${waitLeft}s)` : `Pause for ${pauseMins} min`;
+            }
+            const timer = setInterval(update, 250);
+            function noPaste(e) { e.preventDefault(); }
+            function done(value) {
+                clearInterval(timer);
+                modal.classList.remove('visible');
+                reasonEl.removeEventListener('input', update);
+                codeInput.removeEventListener('input', update);
+                codeInput.removeEventListener('paste', noPaste);
+                pauseBtn.removeEventListener('click', onPause);
+                stayBtn.removeEventListener('click', onStay);
+                document.removeEventListener('keydown', onKey);
+                resolve(value);
+            }
+            function onPause() { if (!pauseBtn.disabled) done(reasonEl.value.trim()); }
+            function onStay() { done(null); }
+            function onKey(e) { if (e.key === 'Escape') done(null); }
+            reasonEl.addEventListener('input', update);
+            codeInput.addEventListener('input', update);
+            codeInput.addEventListener('paste', noPaste);
+            pauseBtn.addEventListener('click', onPause);
+            stayBtn.addEventListener('click', onStay);
+            document.addEventListener('keydown', onKey);
+            update();
+        });
+    }
+
     function updateToggleButton(isEnabled) {
-        if (isEnabled) {
-            toggleBtn.textContent = 'Disable Redirector';
-            toggleBtn.classList.remove('disabled');
-        } else {
-            toggleBtn.textContent = 'Enable Redirector';
-            toggleBtn.classList.add('disabled');
+        toggleBtn.textContent = isEnabled ? 'Pause blocking' : 'Resume blocking';
+        toggleBtn.classList.toggle('disabled', !isEnabled);
+        refreshFocusGuard();
+    }
+
+    // Re-render everything Focus Guard shows: the sidebar pause countdown and
+    // the settings card. Called on load and whenever extensionEnabled changes.
+    let _pauseTick = null;
+    let _focusRenderToken = 0;
+    async function refreshFocusGuard() {
+        const token = ++_focusRenderToken;
+        let state;
+        try {
+            state = await chrome.runtime.sendMessage({ action: 'getFocusState' });
+        } catch (_) { return; }
+        if (!state || token !== _focusRenderToken) return;
+
+        const setInput = (id, v) => {
+            const el = document.getElementById(id);
+            if (el && document.activeElement !== el) el.value = v;
+        };
+        setInput('pauseMinutesInput', state.settings.pauseMinutes);
+        setInput('pauseBudgetInput', state.settings.dailyPauseBudgetMins);
+
+        const days = n => `${n} day${n === 1 ? '' : 's'}`;
+        const streakEl = document.getElementById('focusStreakValue');
+        if (streakEl) streakEl.textContent = `\u{1F525} ${state.streak.current}`;
+        const bestEl = document.getElementById('focusBestStreakValue');
+        if (bestEl) bestEl.textContent = state.streak.best;
+        const sideStreak = document.getElementById('sidebarStreak');
+        if (sideStreak) {
+            sideStreak.textContent = state.streak.current > 0
+                ? `\u{1F525} ${days(state.streak.current)} without pausing` : 'Streak reset today';
         }
+
+        const pts = state.points;
+        const ptsEl = document.getElementById('focusPointsValue');
+        if (ptsEl) ptsEl.textContent = pts.total;
+        const lvlLabel = document.getElementById('focusLevelLabel');
+        if (lvlLabel) lvlLabel.textContent = `Points · Lv ${pts.level} ${pts.name}`;
+        const lvlLine = document.getElementById('focusLevelLine');
+        if (lvlLine) {
+            lvlLine.textContent = (pts.nextAt === null
+                ? 'Top level reached.'
+                : `${pts.nextAt - pts.total} points to the next level.`) +
+                ' +1 per redirect, +10 per Pomodoro session, \u221215 per pause.';
+        }
+
+        const earnedEl = document.getElementById('focusEarnedValue');
+        if (earnedEl) earnedEl.textContent = state.earnedMins;
+        const earnedBtn = document.getElementById('takeEarnedBreakBtn');
+        if (earnedBtn) earnedBtn.disabled = !state.enabled || state.earnedMins < 1;
+
+        const leftMins = Math.floor(state.budget.remainingMs / 60000);
+        const budgetEl = document.getElementById('pauseBudgetLine');
+        if (budgetEl) {
+            budgetEl.innerHTML = `Pause budget left today: <strong>${leftMins} of ${state.budget.totalMins} min</strong>`;
+        }
+
+        const wh = state.settings.workHours;
+        const whEnabledEl = document.getElementById('workHoursEnabled');
+        if (whEnabledEl) whEnabledEl.checked = wh.enabled;
+        document.querySelectorAll('#workHoursDays input').forEach(cb => {
+            cb.checked = wh.days.includes(Number(cb.value));
+        });
+        setInput('workHoursStart', wh.startTime);
+        setInput('workHoursEnd', wh.endTime);
+        const whLine = document.getElementById('workHoursLine');
+        if (whLine) {
+            whLine.innerHTML = state.workHoursActive
+                ? `&#x1F512; Work hours now. Pausing is locked until <strong>${escapeHtml(wh.endTime)}</strong>.`
+                : '';
+        }
+        document.querySelectorAll('#focusGuardSection input, #saveFocusSettingsBtn').forEach(el => {
+            el.disabled = state.workHoursActive;
+        });
+
+        const infoEl = document.getElementById('pauseInfo');
+        if (_pauseTick) { clearInterval(_pauseTick); _pauseTick = null; }
+        if (!infoEl) return;
+        if (state.enabled || !state.pause) {
+            infoEl.textContent = state.workHoursActive ? 'Work hours: pausing locked'
+                : leftMins > 0 ? `${leftMins} min of pausing left today` : 'Pause budget used up today';
+            return;
+        }
+        const endsAt = state.pause.endsAt;
+        const tick = () => {
+            const ms = Math.max(0, endsAt - Date.now());
+            const m = Math.floor(ms / 60000);
+            const sec = Math.floor((ms % 60000) / 1000);
+            infoEl.textContent = `Resumes in ${m}:${String(sec).padStart(2, '0')}`;
+        };
+        tick();
+        _pauseTick = setInterval(tick, 1000);
+    }
+
+    // The pause can end from the background (alarm, shortcut), so follow the
+    // stored flag instead of assuming the page made the change.
+    chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === 'sync' && 'extensionEnabled' in changes) {
+            updateToggleButton(changes.extensionEnabled.newValue !== false);
+        }
+        // finishPause() writes the log after the flag flips, so refresh then.
+        if (area === 'local' && ('pauseLog' in changes || 'focusPause' in changes)) {
+            loadFocusReport().catch(() => {});
+        }
+    });
+
+    const takeEarnedBreakBtn = document.getElementById('takeEarnedBreakBtn');
+    if (takeEarnedBreakBtn) {
+        takeEarnedBreakBtn.addEventListener('click', async () => {
+            const resp = await chrome.runtime.sendMessage({ action: 'requestPause', kind: 'earned' });
+            if (!resp || !resp.ok) {
+                showStatus((resp && resp.error) || 'Could not start the break.', 'error');
+                return;
+            }
+            showStatus('Enjoy your earned break. Blocking switches back on automatically.', 'success');
+        });
+    }
+
+    const saveFocusSettingsBtn = document.getElementById('saveFocusSettingsBtn');
+    if (saveFocusSettingsBtn) {
+        saveFocusSettingsBtn.addEventListener('click', async () => {
+            const statusEl = document.getElementById('focusSettingsStatus');
+            const settings = {
+                pauseMinutes: parseInt(document.getElementById('pauseMinutesInput').value, 10),
+                dailyPauseBudgetMins: parseInt(document.getElementById('pauseBudgetInput').value, 10),
+                workHours: {
+                    enabled: document.getElementById('workHoursEnabled').checked,
+                    days: [...document.querySelectorAll('#workHoursDays input:checked')].map(cb => Number(cb.value)),
+                    startTime: document.getElementById('workHoursStart').value,
+                    endTime: document.getElementById('workHoursEnd').value
+                }
+            };
+            const resp = await chrome.runtime.sendMessage({ action: 'saveFocusSettings', settings });
+            if (statusEl) {
+                statusEl.textContent = resp && resp.ok ? 'Saved.' : ((resp && resp.error) || 'Could not save.');
+                statusEl.style.color = resp && resp.ok ? '#2e7d32' : '#c62828';
+                setTimeout(() => { statusEl.textContent = ''; }, 2500);
+            }
+            refreshFocusGuard();
+        });
     }
 
     function escapeHtml(str) {

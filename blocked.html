@@ -114,6 +114,8 @@
             color: var(--text-muted);
             border: 1px solid var(--border);
         }
+        #focusStreak { font-size: 15px; font-weight: 700; color: #ef6c00; margin: 0 0 20px; }
+        #focusStreak:empty { display: none; }
         .btn-secondary:hover { color: var(--text); border-color: var(--text-muted); }
     </style>
 </head>
@@ -124,6 +126,7 @@
     <p id="blockedMessage"></p>
     <p id="blockedFrom"></p>
     <blockquote id="motivationQuote"></blockquote>
+    <p id="focusStreak"></p>
     <div class="actions">
         <a class="btn btn-primary" href="#" id="goBackBtn" data-i18n="blockedPageGoBack">Go back</a>
         <a class="btn btn-secondary" id="settingsBtn"
