@@ -12,7 +12,6 @@
 
 ## Managing rules
 - **Groups** — organise rules into colour-coded groups you can switch on and off together.
-- **Prebuilt categories** — adds a whole list of social, news, video, gaming, adult or gambling sites in one click.
 - **Bulk add** — paste many sites at once, one per line.
 - **Per-rule exceptions** — allows specific pages inside an otherwise blocked site.
 - **Enable / disable single rules** — turns one rule off without deleting it.

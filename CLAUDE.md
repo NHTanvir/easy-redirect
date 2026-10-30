@@ -16,14 +16,13 @@ Options-page changes take effect the next time the options tab is opened or refr
 
 ## Architecture
 
-Four source files; state shared via `chrome.storage.sync`:
+Source files; state shared via `chrome.storage.sync`:
 
 | File | Role |
 |------|------|
 | `options.html` + `options.js` | Full-tab settings UI. Reads/writes storage, sends `updateRules` message after every mutation. Tabs wired by external `tabs.js` (MV3 CSP requires no inline scripts). |
 | `background.js` | Service worker. Owns DNR dynamic rules; rebuilds them on `onInstalled`, `onStartup`, `storage.onChanged`, and the `updateRules` message. `chrome.action.onClicked` opens options (no `default_popup`). |
 | `manifest.json` | MV3. Permissions: `storage`, `declarativeNetRequest`, `declarativeNetRequestFeedback`, `activeTab`, `alarms`, `notifications`, `<all_urls>`. `options_ui.open_in_tab: true`. |
-| `categories.js` | Static prebuilt category lists (social, news, video, gaming, adult, gambling). |
 
 ### DNR rule ID formula
 
