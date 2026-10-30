@@ -1295,9 +1295,6 @@
             <a class="nav-item" data-tab="settings">
                 <span class="nav-icon">&#x2699;&#xFE0F;</span> Settings
             </a>
-            <a class="nav-item" data-tab="focus">
-                <span class="nav-icon">&#x23F3;</span> Focus &amp; Timer
-            </a>
             <a class="nav-item" data-tab="blocked">
                 <span class="nav-icon">&#x1F6AB;</span> Blocked Page
             </a>
@@ -1540,6 +1537,122 @@
                 <div id="focusSettingsStatus" class="field-status"></div>
             </div>
 
+            <!-- Pomodoro -->
+            <div class="card" id="pomodoroSection">
+                <div class="card-title">Pomodoro Timer</div>
+                <p class="help-text" style="margin-bottom:14px;">
+                    Alternate between work sessions (rules active) and breaks (rules suspended).
+                    Keeps running in the background.
+                </p>
+                <div class="inline-row" style="margin-bottom:14px;gap:20px;">
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Work
+                        <input type="number" id="pomodoroWorkInput" min="1" max="120" step="1" value="25" style="width:60px;text-align:right;">
+                        min
+                    </label>
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Break
+                        <input type="number" id="pomodoroBreakInput" min="1" max="60" step="1" value="5" style="width:60px;text-align:right;">
+                        min
+                    </label>
+                </div>
+                <div class="inline-row" style="margin-bottom:8px;">
+                    <button id="pomodoroStartBtn" class="btn-success">&#9654; Start timer</button>
+                    <button id="pomodoroStopBtn" class="btn-danger">&#9632; Stop timer</button>
+                    <span id="pomodoroCountdown"></span>
+                </div>
+                <div id="pomodoroStatus" class="field-status"></div>
+                <div class="btn-row" style="margin-top:14px;">
+                    <button id="pomodoroToggleBtn" class="btn-success">Enable Pomodoro</button>
+                </div>
+            </div>
+
+            <!-- Lockdown -->
+            <div class="card" id="lockdownSection">
+                <div class="card-title">Lockdown / Focus Mode</div>
+                <p class="help-text" style="margin-bottom:12px;">
+                    Activate a hard lockdown for a fixed duration. While locked you
+                    <strong>cannot</strong> disable the extension, add or remove rules,
+                    or change the redirect URL. The lock expires automatically.
+                </p>
+                <div id="lockdownActivePanel" style="display:none;">
+                    <strong style="color:#B71C1C;">Lockdown active</strong>
+                    <span id="lockdownCountdown" style="margin-left:12px;font-variant-numeric:tabular-nums;font-weight:700;"></span>
+                    <p class="help-text" style="margin-top:4px;">You cannot modify rules until the countdown reaches zero.</p>
+                </div>
+                <div id="lockdownSetupPanel">
+                    <div class="inline-row" style="flex-wrap:wrap;margin-bottom:12px;">
+                        <label style="font-size:13px;display:flex;align-items:center;gap:6px;">
+                            Duration
+                            <input type="number" id="lockdownDurationInput" min="1" max="1440" step="1" value="60"
+                                   style="width:70px;">
+                            minutes
+                        </label>
+                        <label style="font-size:13px;display:flex;align-items:center;gap:6px;">
+                            Scope
+                            <select id="lockdownScopeSelect" style="width:auto;">
+                                <option value="all">All rules</option>
+                                <option value="groups">Current group only</option>
+                                <option value="allowlist-exempt">All except always-allowed</option>
+                            </select>
+                        </label>
+                    </div>
+                    <button id="lockdownActivateBtn" class="btn-danger">Activate lockdown</button>
+                    <div id="lockdownConfirmPanel">
+                        <p style="margin:0 0 6px;font-size:14px;font-weight:600;color:#B71C1C;">
+                            Are you sure? This cannot be cancelled once started.
+                        </p>
+                        <p style="margin:0 0 10px;font-size:13px;">Type <strong>LOCK</strong> to confirm:</p>
+                        <input type="text" id="lockdownConfirmInput" placeholder="LOCK"
+                               autocomplete="off" style="width:110px;">
+                        <button id="lockdownConfirmBtn" class="btn-danger" style="margin-left:8px;" disabled>Lock now</button>
+                        <button id="lockdownCancelBtn" class="btn-ghost" style="margin-left:6px;">Cancel</button>
+                    </div>
+                </div>
+                <div id="lockdownStatus" class="field-status"></div>
+            </div>
+
+            <!-- Disable delay -->
+            <div class="card" id="disableDelaySection">
+                <div class="card-title">Disable Delay</div>
+                <p class="help-text" style="margin-bottom:12px;">
+                    Wait this many seconds after pressing <strong>Disable</strong> before blocking stops.
+                    During the countdown, blocking remains active and the badge shows time remaining.
+                    Set to 0 for instant disable.
+                </p>
+                <div class="inline-row">
+                    <input type="number" id="disableDelayInput" min="0" max="300" step="1" value="0" style="width:80px;">
+                    <span class="text-muted" style="font-size:13px;">seconds (0 – 300)</span>
+                </div>
+                <div class="btn-row">
+                    <button id="saveDisableDelayBtn">Save</button>
+                </div>
+                <div id="disableDelayStatus" class="field-status"></div>
+            </div>
+
+            <div class="card" id="accessCodeSection">
+                <div class="card-title">Friction Code (adding rules &amp; pausing)</div>
+                <p class="help-text" style="margin-bottom:12px;">
+                    When enabled, a randomly generated code is shown each time you try to add a rule.
+                    You must type the full code (paste disabled) to save. Discourages impulsive additions.
+                </p>
+                <label class="check-row" style="margin-bottom:10px;">
+                    <input type="checkbox" id="accessCodeEnabled">
+                    <span>Enable friction code</span>
+                </label>
+                <div id="accessCodeLengthRow">
+                    <label class="field-label">
+                        Code length: <strong id="accessCodeLengthDisplay">64</strong> characters
+                    </label>
+                    <input type="range" id="accessCodeLength" min="32" max="256" step="8" value="64">
+                    <p class="help-text">Range: 32 – 256 characters. Default: 64.</p>
+                </div>
+                <div class="btn-row">
+                    <button id="saveAccessCodeBtn">Save</button>
+                </div>
+                <div id="accessCodeStatus" class="field-status"></div>
+            </div>
+
             <div class="card" id="focusReportSection">
                 <div class="card-title">Focus Report (last 7 days)</div>
                 <p class="help-text" style="margin-bottom:12px;">Pauses, earned breaks and blocked visits per day. Stored locally on this device.</p>
@@ -1656,104 +1769,6 @@
                     <button id="saveSubresourcesBtn">Save</button>
                 </div>
                 <div id="subresourcesStatus" class="field-status"></div>
-            </div>
-        </div>
-
-        <!-- ══════════════════ TAB: FOCUS & TIMER ══════════════════ -->
-        <div class="tab-panel" id="tab-focus">
-            <div class="panel-heading">Focus &amp; Timer</div>
-
-            <!-- Pomodoro -->
-            <div class="card" id="pomodoroSection">
-                <div class="card-title">Pomodoro Timer</div>
-                <p class="help-text" style="margin-bottom:14px;">
-                    Alternate between work sessions (rules active) and breaks (rules suspended).
-                    Keeps running in the background.
-                </p>
-                <div class="inline-row" style="margin-bottom:14px;gap:20px;">
-                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
-                        Work
-                        <input type="number" id="pomodoroWorkInput" min="1" max="120" step="1" value="25" style="width:60px;text-align:right;">
-                        min
-                    </label>
-                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
-                        Break
-                        <input type="number" id="pomodoroBreakInput" min="1" max="60" step="1" value="5" style="width:60px;text-align:right;">
-                        min
-                    </label>
-                </div>
-                <div class="inline-row" style="margin-bottom:8px;">
-                    <button id="pomodoroStartBtn" class="btn-success">&#9654; Start timer</button>
-                    <button id="pomodoroStopBtn" class="btn-danger">&#9632; Stop timer</button>
-                    <span id="pomodoroCountdown"></span>
-                </div>
-                <div id="pomodoroStatus" class="field-status"></div>
-                <div class="btn-row" style="margin-top:14px;">
-                    <button id="pomodoroToggleBtn" class="btn-success">Enable Pomodoro</button>
-                </div>
-            </div>
-
-            <!-- Lockdown -->
-            <div class="card" id="lockdownSection">
-                <div class="card-title">Lockdown / Focus Mode</div>
-                <p class="help-text" style="margin-bottom:12px;">
-                    Activate a hard lockdown for a fixed duration. While locked you
-                    <strong>cannot</strong> disable the extension, add or remove rules,
-                    or change the redirect URL. The lock expires automatically.
-                </p>
-                <div id="lockdownActivePanel" style="display:none;">
-                    <strong style="color:#B71C1C;">Lockdown active</strong>
-                    <span id="lockdownCountdown" style="margin-left:12px;font-variant-numeric:tabular-nums;font-weight:700;"></span>
-                    <p class="help-text" style="margin-top:4px;">You cannot modify rules until the countdown reaches zero.</p>
-                </div>
-                <div id="lockdownSetupPanel">
-                    <div class="inline-row" style="flex-wrap:wrap;margin-bottom:12px;">
-                        <label style="font-size:13px;display:flex;align-items:center;gap:6px;">
-                            Duration
-                            <input type="number" id="lockdownDurationInput" min="1" max="1440" step="1" value="60"
-                                   style="width:70px;">
-                            minutes
-                        </label>
-                        <label style="font-size:13px;display:flex;align-items:center;gap:6px;">
-                            Scope
-                            <select id="lockdownScopeSelect" style="width:auto;">
-                                <option value="all">All rules</option>
-                                <option value="groups">Current group only</option>
-                                <option value="allowlist-exempt">All except always-allowed</option>
-                            </select>
-                        </label>
-                    </div>
-                    <button id="lockdownActivateBtn" class="btn-danger">Activate lockdown</button>
-                    <div id="lockdownConfirmPanel">
-                        <p style="margin:0 0 6px;font-size:14px;font-weight:600;color:#B71C1C;">
-                            Are you sure? This cannot be cancelled once started.
-                        </p>
-                        <p style="margin:0 0 10px;font-size:13px;">Type <strong>LOCK</strong> to confirm:</p>
-                        <input type="text" id="lockdownConfirmInput" placeholder="LOCK"
-                               autocomplete="off" style="width:110px;">
-                        <button id="lockdownConfirmBtn" class="btn-danger" style="margin-left:8px;" disabled>Lock now</button>
-                        <button id="lockdownCancelBtn" class="btn-ghost" style="margin-left:6px;">Cancel</button>
-                    </div>
-                </div>
-                <div id="lockdownStatus" class="field-status"></div>
-            </div>
-
-            <!-- Disable delay -->
-            <div class="card" id="disableDelaySection">
-                <div class="card-title">Disable Delay</div>
-                <p class="help-text" style="margin-bottom:12px;">
-                    Wait this many seconds after pressing <strong>Disable</strong> before blocking stops.
-                    During the countdown, blocking remains active and the badge shows time remaining.
-                    Set to 0 for instant disable.
-                </p>
-                <div class="inline-row">
-                    <input type="number" id="disableDelayInput" min="0" max="300" step="1" value="0" style="width:80px;">
-                    <span class="text-muted" style="font-size:13px;">seconds (0 – 300)</span>
-                </div>
-                <div class="btn-row">
-                    <button id="saveDisableDelayBtn">Save</button>
-                </div>
-                <div id="disableDelayStatus" class="field-status"></div>
             </div>
         </div>
 
@@ -1906,30 +1921,6 @@
                     <button id="secRemoveBtn" class="btn-danger">Remove lock</button>
                 </div>
                 <div id="secStatus" class="field-status"></div>
-            </div>
-
-            <!-- Add-rule friction code -->
-            <div class="card" id="accessCodeSection">
-                <div class="card-title">Add-Rule Friction Code</div>
-                <p class="help-text" style="margin-bottom:12px;">
-                    When enabled, a randomly generated code is shown each time you try to add a rule.
-                    You must type the full code (paste disabled) to save. Discourages impulsive additions.
-                </p>
-                <label class="check-row" style="margin-bottom:10px;">
-                    <input type="checkbox" id="accessCodeEnabled">
-                    <span>Enable friction code</span>
-                </label>
-                <div id="accessCodeLengthRow">
-                    <label class="field-label">
-                        Code length: <strong id="accessCodeLengthDisplay">64</strong> characters
-                    </label>
-                    <input type="range" id="accessCodeLength" min="32" max="256" step="8" value="64">
-                    <p class="help-text">Range: 32 – 256 characters. Default: 64.</p>
-                </div>
-                <div class="btn-row">
-                    <button id="saveAccessCodeBtn">Save</button>
-                </div>
-                <div id="accessCodeStatus" class="field-status"></div>
             </div>
 
             <!-- Uninstall feedback URL -->
