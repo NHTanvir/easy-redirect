@@ -186,7 +186,7 @@ CSS custom properties on `:root` (light), `@media (prefers-color-scheme: dark)`,
 
 ## Git / PR workflow
 
-Feature branches: `feature-name` (kebab-case). All feature commits backdated to January 2026. After `gh pr merge --merge`, rewrite today-dated merge commits using `git commit-tree` (not `git filter-branch` — fails on Windows). Walk commits topologically oldest-first (`git rev-list --topo-order --reverse`), maintain old→new SHA map, finish with `git update-ref` + `git push --force`.
+Feature branches: `feature-name` (kebab-case). Commits use the real current date — never backdate commits or rewrite merge-commit dates. Make several small commits per feature rather than one large one.
 
 Author identity: the configured git user (`NHTanvir <naymulhasantanvir10@gmail.com>`). Do not override it.
 
