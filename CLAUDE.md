@@ -162,6 +162,10 @@ There is no permanent off switch. The sidebar toggle and `Ctrl+Shift+Y` go throu
 - Budget, streak and report use **local** dates (`todayLocal()`); `dailyCounts` and `weeklyStats` still use UTC.
 - Settings are saved through the `saveFocusSettings` message, which refuses during lockdown or work hours.
 
+### Roadmap Coach bridge
+
+`chrome.runtime.onMessageExternal` accepts messages only from `ROADMAP_COACH_IDS` (the unpacked Roadmap Coach extension at `~/Desktop/roadmap-coach`): `getBlockInfo` (sites from enabled domain/path/wildcard rules, on/paused, streak, points, earned minutes) and `grantEarnedBreak { mins }` (adds to `focusStats.earnedMins`, 60-min cap). Easy Redirect stays the only blocker when both are installed.
+
 ### Durability invariant — DO NOT REGRESS
 
 User data must **never** disappear except via Remove or Clear All. `onInstalled` uses `initializeMissingDefaults()` — only fills keys whose value is `undefined`, never overwrites. Every sync write is mirrored to local via `persist()`. `onInstalled`/`onStartup` call `restoreFromLocalIfSyncEmpty()` before setting defaults so a transient empty sync read can't clobber the local backup.

@@ -58,3 +58,6 @@
 - **Points & levels** — earns points for blocked visits and Pomodoro sessions, loses them for pauses, and levels you up.
 - **Reflection prompt** — before pausing, shows today's stats and makes you write a reason and wait 10 seconds.
 - **Focus report & pause history** — 7-day table of pauses, minutes paused, earned breaks and blocked visits, plus your recent pause reasons.
+
+## Works with Roadmap Coach
+- **Roadmap Coach bridge** — the Roadmap Coach extension can read what Easy Redirect blocks and grant an earned break here when its daily roadmap goal is met; Easy Redirect keeps doing all the blocking.
