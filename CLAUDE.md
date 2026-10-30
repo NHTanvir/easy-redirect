@@ -16,14 +16,13 @@ Options-page changes take effect the next time the options tab is opened or refr
 
 ## Architecture
 
-Four source files; state shared via `chrome.storage.sync`:
+Source files; state shared via `chrome.storage.sync`:
 
 | File | Role |
 |------|------|
 | `options.html` + `options.js` | Full-tab settings UI. Reads/writes storage, sends `updateRules` message after every mutation. Tabs wired by external `tabs.js` (MV3 CSP requires no inline scripts). |
 | `background.js` | Service worker. Owns DNR dynamic rules; rebuilds them on `onInstalled`, `onStartup`, `storage.onChanged`, and the `updateRules` message. `chrome.action.onClicked` opens options (no `default_popup`). |
 | `manifest.json` | MV3. Permissions: `storage`, `declarativeNetRequest`, `declarativeNetRequestFeedback`, `activeTab`, `alarms`, `notifications`, `<all_urls>`. `options_ui.open_in_tab: true`. |
-| `categories.js` | Static prebuilt category lists (social, news, video, gaming, adult, gambling). |
 
 ### DNR rule ID formula
 
@@ -187,7 +186,7 @@ CSS custom properties on `:root` (light), `@media (prefers-color-scheme: dark)`,
 
 ## Git / PR workflow
 
-Feature branches: `feature-name` (kebab-case). All feature commits backdated to January 2026. After `gh pr merge --merge`, rewrite today-dated merge commits using `git commit-tree` (not `git filter-branch` — fails on Windows). Walk commits topologically oldest-first (`git rev-list --topo-order --reverse`), maintain old→new SHA map, finish with `git update-ref` + `git push --force`.
+Feature branches: `feature-name` (kebab-case). Commits use the real current date — never backdate commits or rewrite merge-commit dates. Make several small commits per feature rather than one large one.
 
 Author identity: the configured git user (`NHTanvir <naymulhasantanvir10@gmail.com>`). Do not override it.
 
