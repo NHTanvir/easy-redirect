@@ -883,6 +883,16 @@ async function awardPomodoroSession() {
     await addPoints(POINTS_PER_SESSION);
 }
 
+// Earned minutes granted from outside (Roadmap Coach's daily goal). Same
+// cap as Pomodoro earnings; returns the new balance.
+async function grantEarnedMinutes(mins) {
+    const stats = await getFocusStats();
+    const add = Math.max(0, Math.min(EARNED_MINS_MAX, Math.round(Number(mins) || 0)));
+    stats.earnedMins = Math.min(EARNED_MINS_MAX, (stats.earnedMins || 0) + add);
+    await chrome.storage.local.set({ focusStats: stats });
+    return stats.earnedMins;
+}
+
 // Budget minutes already spent today, including the pause that is running now.
 async function getPauseUsedTodayMs() {
     const today = todayLocal();
@@ -1332,6 +1342,67 @@ chrome.runtime.onStartup.addListener(async () => {
 });
 
 // Listen for messages from popup
+// ---------------------------------------------------------------------------
+// Roadmap Coach bridge
+// ---------------------------------------------------------------------------
+// The Roadmap Coach extension (and only it) may read what Easy Redirect
+// blocks and grant earned break minutes when its daily roadmap goal is met.
+// Easy Redirect keeps doing all the blocking. Unpacked extension IDs come
+// from the folder path, so this ID is stable for ~/Desktop/roadmap-coach.
+
+const ROADMAP_COACH_IDS = ['nebknlihiblchhknlfcijcmoggjjofjg'];
+
+// Host (plus path) of every enabled rule that names a site; keyword and
+// regex rules can't be expressed as a site.
+function ruleSites(rules) {
+    const out = new Set();
+    for (const r of rules) {
+        if (r.enabled === false || !['domain', 'path', 'wildcard'].includes(r.type)) continue;
+        const site = String(r.pattern).toLowerCase()
+            .replace(/^[a-z*]+:\/\//, '').replace(/^\*\./, '').replace(/^www\./, '')
+            .replace(/\/\*$/, '').replace(/\*.*$/, '').replace(/\/+$/, '');
+        if (/^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/.test(site)) out.add(site);
+    }
+    return [...out];
+}
+
+async function getBlockInfo() {
+    const [sync, focus] = await Promise.all([
+        chrome.storage.sync.get(['rules', 'mode', 'extensionEnabled']),
+        getFocusState()
+    ]);
+    return {
+        ok: true,
+        mode: sync.mode || 'blocklist',
+        enabled: sync.extensionEnabled !== false,
+        sites: ruleSites(Array.isArray(sync.rules) ? sync.rules : []),
+        pause: focus.pause,
+        earnedMins: focus.earnedMins,
+        streak: focus.streak.current,
+        points: focus.points.total
+    };
+}
+
+chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => {
+    if (!sender || !ROADMAP_COACH_IDS.includes(sender.id)) return false;
+    if (request && request.action === 'getBlockInfo') {
+        getBlockInfo().then(sendResponse);
+        return true;
+    }
+    if (request && request.action === 'grantEarnedBreak') {
+        grantEarnedMinutes(request.mins).then(earnedMins => {
+            chrome.notifications.create(`roadmap-reward-${Date.now()}`, {
+                type: 'basic', iconUrl: 'icons/icon-48.png',
+                title: 'Easy Redirect — Break earned',
+                message: `Roadmap goal done! You earned ${Math.round(request.mins)} min of break (${earnedMins} min banked).`
+            });
+            sendResponse({ ok: true, earnedMins });
+        });
+        return true;
+    }
+    return false;
+});
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'getProfileInfo') {
         chrome.storage.sync.get(['profileName'], r => {
