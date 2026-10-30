@@ -1539,6 +1539,17 @@
                 </div>
                 <div id="focusSettingsStatus" class="field-status"></div>
             </div>
+
+            <div class="card" id="focusReportSection">
+                <div class="card-title">Focus Report (last 7 days)</div>
+                <p class="help-text" style="margin-bottom:12px;">Pauses, earned breaks and blocked visits per day. Stored locally on this device.</p>
+                <table class="focus-table" id="focusReportTable">
+                    <thead><tr><th>Day</th><th>Pauses</th><th>Min paused</th><th>Earned breaks</th><th>Blocked</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+                <div class="card-title" style="margin-top:20px;">Pause History</div>
+                <div id="pauseHistoryList"></div>
+            </div>
         </div>
 
         <div class="tab-panel" id="tab-settings">
@@ -1839,17 +1850,6 @@
                     <button id="clearStatsBtn" class="btn-danger">Clear stats</button>
                 </div>
                 <div id="statsStatus" class="field-status"></div>
-            </div>
-
-            <div class="card" id="focusReportSection">
-                <div class="card-title">Focus Report (last 7 days)</div>
-                <p class="help-text" style="margin-bottom:12px;">Pauses, earned breaks and blocked visits per day. Stored locally on this device.</p>
-                <table class="focus-table" id="focusReportTable">
-                    <thead><tr><th>Day</th><th>Pauses</th><th>Min paused</th><th>Earned breaks</th><th>Blocked</th></tr></thead>
-                    <tbody></tbody>
-                </table>
-                <div class="card-title" style="margin-top:20px;">Pause History</div>
-                <div id="pauseHistoryList"></div>
             </div>
         </div>
 
