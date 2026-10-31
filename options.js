@@ -24,14 +24,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const MODES = ['blocklist', 'allowlist'];
 
-    function applyTheme(theme) {
-        if (theme === 'dark') {
-            document.documentElement.setAttribute('data-theme', 'dark');
-        } else if (theme === 'light') {
-            document.documentElement.setAttribute('data-theme', 'light');
-        } else {
-            document.documentElement.removeAttribute('data-theme');
-        }
+    // Themes: applyTheme() / themeStep() come from theme.js (loaded in
+    // <head>). This only keeps the sidebar switcher's label in step.
+    function showThemeName(t) {
+        const nameEl = document.getElementById('themeName');
+        const countEl = document.getElementById('themeCount');
+        if (nameEl) nameEl.textContent = t.name;
+        if (countEl) countEl.textContent = `Theme ${THEMES.indexOf(t) + 1} of ${THEMES.length}`;
     }
 
     // Active group state — tracks which group tab is currently selected so
@@ -192,15 +191,16 @@ document.addEventListener('DOMContentLoaded', function() {
     modeAllowlistBtn.addEventListener('click', () => switchMode('allowlist'));
     document.getElementById('regexTestBtn').addEventListener('click', testRegexAgainstUrl);
 
-    // Wire the 3-way theme toggle — clicking saves to storage and applies immediately.
-    document.querySelectorAll('.theme-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            const theme = btn.dataset.theme;
-            await chrome.storage.sync.set({ theme });
-            applyTheme(theme);
-            document.querySelectorAll('.theme-btn').forEach(b => b.classList.toggle('active', b.dataset.theme === theme));
-        });
-    });
+    // Prev / Next theme: apply at once, then save (synced) so other devices
+    // and the next page load use it.
+    function stepTheme(dir) {
+        const t = applyTheme(themeStep(document.documentElement.dataset.theme, dir).id);
+        showThemeName(t);
+        chrome.storage.sync.set({ theme: t.id });
+    }
+    document.getElementById('themePrevBtn').addEventListener('click', () => stepTheme(-1));
+    document.getElementById('themeNextBtn').addEventListener('click', () => stepTheme(1));
+    showThemeName(THEME_BY_ID[document.documentElement.dataset.theme]);
 
     const shortcutsLink = document.getElementById('shortcutsLink');
     if (shortcutsLink) {
