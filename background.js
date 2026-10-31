@@ -2012,8 +2012,6 @@ function createRedirectRules(rules, redirectUrl, opts = {}) {
 
 async function _createRedirectRules(rules, redirectUrl, opts = {}) {
     try {
-        // Clear existing rules
-        await _clearAllRules();
 
         const mode = MODES.includes(opts.mode) ? opts.mode : 'blocklist';
         const alwaysAllowed = Array.isArray(opts.alwaysAllowed) ? opts.alwaysAllowed : [];
@@ -2310,21 +2308,24 @@ async function _createRedirectRules(rules, redirectUrl, opts = {}) {
             });
         });
 
-        if (dnrRules.length === 0) {
-            return;
-        }
+        // Never send the same ID twice (Chrome rejects the whole update).
+        const seen = new Set();
+        const unique = dnrRules.filter(r => {
+            if (seen.has(r.id)) { console.warn('[dnr] Dropped duplicate rule id', r.id); return false; }
+            seen.add(r.id);
+            return true;
+        });
 
-        // Add rules in batches to avoid hitting limits
-        const batchSize = 50;
-        for (let i = 0; i < dnrRules.length; i += batchSize) {
-            const batch = dnrRules.slice(i, i + batchSize);
-            await chrome.declarativeNetRequest.updateDynamicRules({
-                addRules: batch
-            });
-        }
+        // Replace the old rules with the new ones in one atomic update, so
+        // there is never a moment with half the rules (or none) installed.
+        const existing = await chrome.declarativeNetRequest.getDynamicRules();
+        await chrome.declarativeNetRequest.updateDynamicRules({
+            removeRuleIds: existing.map(r => r.id),
+            addRules: unique
+        });
 
         console.log(
-            `Created ${dnrRules.length} DNR rules in ${mode} mode ` +
+            `Created ${unique.length} DNR rules in ${mode} mode ` +
             `(${rules.length} source rules, ${allowedPatterns.length} always-allowed)`
         );
     } catch (error) {
