@@ -184,6 +184,9 @@ const DEFAULTS = {
     lockdownUntil: null,
     lockdownDurationSecs: 3600,
     lockdownScope: 'all',
+    // Who started the running lockdown: 'user' (Lockdown card) or 'coach'
+    // (Roadmap Coach study time). Shown on the Focus Guard tab.
+    lockdownSource: 'user',
     // Custom blocked page (feature #13). blockedPageEnabled switches the default
     // redirect URL from the user's chosen URL to the built-in blocked.html page.
     // blockedPageTitle / blockedMessage allow the user to customise the copy shown
@@ -1091,7 +1094,7 @@ async function finishPause() {
 // Snapshot for the options page: active pause plus the Focus Guard settings.
 async function getFocusState() {
     const [sync, local, usedMs, stats, opts] = await Promise.all([
-        chrome.storage.sync.get(['extensionEnabled', 'pauseMinutes', 'dailyPauseBudgetMins', 'workHours']),
+        chrome.storage.sync.get(['extensionEnabled', 'pauseMinutes', 'dailyPauseBudgetMins', 'workHours', 'lockdownUntil', 'lockdownSource']),
         chrome.storage.local.get(['focusPause', 'focusPoints']),
         getPauseUsedTodayMs(),
         getFocusStats(),
@@ -1104,6 +1107,9 @@ async function getFocusState() {
         pause: local.focusPause || null,
         budget: { totalMins: budgetMins, usedMs, remainingMs: Math.max(0, budgetMins * 60000 - usedMs) },
         workHoursActive: isWithinWorkHours(sync.workHours),
+        lockdown: typeof sync.lockdownUntil === 'number' && Date.now() < sync.lockdownUntil
+            ? { until: sync.lockdownUntil, source: sync.lockdownSource === 'coach' ? 'coach' : 'user' }
+            : null,
         streak: { current: streak, best: Math.max(stats.bestStreak || 0, streak) },
         earnedMins: Math.floor(stats.earnedMins || 0),
         points: Object.assign({ total: local.focusPoints || 0 }, levelForPoints(local.focusPoints || 0)),
@@ -1439,7 +1445,7 @@ async function startLockdownFromCoach(mins) {
     if (typeof before.lockdownUntil === 'number' && before.lockdownUntil >= endsAt) {
         return { ok: true, until: before.lockdownUntil, started: false };
     }
-    await startLockdown(secs, before.lockdownScope || 'all');
+    await startLockdown(secs, before.lockdownScope || 'all', 'coach');
     await persist({ lockdownDurationSecs: typeof before.lockdownDurationSecs === 'number' ? before.lockdownDurationSecs : DEFAULTS.lockdownDurationSecs });
     chrome.notifications.create(`coach-lockdown-${Date.now()}`, {
         type: 'basic', iconUrl: 'icons/icon-48.png',
@@ -1659,7 +1665,7 @@ const LOCKDOWN_MAX_SECS = 86400;
 // Start a lockdown session of `durationSecs` seconds (defaults to
 // lockdownDurationSecs from storage). Updates the cache immediately so
 // isLockedDown() reflects the new state without a round-trip.
-async function startLockdown(durationSecs, scope) {
+async function startLockdown(durationSecs, scope, source) {
     const result = await chrome.storage.sync.get(['lockdownDurationSecs']);
     const raw = typeof durationSecs === 'number' ? durationSecs
         : (typeof result.lockdownDurationSecs === 'number' ? result.lockdownDurationSecs : 3600);
@@ -1668,7 +1674,8 @@ async function startLockdown(durationSecs, scope) {
     await persist({
         lockdownUntil: endsAt,
         lockdownDurationSecs: secs,
-        lockdownScope: scope || 'all'
+        lockdownScope: scope || 'all',
+        lockdownSource: source === 'coach' ? 'coach' : 'user'
     });
     _lockdownUntilCache = endsAt;
     // Create an expiry alarm so the lockdown auto-ends even if the options page

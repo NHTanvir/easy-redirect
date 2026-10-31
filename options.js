@@ -1999,14 +1999,20 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         setInput('workHoursStart', wh.startTime);
         setInput('workHoursEnd', wh.endTime);
+        // A running lockdown also locks pausing and these settings. Say which
+        // lock it is, so a Roadmap Coach study lockdown isn't read as work hours.
+        const ld = state.lockdown;
+        const ldName = ld && ld.source === 'coach' ? 'Roadmap Coach study lockdown' : 'Lockdown';
+        const ldEnd = ld ? new Date(ld.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
         const whLine = document.getElementById('workHoursLine');
         if (whLine) {
             whLine.innerHTML = state.workHoursActive
                 ? `&#x1F512; Work hours now. Pausing is locked until <strong>${escapeHtml(wh.endTime)}</strong>.`
+                : ld ? `&#x1F512; ${ldName} (not work hours). Pausing and these settings are locked until <strong>${escapeHtml(ldEnd)}</strong>.`
                 : '';
         }
         document.querySelectorAll('.focus-card input, .focus-card select, .focus-save').forEach(el => {
-            el.disabled = state.workHoursActive;
+            el.disabled = state.workHoursActive || !!ld;
         });
 
         const infoEl = document.getElementById('pauseInfo');
@@ -2014,6 +2020,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!infoEl) return;
         if (state.enabled || !state.pause) {
             infoEl.textContent = state.workHoursActive ? 'Work hours: pausing locked'
+                : ld ? `${ldName} until ${ldEnd}`
                 : leftMins > 0 ? `${leftMins} min of pausing left today` : 'Pause budget used up today';
             return;
         }

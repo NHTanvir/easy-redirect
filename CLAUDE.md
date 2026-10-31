@@ -89,6 +89,7 @@ Redirect URL precedence: `rule.redirectUrl` > `group.redirectUrl` > global `redi
   lockdownUntil: number|null,    // ms epoch; null = not active
   lockdownDurationSecs: number,  // default 3600; max 86400
   lockdownScope: 'all'|'groups'|'allowlist-exempt',
+  lockdownSource: 'user'|'coach', // who started the running lockdown
   blockedPageEnabled: boolean,
   blockedPageTitle: string,
   blockedMessage: string,
