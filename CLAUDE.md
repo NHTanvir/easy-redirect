@@ -68,6 +68,15 @@ Redirect URL precedence: `rule.redirectUrl` > `group.redirectUrl` > global `redi
   pauseMinutes: number,          // Focus Guard pause length; default 5, 1–30
   dailyPauseBudgetMins: number,  // default 30, 0–120
   workHours: { enabled: boolean, days: number[], startTime: "HH:MM", endTime: "HH:MM" },
+  earnedMinsPerSession: number,  // default 5, 1–30   (ranges: FOCUS_NUMBERS in background.js)
+  earnedMinsMax: number,         // default 60, 5–240
+  pointsPerRedirect: number,     // default 1, 0–10
+  pointsPerSession: number,      // default 10, 0–100
+  pointsPerPause: number,        // default 15, 0–100 (subtracted)
+  reflectMinChars: number,       // default 15, 10–300
+  reflectWaitSecs: number,       // default 10, 5–120
+  reportDays: 7|14|30,           // default 7
+  streakOnBlockedPage: boolean,  // default true
   pomodoroEnabled: boolean,
   pomodoroState: 'off'|'work'|'break',
   pomodoroWorkMinutes: number,   // default 25
@@ -155,12 +164,13 @@ Redirect URL precedence: `rule.redirectUrl` > `group.redirectUrl` > global `redi
 
 There is no permanent off switch. The sidebar toggle and `Ctrl+Shift+Y` go through `requestPause()` / `resumeBlocking()` in background.js:
 
-- `requestPause()` checks lockdown, work hours, the daily budget and a 15+ char reason, writes `focusPause` to local **before** setting `extensionEnabled: false`, and schedules the `focusPauseEnd` alarm.
+- `requestPause()` checks lockdown, work hours, the daily budget and a reason of `reflectMinChars`, writes `focusPause` to local **before** setting `extensionEnabled: false`, and schedules the `focusPauseEnd` alarm.
 - The `storage.onChanged` guard reverts any `extensionEnabled: false` with no `focusPause` record. Turning back on calls `finishPause()`, which appends to `pauseLog`.
 - `reconcilePause()` runs on install/startup and switches back on when a pause expired while Chrome was closed (or a legacy disabled state has no record).
 - Kind `'earned'` pauses spend `focusStats.earnedMins` (+5 per finished Pomodoro work session) and skip the budget, streak and work-hours checks.
 - Budget, streak and report use **local** dates (`todayLocal()`); `dailyCounts` and `weeklyStats` still use UTC.
 - Settings are saved through the `saveFocusSettings` message, which refuses during lockdown or work hours.
+- Options UI: the **Focus Guard** tab has one numbered section per feature (1 Auto re-enable … 8 Focus report), each with its own Save button (`.focus-save`, all save the full set).
 
 ### Roadmap Coach bridge
 

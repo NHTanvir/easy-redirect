@@ -49,15 +49,15 @@
 - **Theme** — Auto, Light or Dark mode.
 - **Sync & backup** — settings sync across your Chrome devices and are mirrored locally so they can't vanish.
 
-## Focus Guard (new)
-- **Auto re-enable** — a pause ends by itself after the pause length (default 5 min).
-- **Daily pause budget** — caps total pausing per day (default 30 min).
+## Focus Guard (new) — all in the Focus Guard tab, one section each
+- **Auto re-enable** — a pause ends by itself after the pause length (default 5 min, adjustable 1–30).
+- **Daily pause budget** — caps total pausing per day (default 30 min, adjustable 0–120).
 - **Work-hours lock** — no pausing and no Focus Guard setting changes during chosen work hours.
-- **Focus streak** — counts days in a row without pausing, with your best streak.
-- **Earned breaks** — each finished Pomodoro work session earns 5 min of break that doesn't cost budget or streak.
-- **Points & levels** — earns points for blocked visits and Pomodoro sessions, loses them for pauses, and levels you up.
-- **Reflection prompt** — before pausing, shows today's stats and makes you write a reason and wait 10 seconds.
-- **Focus report & pause history** — 7-day table of pauses, minutes paused, earned breaks and blocked visits, plus your recent pause reasons.
+- **Focus streak** — counts days in a row without pausing, with your best streak; optional on the blocked page.
+- **Earned breaks** — each finished Pomodoro work session earns break minutes (default 5, bank up to 60, both adjustable) that don't cost budget or streak.
+- **Points & levels** — earns points for blocked visits and Pomodoro sessions, loses them for pauses (all three amounts adjustable), and levels you up.
+- **Reflection prompt** — before pausing, shows today's stats and makes you write a reason and wait (length and wait adjustable).
+- **Focus report & pause history** — 7/14/30-day table of pauses, minutes paused, earned breaks and blocked visits, plus your recent pause reasons.
 
 ## Works with Roadmap Coach
 - **Roadmap Coach bridge** — the Roadmap Coach extension can read what Easy Redirect blocks and grant an earned break here when its daily roadmap goal is met; Easy Redirect keeps doing all the blocking.
