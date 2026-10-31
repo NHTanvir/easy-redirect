@@ -3,6 +3,7 @@
   "default_locale": "en",
   "name": "__MSG_extensionName__",
   "version": "1.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAz48MNjuL2BObOLzxyRmV7GDN2RxAi3+qwoD0dmOs8t0mRw1CkNvN5e1ZQcTBsDeESwDGqcVVANxOcKYp1PxSuIMUuH//zAtccWTl0Ugm4O+eQQen1MhWgqaGl306uWgG1GLFHiBQDXy+eX4UnGf7wrQYYBafP4OmPhV9CU2UKcXsMk5d4tZVL3Xjyq/TXm9NqnAACADuXuNHNExdPbwaonzMB5XZuft/oYxsgl1ppW8E2DmDTpC0LTAdVczoYsK8IsbIh/nCnY6/Cch0QLFFV+J+pGGXZds0xxv/widxKfR/t2pDczTMHFoPuJrDRADtE2YFvNFGmoZtNhQNUiDP9wIDAQAB",
   "description": "__MSG_extensionDescription__",
   "icons": {
     "16": "icons/icon-16.png",
@@ -42,11 +43,17 @@
   },
   "commands": {
     "open-settings": {
-      "suggested_key": { "default": "Ctrl+Shift+B", "mac": "Command+Shift+B" },
+      "suggested_key": {
+        "default": "Ctrl+Shift+B",
+        "mac": "Command+Shift+B"
+      },
       "description": "__MSG_openSettingsDesc__"
     },
     "toggle-extension": {
-      "suggested_key": { "default": "Ctrl+Shift+Y", "mac": "Command+Shift+Y" },
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y",
+        "mac": "Command+Shift+Y"
+      },
       "description": "__MSG_toggleExtensionDesc__"
     }
   }

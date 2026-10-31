@@ -1,0 +1,16 @@
+# Local update server for the force-installed extensions. Serves
+# ~/.local/share/focus-extensions/www (built by deploy-extensions.sh) on
+# 127.0.0.1:8787 only. Install as a user service:
+#   cp tools/focus-extensions-server.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now focus-extensions-server
+[Unit]
+Description=Local update server for Easy Redirect and Roadmap Coach
+
+[Service]
+ExecStart=/usr/bin/python3 -m http.server 8787 --bind 127.0.0.1 --directory %h/.local/share/focus-extensions/www
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

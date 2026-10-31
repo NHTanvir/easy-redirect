@@ -176,7 +176,7 @@ There is no permanent off switch. The sidebar toggle and `Ctrl+Shift+Y` go throu
 
 ### Roadmap Coach bridge
 
-`chrome.runtime.onMessageExternal` accepts messages only from `ROADMAP_COACH_IDS` (the unpacked Roadmap Coach extension at `~/Desktop/roadmap-coach`): `getBlockInfo` (sites from enabled domain/path/wildcard rules, on/paused, streak, points, earned minutes) `grantEarnedBreak { mins }` (adds to `focusStats.earnedMins`, capped at `earnedMinsMax`) and `startLockdown { mins }` (`startLockdownFromCoach()`: Roadmap Coach's study-time lockdown; never shortens a longer running lockdown and keeps the user's `lockdownDurationSecs`). Easy Redirect stays the only blocker when both are installed.
+`chrome.runtime.onMessageExternal` accepts messages only from `ROADMAP_COACH_IDS` (Roadmap Coach's fixed ID, plus its old unpacked ID during the switch): `getBlockInfo` (sites from enabled domain/path/wildcard rules, on/paused, streak, points, earned minutes) `grantEarnedBreak { mins }` (adds to `focusStats.earnedMins`, capped at `earnedMinsMax`) and `startLockdown { mins }` (`startLockdownFromCoach()`: Roadmap Coach's study-time lockdown; never shortens a longer running lockdown and keeps the user's `lockdownDurationSecs`). Easy Redirect stays the only blocker when both are installed.
 
 ### Durability invariant — DO NOT REGRESS
 
@@ -201,6 +201,15 @@ Daily rotation: the first load of a new local day picks a random theme (never ye
 ### PIN / lock screen
 
 `protection` key holds PBKDF2-SHA256 hash+salt (SubtleCrypto, 200k iterations). `checkLock()` in options.js blocks the page until correct passphrase. Rate-limited: 10 failures → 60s backoff. Background gate: `updateRules` message requires `protectionOk: true`.
+
+## Force-install (both extensions)
+
+Easy Redirect and Roadmap Coach are force-installed with Chrome's `ExtensionInstallForcelist` policy, so they can't be disabled or removed. Their IDs are fixed by the public `key` in each `manifest.json` (same ID unpacked or packed): Easy Redirect `mmojifignfdbfkcacbcfbflnkfdcgood`, Roadmap Coach `ndhomdedcmiobobjnaeeiffflebkbiif`. The private signing keys live in `~/.config/focus-extensions/keys/` — never commit them.
+
+- **Ship a change:** merge it, then run `tools/deploy-extensions.sh` (packs both, bumps the version, publishes to `~/.local/share/focus-extensions/www`). Chrome picks it up on its next update check or restart.
+- **Update server:** `tools/focus-extensions-server.service` (systemd user unit) serves that folder on `127.0.0.1:8787`, including the roadmap README at `/roadmap/README.md`.
+- **Policy:** `tools/force-install-policy.json` → `/etc/opt/chrome/policies/managed/` (needs sudo; the user copies it).
+- **ID switch:** `tools/migrate-extension-storage.sh` copied the stored data from the old unpacked IDs (Chrome closed).
 
 ## Git / PR workflow
 
