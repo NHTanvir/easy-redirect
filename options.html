@@ -1466,51 +1466,72 @@
         <div class="tab-panel" id="tab-focus-guard">
             <div class="panel-heading">Focus Guard</div>
 
-            <!-- Focus Guard -->
-            <div class="card" id="focusGuardSection">
-                <div class="card-title">Focus Guard</div>
+            <!-- Focus Guard: overview -->
+            <div class="card focus-card" id="focusGuardSection">
+                <div class="card-title">Focus Guard &mdash; overview</div>
                 <p class="help-text" style="margin-bottom:14px;">
-                    <strong>Pause blocking</strong> never turns blocking off for good. It switches
-                    itself back on after the pause length below, and all pauses together can't go
-                    over the daily budget.
+                    <strong>Pause blocking</strong> never turns blocking off for good. Every Focus Guard
+                    feature has its own section and settings below.
                 </p>
                 <div class="stat-cards" id="focusStatCards">
                     <div class="stat-card">
-                        <div class="stat-value" id="focusStreakValue">—</div>
+                        <div class="stat-value" id="focusStreakValue">&mdash;</div>
                         <div class="stat-label">Focus streak</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-value" id="focusBestStreakValue">—</div>
+                        <div class="stat-value" id="focusBestStreakValue">&mdash;</div>
                         <div class="stat-label">Best streak</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-value" id="focusEarnedValue">—</div>
+                        <div class="stat-value" id="focusEarnedValue">&mdash;</div>
                         <div class="stat-label">Earned break (min)</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-value" id="focusPointsValue">—</div>
+                        <div class="stat-value" id="focusPointsValue">&mdash;</div>
                         <div class="stat-label" id="focusLevelLabel">Level</div>
                     </div>
                 </div>
-                <div id="focusLevelLine" class="help-text" style="margin:-8px 0 14px;"></div>
-                <div class="btn-row" style="margin:-6px 0 14px;">
-                    <button id="takeEarnedBreakBtn" class="btn-success">&#x2615; Take earned break</button>
-                    <span class="help-text" style="margin-top:0;">Each finished Pomodoro work session earns 5 min. Earned breaks don't use the budget, don't break the streak and work during work hours.</span>
-                </div>
-                <div id="pauseBudgetLine" style="font-size:13px;margin-bottom:12px;"></div>
-                <div class="inline-row" style="gap:20px;">
+                <div id="workHoursLine" style="font-size:13px;"></div>
+            </div>
+
+            <!-- 1. Auto re-enable -->
+            <div class="card focus-card">
+                <div class="card-title">1. Auto re-enable</div>
+                <p class="help-text" style="margin-bottom:12px;">A pause ends by itself after this long and blocking switches back on.</p>
+                <div class="inline-row">
                     <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
                         Pause length
-                        <input type="number" id="pauseMinutesInput" min="1" max="30" step="1" value="5" style="width:70px;text-align:right;">
-                        min
-                    </label>
-                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
-                        Daily budget
-                        <input type="number" id="pauseBudgetInput" min="0" max="120" step="1" value="30" style="width:70px;text-align:right;">
-                        min
+                        <input type="number" id="pauseMinutesInput" min="1" max="30" step="1" value="5" style="width:76px;text-align:right;">
+                        min (1&ndash;30)
                     </label>
                 </div>
-                <hr class="divider">
+                <div class="btn-row">
+                    <button class="focus-save">Save</button>
+                </div>
+                <div class="field-status focus-status"></div>
+            </div>
+
+            <!-- 2. Daily pause budget -->
+            <div class="card focus-card">
+                <div class="card-title">2. Daily pause budget</div>
+                <p class="help-text" style="margin-bottom:12px;">All pauses together can't go over this per day. Resets at local midnight.</p>
+                <div id="pauseBudgetLine" style="font-size:13px;margin-bottom:12px;"></div>
+                <div class="inline-row">
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Daily budget
+                        <input type="number" id="pauseBudgetInput" min="0" max="120" step="1" value="30" style="width:76px;text-align:right;">
+                        min (0&ndash;120)
+                    </label>
+                </div>
+                <div class="btn-row">
+                    <button class="focus-save">Save</button>
+                </div>
+                <div class="field-status focus-status"></div>
+            </div>
+
+            <!-- 3. Work-hours lock -->
+            <div class="card focus-card">
+                <div class="card-title">3. Work-hours lock</div>
                 <label class="check-row" style="margin-bottom:8px;">
                     <input type="checkbox" id="workHoursEnabled">
                     <span style="font-size:14px;">Lock pausing during work hours</span>
@@ -1529,13 +1550,126 @@
                     <span class="text-muted" style="font-size:13px;">to</span>
                     <input type="time" id="workHoursEnd" value="18:00" style="width:auto;">
                 </div>
-                <p class="help-text">While work hours are on, Pause is refused, a running pause ends, and these settings can't be changed.</p>
-                <div id="workHoursLine" style="font-size:13px;margin-top:8px;"></div>
+                <p class="help-text">While work hours are on, Pause is refused, a running pause ends, and Focus Guard settings can't be changed. Save before work starts.</p>
                 <div class="btn-row">
-                    <button id="saveFocusSettingsBtn">Save</button>
+                    <button class="focus-save">Save</button>
                 </div>
-                <div id="focusSettingsStatus" class="field-status"></div>
+                <div class="field-status focus-status"></div>
             </div>
+
+            <!-- 4. Focus streak -->
+            <div class="card focus-card">
+                <div class="card-title">4. Focus streak</div>
+                <p class="help-text" style="margin-bottom:12px;">Days in a row without a regular pause. A pause resets it to 0; earned breaks don't.</p>
+                <div id="focusStreakLine" style="font-size:13px;margin-bottom:10px;"></div>
+                <label class="check-row">
+                    <input type="checkbox" id="streakOnBlockedPage">
+                    <span style="font-size:14px;">Show my streak on the blocked page</span>
+                </label>
+                <div class="btn-row">
+                    <button class="focus-save">Save</button>
+                </div>
+                <div class="field-status focus-status"></div>
+            </div>
+
+            <!-- 5. Earned breaks -->
+            <div class="card focus-card">
+                <div class="card-title">5. Earned breaks</div>
+                <p class="help-text" style="margin-bottom:12px;">Finished Pomodoro work sessions (and Roadmap Coach goals) earn break minutes. An earned break doesn't use the budget, doesn't break the streak and works during work hours.</p>
+                <div id="focusEarnedLine" style="font-size:13px;margin-bottom:10px;"></div>
+                <div class="inline-row" style="gap:20px;">
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Earned per Pomodoro session
+                        <input type="number" id="earnedMinsPerSession" min="1" max="30" step="1" value="5" style="width:76px;text-align:right;">
+                        min (1&ndash;30)
+                    </label>
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Most you can bank
+                        <input type="number" id="earnedMinsMax" min="5" max="240" step="1" value="60" style="width:76px;text-align:right;">
+                        min (5&ndash;240)
+                    </label>
+                </div>
+                <div class="btn-row">
+                    <button id="takeEarnedBreakBtn" class="btn-success">&#x2615; Take earned break</button>
+                    <button class="focus-save">Save</button>
+                </div>
+                <div class="field-status focus-status"></div>
+            </div>
+
+            <!-- 6. Points & levels -->
+            <div class="card focus-card">
+                <div class="card-title">6. Points &amp; levels</div>
+                <div id="focusLevelLine" class="help-text" style="margin-bottom:12px;"></div>
+                <div class="inline-row" style="gap:20px;">
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Per blocked visit
+                        <input type="number" id="pointsPerRedirect" min="0" max="10" step="1" value="1" style="width:76px;text-align:right;">
+                        + (0&ndash;10)
+                    </label>
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Per Pomodoro session
+                        <input type="number" id="pointsPerSession" min="0" max="100" step="1" value="10" style="width:76px;text-align:right;">
+                        + (0&ndash;100)
+                    </label>
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Lost per pause
+                        <input type="number" id="pointsPerPause" min="0" max="100" step="1" value="15" style="width:76px;text-align:right;">
+                        &minus; (0&ndash;100)
+                    </label>
+                </div>
+                <p class="help-text">Levels: Beginner 0 &middot; Apprentice 50 &middot; Focused 150 &middot; Disciplined 300 &middot; Deep Worker 600 &middot; Master 1000 &middot; Legend 2000.</p>
+                <div class="btn-row">
+                    <button class="focus-save">Save</button>
+                </div>
+                <div class="field-status focus-status"></div>
+            </div>
+
+            <!-- 7. Reflection prompt -->
+            <div class="card focus-card">
+                <div class="card-title">7. Reflection prompt</div>
+                <p class="help-text" style="margin-bottom:12px;">Before a pause: today's stats, a written reason and a wait. With the Friction Code on (below), you also type the code.</p>
+                <div class="inline-row" style="gap:20px;">
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Reason at least
+                        <input type="number" id="reflectMinChars" min="10" max="300" step="1" value="15" style="width:76px;text-align:right;">
+                        characters (10&ndash;300)
+                    </label>
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Wait before Pause
+                        <input type="number" id="reflectWaitSecs" min="5" max="120" step="1" value="10" style="width:76px;text-align:right;">
+                        seconds (5&ndash;120)
+                    </label>
+                </div>
+                <div class="btn-row">
+                    <button class="focus-save">Save</button>
+                </div>
+                <div class="field-status focus-status"></div>
+            </div>
+
+            <div class="card focus-card" id="focusReportSection">
+                <div class="card-title">8. Focus report &amp; pause history</div>
+                <div class="inline-row" style="margin-bottom:10px;">
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Show the last
+                        <select id="reportDays" style="width:auto;">
+                            <option value="7">7 days</option>
+                            <option value="14">14 days</option>
+                            <option value="30">30 days</option>
+                        </select>
+                    </label>
+                    <button class="focus-save" style="margin-top:0;">Save</button>
+                    <span class="field-status focus-status" style="margin-top:0;"></span>
+                </div>
+                <p class="help-text" style="margin-bottom:12px;">Pauses, earned breaks and blocked visits per day. Stored locally on this device.</p>
+                <table class="focus-table" id="focusReportTable">
+                    <thead><tr><th>Day</th><th>Pauses</th><th>Min paused</th><th>Earned breaks</th><th>Blocked</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+                <div class="card-title" style="margin-top:20px;">Pause History</div>
+                <div id="pauseHistoryList"></div>
+            </div>
+
+            <div class="panel-heading" style="margin-top:28px;">Related focus tools</div>
 
             <!-- Pomodoro -->
             <div class="card" id="pomodoroSection">
@@ -1653,16 +1787,6 @@
                 <div id="accessCodeStatus" class="field-status"></div>
             </div>
 
-            <div class="card" id="focusReportSection">
-                <div class="card-title">Focus Report (last 7 days)</div>
-                <p class="help-text" style="margin-bottom:12px;">Pauses, earned breaks and blocked visits per day. Stored locally on this device.</p>
-                <table class="focus-table" id="focusReportTable">
-                    <thead><tr><th>Day</th><th>Pauses</th><th>Min paused</th><th>Earned breaks</th><th>Blocked</th></tr></thead>
-                    <tbody></tbody>
-                </table>
-                <div class="card-title" style="margin-top:20px;">Pause History</div>
-                <div id="pauseHistoryList"></div>
-            </div>
         </div>
 
         <div class="tab-panel" id="tab-settings">
