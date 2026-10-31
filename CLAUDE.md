@@ -167,14 +167,14 @@ There is no permanent off switch. The sidebar toggle and `Ctrl+Shift+Y` go throu
 - `requestPause()` checks lockdown, work hours, the daily budget and a reason of `reflectMinChars`, writes `focusPause` to local **before** setting `extensionEnabled: false`, and schedules the `focusPauseEnd` alarm.
 - The `storage.onChanged` guard reverts any `extensionEnabled: false` with no `focusPause` record. Turning back on calls `finishPause()`, which appends to `pauseLog`.
 - `reconcilePause()` runs on install/startup and switches back on when a pause expired while Chrome was closed (or a legacy disabled state has no record).
-- Kind `'earned'` pauses spend `focusStats.earnedMins` (+5 per finished Pomodoro work session) and skip the budget, streak and work-hours checks.
+- Kind `'earned'` pauses spend `focusStats.earnedMins` (+`earnedMinsPerSession` per finished Pomodoro work session, capped at `earnedMinsMax`) and skip the budget, streak and work-hours checks.
 - Budget, streak and report use **local** dates (`todayLocal()`); `dailyCounts` and `weeklyStats` still use UTC.
 - Settings are saved through the `saveFocusSettings` message, which refuses during lockdown or work hours.
 - Options UI: the **Focus Guard** tab has one numbered section per feature (1 Auto re-enable … 8 Focus report), each with its own Save button (`.focus-save`, all save the full set).
 
 ### Roadmap Coach bridge
 
-`chrome.runtime.onMessageExternal` accepts messages only from `ROADMAP_COACH_IDS` (the unpacked Roadmap Coach extension at `~/Desktop/roadmap-coach`): `getBlockInfo` (sites from enabled domain/path/wildcard rules, on/paused, streak, points, earned minutes) and `grantEarnedBreak { mins }` (adds to `focusStats.earnedMins`, 60-min cap). Easy Redirect stays the only blocker when both are installed.
+`chrome.runtime.onMessageExternal` accepts messages only from `ROADMAP_COACH_IDS` (the unpacked Roadmap Coach extension at `~/Desktop/roadmap-coach`): `getBlockInfo` (sites from enabled domain/path/wildcard rules, on/paused, streak, points, earned minutes) and `grantEarnedBreak { mins }` (adds to `focusStats.earnedMins`, capped at `earnedMinsMax`). Easy Redirect stays the only blocker when both are installed.
 
 ### Durability invariant — DO NOT REGRESS
 
