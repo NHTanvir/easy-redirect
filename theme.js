@@ -3,8 +3,13 @@
 //
 // Every theme from themes.js becomes one CSS rule, :root[data-theme="<id>"],
 // in a <style> element; switching themes only changes the data-theme
-// attribute (no inline styles). The choice is stored in chrome.storage.sync
-// as `theme` and cached in localStorage.erTheme for the synchronous boot.
+// attribute (no inline styles).
+//
+// The theme rotates daily: on the first page load of a new local day a
+// random theme is picked (never yesterday's). Prev / Next change today's
+// theme. Today's choice is cached in localStorage.erTheme as { date, id } for
+// the synchronous boot and synced as `theme` + `themeDate` (options.js), so
+// every device shows the same theme on the same day.
 
 const THEME_DEFAULT = 'midnight';
 
@@ -44,7 +49,35 @@ function installThemeRules() {
     document.head.appendChild(style);
 }
 
-// Apply a theme by id and remember it locally. Returns the theme.
+function themeToday(d = new Date()) {
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function readThemeCache() {
+    try {
+        const raw = localStorage.getItem('erTheme');
+        if (!raw) return null;
+        if (raw.startsWith('{')) return JSON.parse(raw);
+        return { date: null, id: raw }; // older cache: a bare id
+    } catch (_) { return null; }
+}
+
+// Random theme, never `avoidId` (yesterday's).
+function randomTheme(avoidId) {
+    const pool = THEMES.filter(t => t.id !== avoidId);
+    return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// Today's theme id: the cached one if it was set today, otherwise a new
+// random pick for the new day.
+function todaysThemeId() {
+    const cache = readThemeCache();
+    if (cache && cache.date === themeToday() && THEME_BY_ID[cache.id]) return cache.id;
+    return randomTheme(cache && cache.id).id;
+}
+
+// Apply a theme by id and remember it as today's. Returns the theme.
 function applyTheme(id) {
     const t = THEME_BY_ID[themeIdOrDefault(id)];
     installThemeRules();
@@ -52,7 +85,7 @@ function applyTheme(id) {
     root.dataset.theme = t.id;
     root.dataset.card = t.card || 'flat';
     root.dataset.heading = t.heading || 'normal';
-    try { localStorage.setItem('erTheme', t.id); } catch (_) {}
+    try { localStorage.setItem('erTheme', JSON.stringify({ date: themeToday(), id: t.id })); } catch (_) {}
     return t;
 }
 
@@ -62,6 +95,4 @@ function themeStep(currentId, dir) {
     return THEMES[(i + dir + THEMES.length) % THEMES.length];
 }
 
-let _bootTheme = THEME_DEFAULT;
-try { _bootTheme = localStorage.getItem('erTheme') || THEME_DEFAULT; } catch (_) {}
-applyTheme(_bootTheme);
+applyTheme(todaysThemeId());
