@@ -506,10 +506,13 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('rulesHeading').textContent =
                 mode === 'allowlist' ? 'Allowed Sites (Allowlist mode)' : 'Block Rules';
 
-            // Apply saved theme preference, highlighting the active toggle button.
-            const theme = result.theme || 'auto';
-            applyTheme(theme);
-            document.querySelectorAll('.theme-btn').forEach(b => b.classList.toggle('active', b.dataset.theme === theme));
+            // Apply the synced theme (it may have been changed on another
+            // device since localStorage cached it). Old 'auto' / 'light' /
+            // 'dark' values are not theme ids: show Midnight and store it.
+            const savedTheme = themeIdOrDefault(result.theme);
+            if (document.documentElement.dataset.theme !== savedTheme) applyTheme(savedTheme);
+            showThemeName(THEME_BY_ID[savedTheme]);
+            if (result.theme !== savedTheme) chrome.storage.sync.set({ theme: savedTheme });
         loadSecuritySection();
         // Populate access code settings (feature #18).
         const ac = result.accessCode || { enabled: false, length: 64 };
