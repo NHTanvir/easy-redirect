@@ -1884,7 +1884,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 const len = reasonEl.value.trim().length;
                 const waitLeft = Math.max(0, REFLECT_WAIT_SECS - Math.floor((Date.now() - openedAt) / 1000));
                 const codeOk = !code || codeInput.value === code;
-                hintEl.textContent = len < REFLECT_MIN_CHARS ? `${REFLECT_MIN_CHARS - len} more characters needed.` : '';
+                const need = REFLECT_MIN_CHARS - len;
+                hintEl.textContent = need > 0 ? `${need} more character${need === 1 ? '' : 's'} needed.` : '';
                 pauseBtn.disabled = len < REFLECT_MIN_CHARS || waitLeft > 0 || !codeOk;
                 pauseBtn.textContent = waitLeft > 0 ? `Pause (wait ${waitLeft}s)` : `Pause for ${pauseMins} min`;
             }
