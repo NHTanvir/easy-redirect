@@ -60,4 +60,4 @@
 - **Focus report & pause history** — 7/14/30-day table of pauses, minutes paused, earned breaks and blocked visits, plus your recent pause reasons.
 
 ## Works with Roadmap Coach
-- **Roadmap Coach bridge** — the Roadmap Coach extension can read what Easy Redirect blocks and grant an earned break here when its daily roadmap goal is met; Easy Redirect keeps doing all the blocking.
+- **Roadmap Coach bridge** — the Roadmap Coach extension can read what Easy Redirect blocks, grant an earned break here when its daily roadmap goal is met, and start a lockdown at your study time; Easy Redirect keeps doing all the blocking.
