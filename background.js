@@ -111,9 +111,10 @@ const DEFAULTS = {
     // shows an interstitial countdown page before completing the redirect. After
     // the countdown, the user is allowed through for `allowWindowSecs` seconds.
     groups: [{ id: 'default', name: 'Default', color: '#2196F3', enabled: true, redirectUrl: null, schedule: null, delaySeconds: 0, allowWindowSecs: 0 }],
-    // User theme preference: 'auto' defers to prefers-color-scheme, 'light' forces
-    // light regardless of OS setting, 'dark' forces dark regardless of OS setting.
-    theme: 'auto',
+    // Options-page theme: the id of one of the 30 dark themes in themes.js,
+    // changed with Prev / Next in the sidebar. Older 'auto' / 'light' /
+    // 'dark' values are migrated to 'midnight' by options.js on load.
+    theme: 'midnight',
     // PIN / password protection settings. mode is 'none' (no lock),
     // 'pin' (numeric PIN), or 'password' (arbitrary passphrase). hash and salt
     // are Base64-encoded PBKDF2-SHA256 output and random salt respectively.
