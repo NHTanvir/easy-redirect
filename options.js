@@ -24,14 +24,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const MODES = ['blocklist', 'allowlist'];
 
-    function applyTheme(theme) {
-        if (theme === 'dark') {
-            document.documentElement.setAttribute('data-theme', 'dark');
-        } else if (theme === 'light') {
-            document.documentElement.setAttribute('data-theme', 'light');
-        } else {
-            document.documentElement.removeAttribute('data-theme');
-        }
+    // Themes: applyTheme() / themeStep() come from theme.js (loaded in
+    // <head>). This only keeps the sidebar switcher's label in step.
+    function showThemeName(t) {
+        const nameEl = document.getElementById('themeName');
+        const countEl = document.getElementById('themeCount');
+        if (nameEl) nameEl.textContent = t.name;
+        if (countEl) countEl.textContent = `Theme ${THEMES.indexOf(t) + 1} of ${THEMES.length}`;
     }
 
     // Active group state — tracks which group tab is currently selected so
@@ -192,15 +191,16 @@ document.addEventListener('DOMContentLoaded', function() {
     modeAllowlistBtn.addEventListener('click', () => switchMode('allowlist'));
     document.getElementById('regexTestBtn').addEventListener('click', testRegexAgainstUrl);
 
-    // Wire the 3-way theme toggle — clicking saves to storage and applies immediately.
-    document.querySelectorAll('.theme-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            const theme = btn.dataset.theme;
-            await chrome.storage.sync.set({ theme });
-            applyTheme(theme);
-            document.querySelectorAll('.theme-btn').forEach(b => b.classList.toggle('active', b.dataset.theme === theme));
-        });
-    });
+    // Prev / Next change today's theme: apply at once, then sync it with
+    // today's date so other devices show the same one. Tomorrow rotates again.
+    function stepTheme(dir) {
+        const t = applyTheme(themeStep(document.documentElement.dataset.theme, dir).id);
+        showThemeName(t);
+        chrome.storage.sync.set({ theme: t.id, themeDate: themeToday() });
+    }
+    document.getElementById('themePrevBtn').addEventListener('click', () => stepTheme(-1));
+    document.getElementById('themeNextBtn').addEventListener('click', () => stepTheme(1));
+    showThemeName(THEME_BY_ID[document.documentElement.dataset.theme]);
 
     const shortcutsLink = document.getElementById('shortcutsLink');
     if (shortcutsLink) {
@@ -440,7 +440,7 @@ document.addEventListener('DOMContentLoaded', function() {
         applyI18n();
         try {
             const result = await chrome.storage.sync.get([
-                'redirectUrl', 'rules', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups', 'theme',
+                'redirectUrl', 'rules', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups', 'theme', 'themeDate',
                 'accessCode', 'uninstallUrl', 'disableDelaySecs',
                 'pomodoroWorkMinutes', 'pomodoroBreakMinutes',
                 'blockedPageEnabled', 'blockedPageTitle', 'blockedMessage',
@@ -506,10 +506,17 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('rulesHeading').textContent =
                 mode === 'allowlist' ? 'Allowed Sites (Allowlist mode)' : 'Block Rules';
 
-            // Apply saved theme preference, highlighting the active toggle button.
-            const theme = result.theme || 'auto';
-            applyTheme(theme);
-            document.querySelectorAll('.theme-btn').forEach(b => b.classList.toggle('active', b.dataset.theme === theme));
+            // Daily rotation: if another device already set today's theme,
+            // use it; otherwise today's local pick (theme.js) becomes the
+            // synced one. Old 'auto' / 'light' / 'dark' values are simply
+            // replaced by today's pick.
+            const today = themeToday();
+            if (result.themeDate === today && THEME_BY_ID[result.theme]) {
+                if (document.documentElement.dataset.theme !== result.theme) applyTheme(result.theme);
+            } else {
+                chrome.storage.sync.set({ theme: document.documentElement.dataset.theme, themeDate: today });
+            }
+            showThemeName(THEME_BY_ID[document.documentElement.dataset.theme]);
         loadSecuritySection();
         // Populate access code settings (feature #18).
         const ac = result.accessCode || { enabled: false, length: 64 };

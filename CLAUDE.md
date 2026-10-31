@@ -22,6 +22,7 @@ Source files; state shared via `chrome.storage.sync`:
 |------|------|
 | `options.html` + `options.js` | Full-tab settings UI. Reads/writes storage, sends `updateRules` message after every mutation. Tabs wired by external `tabs.js` (MV3 CSP requires no inline scripts). |
 | `background.js` | Service worker. Owns DNR dynamic rules; rebuilds them on `onInstalled`, `onStartup`, `storage.onChanged`, and the `updateRules` message. `chrome.action.onClicked` opens options (no `default_popup`). |
+| `themes.js` + `theme.js` | 30 dark themes and the daily-rotating theme engine (options, blocked and countdown pages). |
 | `manifest.json` | MV3. Permissions: `storage`, `declarativeNetRequest`, `declarativeNetRequestFeedback`, `activeTab`, `alarms`, `notifications`, `<all_urls>`. `options_ui.open_in_tab: true`. |
 
 ### DNR rule ID formula
@@ -60,7 +61,8 @@ Redirect URL precedence: `rule.redirectUrl` > `group.redirectUrl` > global `redi
   alwaysAllowed: string[],
   schemaVersion: number,         // 2 after migration
   groups: Group[],               // always has Default
-  theme: 'auto'|'light'|'dark',
+  theme: string,                 // id from themes.js (default 'midnight'); rotates daily
+  themeDate: string|null,        // local date the theme was chosen
   protection: { mode: 'none'|'pin', hash: string|null, salt: string|null },
   accessCode: { enabled: boolean, length: number },
   uninstallUrl: string,
@@ -192,7 +194,9 @@ Options-page mutations trigger rule rebuilds twice: explicit `sendMessage({actio
 
 ### Theme system
 
-CSS custom properties on `:root` (light), `@media (prefers-color-scheme: dark)`, and `[data-theme=dark/light]` (highest). `applyTheme()` in options.js sets the `data-theme` attribute and uses `classList.toggle('active')` on theme buttons — never inline styles (they override CSS).
+All themes are dark. `themes.js` (same file as in Roadmap Coach) lists 30 themes; `theme.js` (loaded in `<head>` of options, blocked and countdown pages) turns each into a `:root[data-theme="<id>"]` rule that maps it onto the page's CSS variables (plus `--font`, `--radius`, `--page-bg`, `--card-shadow`, `--on-accent`, and `data-card` / `data-heading` variants). `applyTheme(id)` only sets data attributes — never inline styles.
+
+Daily rotation: the first load of a new local day picks a random theme (never yesterday's), cached as `localStorage.erTheme = { date, id }`. Sidebar ◀ / ▶ (`themeStep`) change today's theme. options.js syncs `theme` + `themeDate`; a theme already chosen today on another device wins. Unknown values (old `'auto'|'light'|'dark'`) are replaced by today's pick.
 
 ### PIN / lock screen
 

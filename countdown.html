@@ -4,30 +4,25 @@
     <meta charset="utf-8">
     <title>Easy Redirect — Redirecting…</title>
     <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+    <script src="themes.js"></script>
+    <script src="theme.js"></script>
     <style>
+        /* Dark defaults (Midnight); theme.js applies the chosen theme via
+           :root[data-theme="<id>"]. The allow button uses the theme's green. */
         :root {
-            --bg: #fafafa;
-            --bg-card: #fff;
-            --text: #222;
-            --text-muted: #666;
-            --border: #ddd;
-            --accent: #e53935;
-            --accent-muted: #fdecea;
-            --btn-allow: #4caf50;
-            --btn-allow-hover: #388e3c;
-        }
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --bg: #121212;
-                --bg-card: #1e1e1e;
-                --text: #e0e0e0;
-                --text-muted: #9e9e9e;
-                --border: #333;
-                --accent: #ef5350;
-                --accent-muted: #3a1010;
-                --btn-allow: #388e3c;
-                --btn-allow-hover: #2e7d32;
-            }
+            --bg: #0F1120;
+            --bg-card: #191C30;
+            --text: #E8EAF6;
+            --text-muted: #9095AD;
+            --border: #2A2E48;
+            --accent: #E53935;
+            --accent-muted: var(--accent-light, rgba(229,57,53,.18));
+            --btn-allow: var(--green, #43A047);
+            --btn-allow-hover: var(--green, #388E3C);
+            --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+            --radius: 10px;
+            --page-bg: var(--bg);
+            color-scheme: dark;
         }
         body {
             margin: 0;
@@ -35,8 +30,8 @@
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-            background: var(--bg);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+            background: var(--page-bg);
+            font-family: var(--font);
             color: var(--text);
         }
         .card {
@@ -44,7 +39,7 @@
             width: 90%;
             background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: 10px;
+            border-radius: var(--radius);
             padding: 36px 32px;
             text-align: center;
             box-shadow: 0 2px 12px rgba(0,0,0,.08);

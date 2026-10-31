@@ -46,7 +46,7 @@
 - **Profile name** — labels this Chrome profile's rule set.
 - **Uninstall feedback URL** — opens a page of your choice when the extension is removed.
 - **Keyboard shortcuts** — `Ctrl+Shift+B` opens settings, `Ctrl+Shift+Y` resumes blocking.
-- **Theme** — Auto, Light or Dark mode.
+- **Themes** — 30 dark themes (own colours, font, corners, background); a random one every day, change it with ◀ ▶ in the sidebar.
 - **Sync & backup** — settings sync across your Chrome devices and are mirrored locally so they can't vanish.
 
 ## Focus Guard (new) — all in the Focus Guard tab, one section each
