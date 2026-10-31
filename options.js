@@ -591,7 +591,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const totals = cols.map(c => report.days.reduce((sum, day) => sum + day[c], 0));
         let tfoot = table.querySelector('tfoot');
         if (!tfoot) { tfoot = document.createElement('tfoot'); table.appendChild(tfoot); }
-        tfoot.innerHTML = `<tr><td>7-day total</td>${totals.map(t => `<td>${t}</td>`).join('')}</tr>`;
+        tfoot.innerHTML = `<tr><td>${report.days.length}-day total</td>${totals.map(t => `<td>${t}</td>`).join('')}</tr>`;
         renderPauseHistory(report.recent);
     }
 
@@ -1834,15 +1834,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Reflection prompt shown before every regular pause. Shows today's
-    // numbers, asks for a written reason, waits REFLECT_WAIT_SECS and, when the
+    // numbers, asks for a written reason (reflectMinChars), waits
+    // reflectWaitSecs (both Focus Guard settings) and, when the
     // access code is enabled, asks for that too. Resolves to the reason, or
     // null when the user stays focused. Refusals that need no reflection
     // (work hours, budget used up) resolve straight away so the background
     // can report them.
-    const REFLECT_MIN_CHARS = 15;
-    const REFLECT_WAIT_SECS = 10;
     async function _showReflection() {
         const state = await chrome.runtime.sendMessage({ action: 'getFocusState' });
+        const REFLECT_MIN_CHARS = state.settings.reflectMinChars;
+        const REFLECT_WAIT_SECS = state.settings.reflectWaitSecs;
         if (state.workHoursActive || state.budget.remainingMs < 60000) return '';
 
         const statsResp = await chrome.runtime.sendMessage({ action: 'getWeeklyStats' }).catch(() => null);
@@ -1867,7 +1868,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('reflectStats').innerHTML = [
             `\u{1F6AB} <strong>${redirects}</strong> distraction${redirects === 1 ? '' : 's'} blocked today`,
             streakNote,
-            `\u2B50 <strong>${state.points.total}</strong> points (\u221215 if you pause)`,
+            `\u2B50 <strong>${state.points.total}</strong> points (\u2212${state.settings.pointsPerPause} if you pause)`,
             `\u23F3 <strong>${Math.floor(state.budget.remainingMs / 60000)} min</strong> of pause budget left today`
         ].map(li => `<li>${li}</li>`).join('');
         reasonEl.value = '';
@@ -1883,7 +1884,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 const len = reasonEl.value.trim().length;
                 const waitLeft = Math.max(0, REFLECT_WAIT_SECS - Math.floor((Date.now() - openedAt) / 1000));
                 const codeOk = !code || codeInput.value === code;
-                hintEl.textContent = len < REFLECT_MIN_CHARS ? `${REFLECT_MIN_CHARS - len} more characters needed.` : '';
+                const need = REFLECT_MIN_CHARS - len;
+                hintEl.textContent = need > 0 ? `${need} more character${need === 1 ? '' : 's'} needed.` : '';
                 pauseBtn.disabled = len < REFLECT_MIN_CHARS || waitLeft > 0 || !codeOk;
                 pauseBtn.textContent = waitLeft > 0 ? `Pause (wait ${waitLeft}s)` : `Pause for ${pauseMins} min`;
             }
@@ -1937,12 +1939,19 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         setInput('pauseMinutesInput', state.settings.pauseMinutes);
         setInput('pauseBudgetInput', state.settings.dailyPauseBudgetMins);
+        ['earnedMinsPerSession', 'earnedMinsMax', 'pointsPerRedirect', 'pointsPerSession',
+            'pointsPerPause', 'reflectMinChars', 'reflectWaitSecs', 'reportDays']
+            .forEach(k => setInput(k, state.settings[k]));
+        const streakToggle = document.getElementById('streakOnBlockedPage');
+        if (streakToggle) streakToggle.checked = state.settings.streakOnBlockedPage !== false;
 
         const days = n => `${n} day${n === 1 ? '' : 's'}`;
         const streakEl = document.getElementById('focusStreakValue');
         if (streakEl) streakEl.textContent = `\u{1F525} ${state.streak.current}`;
         const bestEl = document.getElementById('focusBestStreakValue');
         if (bestEl) bestEl.textContent = state.streak.best;
+        const streakLine = document.getElementById('focusStreakLine');
+        if (streakLine) streakLine.innerHTML = `Current: <strong>\u{1F525} ${days(state.streak.current)}</strong> &middot; Best: <strong>${days(state.streak.best)}</strong>`;
         const sideStreak = document.getElementById('sidebarStreak');
         if (sideStreak) {
             sideStreak.textContent = state.streak.current > 0
@@ -1959,13 +1968,15 @@ document.addEventListener('DOMContentLoaded', function() {
             lvlLine.textContent = (pts.nextAt === null
                 ? 'Top level reached.'
                 : `${pts.nextAt - pts.total} points to the next level.`) +
-                ' +1 per redirect, +10 per Pomodoro session, \u221215 per pause.';
+                ` Now: ${pts.total} points, level ${pts.level} (${pts.name}).`;
         }
 
         const earnedEl = document.getElementById('focusEarnedValue');
         if (earnedEl) earnedEl.textContent = state.earnedMins;
         const earnedBtn = document.getElementById('takeEarnedBreakBtn');
         if (earnedBtn) earnedBtn.disabled = !state.enabled || state.earnedMins < 1;
+        const earnedLine = document.getElementById('focusEarnedLine');
+        if (earnedLine) earnedLine.innerHTML = `Banked: <strong>${state.earnedMins} of ${state.settings.earnedMinsMax} min</strong>`;
 
         const leftMins = Math.floor(state.budget.remainingMs / 60000);
         const budgetEl = document.getElementById('pauseBudgetLine');
@@ -1987,7 +1998,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 ? `&#x1F512; Work hours now. Pausing is locked until <strong>${escapeHtml(wh.endTime)}</strong>.`
                 : '';
         }
-        document.querySelectorAll('#focusGuardSection input, #saveFocusSettingsBtn').forEach(el => {
+        document.querySelectorAll('.focus-card input, .focus-card select, .focus-save').forEach(el => {
             el.disabled = state.workHoursActive;
         });
 
@@ -2034,20 +2045,27 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    const saveFocusSettingsBtn = document.getElementById('saveFocusSettingsBtn');
-    if (saveFocusSettingsBtn) {
-        saveFocusSettingsBtn.addEventListener('click', async () => {
-            const statusEl = document.getElementById('focusSettingsStatus');
+    // Every Focus Guard section has its own Save button; they all save the
+    // whole set (the background validates and locks it during work hours /
+    // lockdown) and report in their own section.
+    const numVal = id => parseInt(document.getElementById(id).value, 10);
+    document.querySelectorAll('.focus-save').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const statusEl = btn.closest('.card').querySelector('.focus-status');
             const settings = {
-                pauseMinutes: parseInt(document.getElementById('pauseMinutesInput').value, 10),
-                dailyPauseBudgetMins: parseInt(document.getElementById('pauseBudgetInput').value, 10),
+                pauseMinutes: numVal('pauseMinutesInput'),
+                dailyPauseBudgetMins: numVal('pauseBudgetInput'),
                 workHours: {
                     enabled: document.getElementById('workHoursEnabled').checked,
                     days: [...document.querySelectorAll('#workHoursDays input:checked')].map(cb => Number(cb.value)),
                     startTime: document.getElementById('workHoursStart').value,
                     endTime: document.getElementById('workHoursEnd').value
-                }
+                },
+                streakOnBlockedPage: document.getElementById('streakOnBlockedPage').checked
             };
+            ['earnedMinsPerSession', 'earnedMinsMax', 'pointsPerRedirect', 'pointsPerSession',
+                'pointsPerPause', 'reflectMinChars', 'reflectWaitSecs', 'reportDays']
+                .forEach(k => { settings[k] = numVal(k); });
             const resp = await chrome.runtime.sendMessage({ action: 'saveFocusSettings', settings });
             if (statusEl) {
                 statusEl.textContent = resp && resp.ok ? 'Saved.' : ((resp && resp.error) || 'Could not save.');
@@ -2055,8 +2073,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 setTimeout(() => { statusEl.textContent = ''; }, 2500);
             }
             refreshFocusGuard();
+            loadFocusReport().catch(() => {});
         });
-    }
+    });
 
     function escapeHtml(str) {
         return String(str)

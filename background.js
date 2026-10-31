@@ -143,6 +143,21 @@ const DEFAULTS = {
     // changing Focus Guard settings are refused, and a running pause ends.
     // Same shape and midnight-wrap rules as a group schedule (feature #8).
     workHours: { enabled: false, days: [0, 1, 2, 3, 4], startTime: '09:00', endTime: '18:00' },
+    // Tunable Focus Guard numbers (ranges in FOCUS_NUMBERS):
+    // earned break minutes per finished Pomodoro work session and the most
+    // that can be banked; points per blocked visit / per session / lost per
+    // pause; the reflection prompt's minimum reason length and wait; how
+    // many days the Focus Report shows. streakOnBlockedPage shows the focus
+    // streak on blocked.html.
+    earnedMinsPerSession: 5,
+    earnedMinsMax: 60,
+    pointsPerRedirect: 1,
+    pointsPerSession: 10,
+    pointsPerPause: 15,
+    reflectMinChars: 15,
+    reflectWaitSecs: 10,
+    reportDays: 7,
+    streakOnBlockedPage: true,
     // Pomodoro timer state (feature #10). pomodoroEnabled toggles the feature;
     // pomodoroState tracks the current phase ('off'|'work'|'break');
     // pomodoroWorkMinutes and pomodoroBreakMinutes set session lengths (defaults
@@ -354,13 +369,13 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
                 pomodoroSessionsToday: sessionsToday,
                 pomodoroSessionDate: today
             });
-            await awardPomodoroSession();
+            const earned = await awardPomodoroSession();
             await updateRedirectRules(); // suspends DNR rules during break
             chrome.alarms.create('pomodoroBreak', { delayInMinutes: breakMins });
             chrome.notifications.create(`pomo-break-${Date.now()}`, {
                 type: 'basic', iconUrl: 'icons/icon-48.png',
                 title: 'Easy Redirect — Pomodoro',
-                message: `Work session complete (#${sessionsToday} today)! Take a ${breakMins}-min break. +${EARNED_MINS_PER_SESSION} min earned break time.`
+                message: `Work session complete (#${sessionsToday} today)! Take a ${breakMins}-min break. +${earned} min earned break time.`
             });
             console.log(`[pomodoro] Break started (${breakMins} min). Sessions today: ${sessionsToday}`);
         } else {
@@ -775,18 +790,38 @@ const FOCUS_PAUSE_ALARM = 'focusPauseEnd';
 const PAUSE_MINUTES_MAX = 30;
 const PAUSE_BUDGET_MAX = 120;
 const PAUSE_LOG_KEEP_DAYS = 35;
-const EARNED_MINS_PER_SESSION = 5;
-// A regular pause needs a written reason of at least this many characters
-// (the reflection prompt in options.js). Checked here too so the message
-// can't be sent without one.
-const PAUSE_REASON_MIN_CHARS = 15;
-const EARNED_MINS_MAX = 60;
 
-// Points: +1 per redirect (a visit you didn't make), +10 per finished
-// Pomodoro work session, -15 per regular pause. Never below 0.
-const POINTS_PER_REDIRECT = 1;
-const POINTS_PER_SESSION = 10;
-const POINTS_PER_PAUSE = -15;
+// Tunable Focus Guard numbers: key → [default, min, max]. Clamped on save
+// and on read. A regular pause needs a written reason of reflectMinChars
+// (checked here too, so the message can't be sent without one). Points
+// never go below 0; pointsPerPause is subtracted.
+const FOCUS_NUMBERS = {
+    earnedMinsPerSession: [5, 1, 30],
+    earnedMinsMax: [60, 5, 240],
+    pointsPerRedirect: [1, 0, 10],
+    pointsPerSession: [10, 0, 100],
+    pointsPerPause: [15, 0, 100],
+    reflectMinChars: [15, 10, 300],
+    reflectWaitSecs: [10, 5, 120],
+    reportDays: [7, 7, 30]
+};
+const REPORT_DAY_CHOICES = [7, 14, 30];
+
+function clampFocusNumber(key, v) {
+    const [def, min, max] = FOCUS_NUMBERS[key];
+    const n = Number(v);
+    if (!Number.isFinite(n)) return def;
+    const c = Math.max(min, Math.min(max, Math.round(n)));
+    return key === 'reportDays' ? REPORT_DAY_CHOICES.reduce((a, b) => Math.abs(b - c) < Math.abs(a - c) ? b : a) : c;
+}
+
+async function getFocusOpts() {
+    const r = await chrome.storage.sync.get([...Object.keys(FOCUS_NUMBERS), 'streakOnBlockedPage']);
+    const o = {};
+    for (const k of Object.keys(FOCUS_NUMBERS)) o[k] = r[k] === undefined ? FOCUS_NUMBERS[k][0] : clampFocusNumber(k, r[k]);
+    o.streakOnBlockedPage = r.streakOnBlockedPage !== false;
+    return o;
+}
 const FOCUS_LEVELS = [
     { at: 0, name: 'Beginner' },
     { at: 50, name: 'Apprentice' },
@@ -876,19 +911,21 @@ async function breakStreak() {
 }
 
 // A finished Pomodoro work session banks break minutes.
+// Returns the minutes earned (for the notification).
 async function awardPomodoroSession() {
-    const stats = await getFocusStats();
-    stats.earnedMins = Math.min(EARNED_MINS_MAX, (stats.earnedMins || 0) + EARNED_MINS_PER_SESSION);
+    const [stats, o] = await Promise.all([getFocusStats(), getFocusOpts()]);
+    stats.earnedMins = Math.min(o.earnedMinsMax, (stats.earnedMins || 0) + o.earnedMinsPerSession);
     await chrome.storage.local.set({ focusStats: stats });
-    await addPoints(POINTS_PER_SESSION);
+    await addPoints(o.pointsPerSession);
+    return o.earnedMinsPerSession;
 }
 
 // Earned minutes granted from outside (Roadmap Coach's daily goal). Same
 // cap as Pomodoro earnings; returns the new balance.
 async function grantEarnedMinutes(mins) {
-    const stats = await getFocusStats();
-    const add = Math.max(0, Math.min(EARNED_MINS_MAX, Math.round(Number(mins) || 0)));
-    stats.earnedMins = Math.min(EARNED_MINS_MAX, (stats.earnedMins || 0) + add);
+    const [stats, o] = await Promise.all([getFocusStats(), getFocusOpts()]);
+    const add = Math.max(0, Math.min(o.earnedMinsMax, Math.round(Number(mins) || 0)));
+    stats.earnedMins = Math.min(o.earnedMinsMax, (stats.earnedMins || 0) + add);
     await chrome.storage.local.set({ focusStats: stats });
     return stats.earnedMins;
 }
@@ -973,8 +1010,9 @@ async function requestPause(opts = {}) {
             return { ok: false, error: `Today's pause budget (${clampPauseBudget(sync.dailyPauseBudgetMins)} min) is used up. It resets at midnight.` };
         }
     }
-    if (kind === 'pause' && (typeof opts.reason !== 'string' || opts.reason.trim().length < PAUSE_REASON_MIN_CHARS)) {
-        return { ok: false, error: `Write a reason of at least ${PAUSE_REASON_MIN_CHARS} characters to pause.` };
+    const fo = await getFocusOpts();
+    if (kind === 'pause' && (typeof opts.reason !== 'string' || opts.reason.trim().length < fo.reflectMinChars)) {
+        return { ok: false, error: `Write a reason of at least ${fo.reflectMinChars} characters to pause.` };
     }
     const pauseMs = Math.floor(Math.min(clampPauseMinutes(sync.pauseMinutes) * 60 * 1000, remainingMs) / 60000) * 60000;
     const delaySecs = typeof sync.disableDelaySecs === 'number'
@@ -997,7 +1035,7 @@ async function requestPause(opts = {}) {
         await chrome.storage.local.set({ focusStats: stats });
     } else {
         await breakStreak();
-        await addPoints(POINTS_PER_PAUSE);
+        await addPoints(-fo.pointsPerPause);
     }
     console.log(`[focus-guard] ${kind} for ${pauseMs / 60000} min (resumes ${new Date(pause.endsAt).toISOString()}).`);
     return { ok: true, pause };
@@ -1040,7 +1078,7 @@ async function finishPause() {
         const unusedMins = Math.floor((plannedMs - pauseUsedMs(focusPause, now)) / 60000);
         if (unusedMins > 0) {
             const stats = await getFocusStats();
-            stats.earnedMins = Math.min(EARNED_MINS_MAX, (stats.earnedMins || 0) + unusedMins);
+            stats.earnedMins = Math.min((await getFocusOpts()).earnedMinsMax, (stats.earnedMins || 0) + unusedMins);
             await chrome.storage.local.set({ focusStats: stats });
         }
     }
@@ -1049,11 +1087,12 @@ async function finishPause() {
 
 // Snapshot for the options page: active pause plus the Focus Guard settings.
 async function getFocusState() {
-    const [sync, local, usedMs, stats] = await Promise.all([
+    const [sync, local, usedMs, stats, opts] = await Promise.all([
         chrome.storage.sync.get(['extensionEnabled', 'pauseMinutes', 'dailyPauseBudgetMins', 'workHours']),
         chrome.storage.local.get(['focusPause', 'focusPoints']),
         getPauseUsedTodayMs(),
-        getFocusStats()
+        getFocusStats(),
+        getFocusOpts()
     ]);
     const streak = currentStreak(stats);
     const budgetMins = clampPauseBudget(sync.dailyPauseBudgetMins);
@@ -1065,21 +1104,21 @@ async function getFocusState() {
         streak: { current: streak, best: Math.max(stats.bestStreak || 0, streak) },
         earnedMins: Math.floor(stats.earnedMins || 0),
         points: Object.assign({ total: local.focusPoints || 0 }, levelForPoints(local.focusPoints || 0)),
-        settings: {
+        settings: Object.assign({
             pauseMinutes: clampPauseMinutes(sync.pauseMinutes),
             dailyPauseBudgetMins: budgetMins,
             workHours: normalizeWorkHours(sync.workHours)
-        }
+        }, opts)
     };
 }
 
-// Last 7 local days for the Stats tab: per-day pauses, minutes paused,
+// Last reportDays local days for the Focus Report: per-day pauses, minutes paused,
 // earned breaks and redirects, plus the most recent pauses with reasons.
 // Redirect counts come from weeklyStats, which is keyed by UTC date and only
 // holds the current week, so older days show 0 there.
 async function getFocusReport() {
-    const [log, weekly, local] = await Promise.all([
-        getPauseLog(), getWeeklyStats(), chrome.storage.local.get(['focusPause'])
+    const [log, weekly, local, opts] = await Promise.all([
+        getPauseLog(), getWeeklyStats(), chrome.storage.local.get(['focusPause']), getFocusOpts()
     ]);
     const entries = log.slice();
     if (local.focusPause) {
@@ -1088,7 +1127,7 @@ async function getFocusReport() {
             usedMs: pauseUsedMs(p), reason: p.reason || '', kind: p.kind });
     }
     const days = [];
-    for (let i = 6; i >= 0; i--) {
+    for (let i = opts.reportDays - 1; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
         const date = todayLocal(d);
@@ -1115,6 +1154,8 @@ async function saveFocusSettings(input) {
     if ('pauseMinutes' in input) updates.pauseMinutes = clampPauseMinutes(Number(input.pauseMinutes));
     if ('dailyPauseBudgetMins' in input) updates.dailyPauseBudgetMins = clampPauseBudget(Number(input.dailyPauseBudgetMins));
     if ('workHours' in input) updates.workHours = normalizeWorkHours(input.workHours);
+    for (const k of Object.keys(FOCUS_NUMBERS)) if (k in input) updates[k] = clampFocusNumber(k, input[k]);
+    if ('streakOnBlockedPage' in input) updates.streakOnBlockedPage = input.streakOnBlockedPage !== false;
     await persist(updates);
     return { ok: true };
 }
@@ -1579,7 +1620,7 @@ async function handleKeywordHit(sender, request) {
     if (settings.extensionEnabled === false) return;
     const target = settings.redirectUrl || 'https://www.google.com';
     await chrome.tabs.update(sender.tab.id, { url: target });
-    addPoints(POINTS_PER_REDIRECT);
+    getFocusOpts().then(o => addPoints(o.pointsPerRedirect));
 }
 
 // Maximum lockdown duration in seconds (24 hours). User values above this cap
@@ -1786,7 +1827,7 @@ if (chrome.declarativeNetRequest && chrome.declarativeNetRequest.onRuleMatchedDe
 
         // Record the hit in weekly stats for the stats dashboard (feature #28).
         await recordHit(rule.id);
-        addPoints(POINTS_PER_REDIRECT);
+        getFocusOpts().then(o => addPoints(o.pointsPerRedirect));
 
         if (rule.quota === null || rule.quota === undefined) return; // no quota set
 

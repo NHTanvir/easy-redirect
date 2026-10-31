@@ -1289,11 +1289,11 @@
             <a class="nav-item active" data-tab="rules">
                 <span class="nav-icon">&#x26D4;</span> Rules
             </a>
+            <a class="nav-item" data-tab="focus-guard">
+                <span class="nav-icon">&#x1F6E1;&#xFE0F;</span> Focus Guard
+            </a>
             <a class="nav-item" data-tab="settings">
                 <span class="nav-icon">&#x2699;&#xFE0F;</span> Settings
-            </a>
-            <a class="nav-item" data-tab="focus">
-                <span class="nav-icon">&#x23F3;</span> Focus &amp; Timer
             </a>
             <a class="nav-item" data-tab="blocked">
                 <span class="nav-icon">&#x1F6AB;</span> Blocked Page
@@ -1463,6 +1463,332 @@
         </div>
 
         <!-- ══════════════════ TAB: SETTINGS ══════════════════ -->
+        <div class="tab-panel" id="tab-focus-guard">
+            <div class="panel-heading">Focus Guard</div>
+
+            <!-- Focus Guard: overview -->
+            <div class="card focus-card" id="focusGuardSection">
+                <div class="card-title">Focus Guard &mdash; overview</div>
+                <p class="help-text" style="margin-bottom:14px;">
+                    <strong>Pause blocking</strong> never turns blocking off for good. Every Focus Guard
+                    feature has its own section and settings below.
+                </p>
+                <div class="stat-cards" id="focusStatCards">
+                    <div class="stat-card">
+                        <div class="stat-value" id="focusStreakValue">&mdash;</div>
+                        <div class="stat-label">Focus streak</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="focusBestStreakValue">&mdash;</div>
+                        <div class="stat-label">Best streak</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="focusEarnedValue">&mdash;</div>
+                        <div class="stat-label">Earned break (min)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="focusPointsValue">&mdash;</div>
+                        <div class="stat-label" id="focusLevelLabel">Level</div>
+                    </div>
+                </div>
+                <div id="workHoursLine" style="font-size:13px;"></div>
+            </div>
+
+            <!-- 1. Auto re-enable -->
+            <div class="card focus-card">
+                <div class="card-title">1. Auto re-enable</div>
+                <p class="help-text" style="margin-bottom:12px;">A pause ends by itself after this long and blocking switches back on.</p>
+                <div class="inline-row">
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Pause length
+                        <input type="number" id="pauseMinutesInput" min="1" max="30" step="1" value="5" style="width:76px;text-align:right;">
+                        min (1&ndash;30)
+                    </label>
+                </div>
+                <div class="btn-row">
+                    <button class="focus-save">Save</button>
+                </div>
+                <div class="field-status focus-status"></div>
+            </div>
+
+            <!-- 2. Daily pause budget -->
+            <div class="card focus-card">
+                <div class="card-title">2. Daily pause budget</div>
+                <p class="help-text" style="margin-bottom:12px;">All pauses together can't go over this per day. Resets at local midnight.</p>
+                <div id="pauseBudgetLine" style="font-size:13px;margin-bottom:12px;"></div>
+                <div class="inline-row">
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Daily budget
+                        <input type="number" id="pauseBudgetInput" min="0" max="120" step="1" value="30" style="width:76px;text-align:right;">
+                        min (0&ndash;120)
+                    </label>
+                </div>
+                <div class="btn-row">
+                    <button class="focus-save">Save</button>
+                </div>
+                <div class="field-status focus-status"></div>
+            </div>
+
+            <!-- 3. Work-hours lock -->
+            <div class="card focus-card">
+                <div class="card-title">3. Work-hours lock</div>
+                <label class="check-row" style="margin-bottom:8px;">
+                    <input type="checkbox" id="workHoursEnabled">
+                    <span style="font-size:14px;">Lock pausing during work hours</span>
+                </label>
+                <div class="inline-row" id="workHoursDays" style="gap:6px;margin-bottom:10px;">
+                    <label class="day-chip"><input type="checkbox" value="0"> Sun</label>
+                    <label class="day-chip"><input type="checkbox" value="1"> Mon</label>
+                    <label class="day-chip"><input type="checkbox" value="2"> Tue</label>
+                    <label class="day-chip"><input type="checkbox" value="3"> Wed</label>
+                    <label class="day-chip"><input type="checkbox" value="4"> Thu</label>
+                    <label class="day-chip"><input type="checkbox" value="5"> Fri</label>
+                    <label class="day-chip"><input type="checkbox" value="6"> Sat</label>
+                </div>
+                <div class="inline-row">
+                    <input type="time" id="workHoursStart" value="09:00" style="width:auto;">
+                    <span class="text-muted" style="font-size:13px;">to</span>
+                    <input type="time" id="workHoursEnd" value="18:00" style="width:auto;">
+                </div>
+                <p class="help-text">While work hours are on, Pause is refused, a running pause ends, and Focus Guard settings can't be changed. Save before work starts.</p>
+                <div class="btn-row">
+                    <button class="focus-save">Save</button>
+                </div>
+                <div class="field-status focus-status"></div>
+            </div>
+
+            <!-- 4. Focus streak -->
+            <div class="card focus-card">
+                <div class="card-title">4. Focus streak</div>
+                <p class="help-text" style="margin-bottom:12px;">Days in a row without a regular pause. A pause resets it to 0; earned breaks don't.</p>
+                <div id="focusStreakLine" style="font-size:13px;margin-bottom:10px;"></div>
+                <label class="check-row">
+                    <input type="checkbox" id="streakOnBlockedPage">
+                    <span style="font-size:14px;">Show my streak on the blocked page</span>
+                </label>
+                <div class="btn-row">
+                    <button class="focus-save">Save</button>
+                </div>
+                <div class="field-status focus-status"></div>
+            </div>
+
+            <!-- 5. Earned breaks -->
+            <div class="card focus-card">
+                <div class="card-title">5. Earned breaks</div>
+                <p class="help-text" style="margin-bottom:12px;">Finished Pomodoro work sessions (and Roadmap Coach goals) earn break minutes. An earned break doesn't use the budget, doesn't break the streak and works during work hours.</p>
+                <div id="focusEarnedLine" style="font-size:13px;margin-bottom:10px;"></div>
+                <div class="inline-row" style="gap:20px;">
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Earned per Pomodoro session
+                        <input type="number" id="earnedMinsPerSession" min="1" max="30" step="1" value="5" style="width:76px;text-align:right;">
+                        min (1&ndash;30)
+                    </label>
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Most you can bank
+                        <input type="number" id="earnedMinsMax" min="5" max="240" step="1" value="60" style="width:76px;text-align:right;">
+                        min (5&ndash;240)
+                    </label>
+                </div>
+                <div class="btn-row">
+                    <button id="takeEarnedBreakBtn" class="btn-success">&#x2615; Take earned break</button>
+                    <button class="focus-save">Save</button>
+                </div>
+                <div class="field-status focus-status"></div>
+            </div>
+
+            <!-- 6. Points & levels -->
+            <div class="card focus-card">
+                <div class="card-title">6. Points &amp; levels</div>
+                <div id="focusLevelLine" class="help-text" style="margin-bottom:12px;"></div>
+                <div class="inline-row" style="gap:20px;">
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Per blocked visit
+                        <input type="number" id="pointsPerRedirect" min="0" max="10" step="1" value="1" style="width:76px;text-align:right;">
+                        + (0&ndash;10)
+                    </label>
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Per Pomodoro session
+                        <input type="number" id="pointsPerSession" min="0" max="100" step="1" value="10" style="width:76px;text-align:right;">
+                        + (0&ndash;100)
+                    </label>
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Lost per pause
+                        <input type="number" id="pointsPerPause" min="0" max="100" step="1" value="15" style="width:76px;text-align:right;">
+                        &minus; (0&ndash;100)
+                    </label>
+                </div>
+                <p class="help-text">Levels: Beginner 0 &middot; Apprentice 50 &middot; Focused 150 &middot; Disciplined 300 &middot; Deep Worker 600 &middot; Master 1000 &middot; Legend 2000.</p>
+                <div class="btn-row">
+                    <button class="focus-save">Save</button>
+                </div>
+                <div class="field-status focus-status"></div>
+            </div>
+
+            <!-- 7. Reflection prompt -->
+            <div class="card focus-card">
+                <div class="card-title">7. Reflection prompt</div>
+                <p class="help-text" style="margin-bottom:12px;">Before a pause: today's stats, a written reason and a wait. With the Friction Code on (below), you also type the code.</p>
+                <div class="inline-row" style="gap:20px;">
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Reason at least
+                        <input type="number" id="reflectMinChars" min="10" max="300" step="1" value="15" style="width:76px;text-align:right;">
+                        characters (10&ndash;300)
+                    </label>
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Wait before Pause
+                        <input type="number" id="reflectWaitSecs" min="5" max="120" step="1" value="10" style="width:76px;text-align:right;">
+                        seconds (5&ndash;120)
+                    </label>
+                </div>
+                <div class="btn-row">
+                    <button class="focus-save">Save</button>
+                </div>
+                <div class="field-status focus-status"></div>
+            </div>
+
+            <div class="card focus-card" id="focusReportSection">
+                <div class="card-title">8. Focus report &amp; pause history</div>
+                <div class="inline-row" style="margin-bottom:10px;">
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Show the last
+                        <select id="reportDays" style="width:auto;">
+                            <option value="7">7 days</option>
+                            <option value="14">14 days</option>
+                            <option value="30">30 days</option>
+                        </select>
+                    </label>
+                    <button class="focus-save" style="margin-top:0;">Save</button>
+                    <span class="field-status focus-status" style="margin-top:0;"></span>
+                </div>
+                <p class="help-text" style="margin-bottom:12px;">Pauses, earned breaks and blocked visits per day. Stored locally on this device.</p>
+                <table class="focus-table" id="focusReportTable">
+                    <thead><tr><th>Day</th><th>Pauses</th><th>Min paused</th><th>Earned breaks</th><th>Blocked</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+                <div class="card-title" style="margin-top:20px;">Pause History</div>
+                <div id="pauseHistoryList"></div>
+            </div>
+
+            <div class="panel-heading" style="margin-top:28px;">Related focus tools</div>
+
+            <!-- Pomodoro -->
+            <div class="card" id="pomodoroSection">
+                <div class="card-title">Pomodoro Timer</div>
+                <p class="help-text" style="margin-bottom:14px;">
+                    Alternate between work sessions (rules active) and breaks (rules suspended).
+                    Keeps running in the background.
+                </p>
+                <div class="inline-row" style="margin-bottom:14px;gap:20px;">
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Work
+                        <input type="number" id="pomodoroWorkInput" min="1" max="120" step="1" value="25" style="width:60px;text-align:right;">
+                        min
+                    </label>
+                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+                        Break
+                        <input type="number" id="pomodoroBreakInput" min="1" max="60" step="1" value="5" style="width:60px;text-align:right;">
+                        min
+                    </label>
+                </div>
+                <div class="inline-row" style="margin-bottom:8px;">
+                    <button id="pomodoroStartBtn" class="btn-success">&#9654; Start timer</button>
+                    <button id="pomodoroStopBtn" class="btn-danger">&#9632; Stop timer</button>
+                    <span id="pomodoroCountdown"></span>
+                </div>
+                <div id="pomodoroStatus" class="field-status"></div>
+                <div class="btn-row" style="margin-top:14px;">
+                    <button id="pomodoroToggleBtn" class="btn-success">Enable Pomodoro</button>
+                </div>
+            </div>
+
+            <!-- Lockdown -->
+            <div class="card" id="lockdownSection">
+                <div class="card-title">Lockdown / Focus Mode</div>
+                <p class="help-text" style="margin-bottom:12px;">
+                    Activate a hard lockdown for a fixed duration. While locked you
+                    <strong>cannot</strong> disable the extension, add or remove rules,
+                    or change the redirect URL. The lock expires automatically.
+                </p>
+                <div id="lockdownActivePanel" style="display:none;">
+                    <strong style="color:#B71C1C;">Lockdown active</strong>
+                    <span id="lockdownCountdown" style="margin-left:12px;font-variant-numeric:tabular-nums;font-weight:700;"></span>
+                    <p class="help-text" style="margin-top:4px;">You cannot modify rules until the countdown reaches zero.</p>
+                </div>
+                <div id="lockdownSetupPanel">
+                    <div class="inline-row" style="flex-wrap:wrap;margin-bottom:12px;">
+                        <label style="font-size:13px;display:flex;align-items:center;gap:6px;">
+                            Duration
+                            <input type="number" id="lockdownDurationInput" min="1" max="1440" step="1" value="60"
+                                   style="width:70px;">
+                            minutes
+                        </label>
+                        <label style="font-size:13px;display:flex;align-items:center;gap:6px;">
+                            Scope
+                            <select id="lockdownScopeSelect" style="width:auto;">
+                                <option value="all">All rules</option>
+                                <option value="groups">Current group only</option>
+                                <option value="allowlist-exempt">All except always-allowed</option>
+                            </select>
+                        </label>
+                    </div>
+                    <button id="lockdownActivateBtn" class="btn-danger">Activate lockdown</button>
+                    <div id="lockdownConfirmPanel">
+                        <p style="margin:0 0 6px;font-size:14px;font-weight:600;color:#B71C1C;">
+                            Are you sure? This cannot be cancelled once started.
+                        </p>
+                        <p style="margin:0 0 10px;font-size:13px;">Type <strong>LOCK</strong> to confirm:</p>
+                        <input type="text" id="lockdownConfirmInput" placeholder="LOCK"
+                               autocomplete="off" style="width:110px;">
+                        <button id="lockdownConfirmBtn" class="btn-danger" style="margin-left:8px;" disabled>Lock now</button>
+                        <button id="lockdownCancelBtn" class="btn-ghost" style="margin-left:6px;">Cancel</button>
+                    </div>
+                </div>
+                <div id="lockdownStatus" class="field-status"></div>
+            </div>
+
+            <!-- Disable delay -->
+            <div class="card" id="disableDelaySection">
+                <div class="card-title">Disable Delay</div>
+                <p class="help-text" style="margin-bottom:12px;">
+                    Wait this many seconds after pressing <strong>Disable</strong> before blocking stops.
+                    During the countdown, blocking remains active and the badge shows time remaining.
+                    Set to 0 for instant disable.
+                </p>
+                <div class="inline-row">
+                    <input type="number" id="disableDelayInput" min="0" max="300" step="1" value="0" style="width:80px;">
+                    <span class="text-muted" style="font-size:13px;">seconds (0 – 300)</span>
+                </div>
+                <div class="btn-row">
+                    <button id="saveDisableDelayBtn">Save</button>
+                </div>
+                <div id="disableDelayStatus" class="field-status"></div>
+            </div>
+
+            <div class="card" id="accessCodeSection">
+                <div class="card-title">Friction Code (adding rules &amp; pausing)</div>
+                <p class="help-text" style="margin-bottom:12px;">
+                    When enabled, a randomly generated code is shown each time you try to add a rule or pause blocking.
+                    You must type the full code (paste disabled) to continue. Discourages impulsive changes.
+                </p>
+                <label class="check-row" style="margin-bottom:10px;">
+                    <input type="checkbox" id="accessCodeEnabled">
+                    <span>Enable friction code</span>
+                </label>
+                <div id="accessCodeLengthRow">
+                    <label class="field-label">
+                        Code length: <strong id="accessCodeLengthDisplay">64</strong> characters
+                    </label>
+                    <input type="range" id="accessCodeLength" min="32" max="256" step="8" value="64">
+                    <p class="help-text">Range: 32 – 256 characters. Default: 64.</p>
+                </div>
+                <div class="btn-row">
+                    <button id="saveAccessCodeBtn">Save</button>
+                </div>
+                <div id="accessCodeStatus" class="field-status"></div>
+            </div>
+
+        </div>
+
         <div class="tab-panel" id="tab-settings">
             <div class="panel-heading">Settings</div>
 
@@ -1570,175 +1896,6 @@
             </div>
         </div>
 
-        <!-- ══════════════════ TAB: FOCUS & TIMER ══════════════════ -->
-        <div class="tab-panel" id="tab-focus">
-            <div class="panel-heading">Focus &amp; Timer</div>
-
-            <!-- Focus Guard -->
-            <div class="card" id="focusGuardSection">
-                <div class="card-title">Focus Guard</div>
-                <p class="help-text" style="margin-bottom:14px;">
-                    <strong>Pause blocking</strong> never turns blocking off for good. It switches
-                    itself back on after the pause length below, and all pauses together can't go
-                    over the daily budget.
-                </p>
-                <div class="stat-cards" id="focusStatCards">
-                    <div class="stat-card">
-                        <div class="stat-value" id="focusStreakValue">—</div>
-                        <div class="stat-label">Focus streak</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="focusBestStreakValue">—</div>
-                        <div class="stat-label">Best streak</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="focusEarnedValue">—</div>
-                        <div class="stat-label">Earned break (min)</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="focusPointsValue">—</div>
-                        <div class="stat-label" id="focusLevelLabel">Level</div>
-                    </div>
-                </div>
-                <div id="focusLevelLine" class="help-text" style="margin:-8px 0 14px;"></div>
-                <div class="btn-row" style="margin:-6px 0 14px;">
-                    <button id="takeEarnedBreakBtn" class="btn-success">&#x2615; Take earned break</button>
-                    <span class="help-text" style="margin-top:0;">Each finished Pomodoro work session earns 5 min. Earned breaks don't use the budget, don't break the streak and work during work hours.</span>
-                </div>
-                <div id="pauseBudgetLine" style="font-size:13px;margin-bottom:12px;"></div>
-                <div class="inline-row" style="gap:20px;">
-                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
-                        Pause length
-                        <input type="number" id="pauseMinutesInput" min="1" max="30" step="1" value="5" style="width:70px;text-align:right;">
-                        min
-                    </label>
-                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
-                        Daily budget
-                        <input type="number" id="pauseBudgetInput" min="0" max="120" step="1" value="30" style="width:70px;text-align:right;">
-                        min
-                    </label>
-                </div>
-                <hr class="divider">
-                <label class="check-row" style="margin-bottom:8px;">
-                    <input type="checkbox" id="workHoursEnabled">
-                    <span style="font-size:14px;">Lock pausing during work hours</span>
-                </label>
-                <div class="inline-row" id="workHoursDays" style="gap:6px;margin-bottom:10px;">
-                    <label class="day-chip"><input type="checkbox" value="0"> Sun</label>
-                    <label class="day-chip"><input type="checkbox" value="1"> Mon</label>
-                    <label class="day-chip"><input type="checkbox" value="2"> Tue</label>
-                    <label class="day-chip"><input type="checkbox" value="3"> Wed</label>
-                    <label class="day-chip"><input type="checkbox" value="4"> Thu</label>
-                    <label class="day-chip"><input type="checkbox" value="5"> Fri</label>
-                    <label class="day-chip"><input type="checkbox" value="6"> Sat</label>
-                </div>
-                <div class="inline-row">
-                    <input type="time" id="workHoursStart" value="09:00" style="width:auto;">
-                    <span class="text-muted" style="font-size:13px;">to</span>
-                    <input type="time" id="workHoursEnd" value="18:00" style="width:auto;">
-                </div>
-                <p class="help-text">While work hours are on, Pause is refused, a running pause ends, and these settings can't be changed.</p>
-                <div id="workHoursLine" style="font-size:13px;margin-top:8px;"></div>
-                <div class="btn-row">
-                    <button id="saveFocusSettingsBtn">Save</button>
-                </div>
-                <div id="focusSettingsStatus" class="field-status"></div>
-            </div>
-
-            <!-- Pomodoro -->
-            <div class="card" id="pomodoroSection">
-                <div class="card-title">Pomodoro Timer</div>
-                <p class="help-text" style="margin-bottom:14px;">
-                    Alternate between work sessions (rules active) and breaks (rules suspended).
-                    Keeps running in the background.
-                </p>
-                <div class="inline-row" style="margin-bottom:14px;gap:20px;">
-                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
-                        Work
-                        <input type="number" id="pomodoroWorkInput" min="1" max="120" step="1" value="25" style="width:60px;text-align:right;">
-                        min
-                    </label>
-                    <label style="font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
-                        Break
-                        <input type="number" id="pomodoroBreakInput" min="1" max="60" step="1" value="5" style="width:60px;text-align:right;">
-                        min
-                    </label>
-                </div>
-                <div class="inline-row" style="margin-bottom:8px;">
-                    <button id="pomodoroStartBtn" class="btn-success">&#9654; Start timer</button>
-                    <button id="pomodoroStopBtn" class="btn-danger">&#9632; Stop timer</button>
-                    <span id="pomodoroCountdown"></span>
-                </div>
-                <div id="pomodoroStatus" class="field-status"></div>
-                <div class="btn-row" style="margin-top:14px;">
-                    <button id="pomodoroToggleBtn" class="btn-success">Enable Pomodoro</button>
-                </div>
-            </div>
-
-            <!-- Lockdown -->
-            <div class="card" id="lockdownSection">
-                <div class="card-title">Lockdown / Focus Mode</div>
-                <p class="help-text" style="margin-bottom:12px;">
-                    Activate a hard lockdown for a fixed duration. While locked you
-                    <strong>cannot</strong> disable the extension, add or remove rules,
-                    or change the redirect URL. The lock expires automatically.
-                </p>
-                <div id="lockdownActivePanel" style="display:none;">
-                    <strong style="color:#B71C1C;">Lockdown active</strong>
-                    <span id="lockdownCountdown" style="margin-left:12px;font-variant-numeric:tabular-nums;font-weight:700;"></span>
-                    <p class="help-text" style="margin-top:4px;">You cannot modify rules until the countdown reaches zero.</p>
-                </div>
-                <div id="lockdownSetupPanel">
-                    <div class="inline-row" style="flex-wrap:wrap;margin-bottom:12px;">
-                        <label style="font-size:13px;display:flex;align-items:center;gap:6px;">
-                            Duration
-                            <input type="number" id="lockdownDurationInput" min="1" max="1440" step="1" value="60"
-                                   style="width:70px;">
-                            minutes
-                        </label>
-                        <label style="font-size:13px;display:flex;align-items:center;gap:6px;">
-                            Scope
-                            <select id="lockdownScopeSelect" style="width:auto;">
-                                <option value="all">All rules</option>
-                                <option value="groups">Current group only</option>
-                                <option value="allowlist-exempt">All except always-allowed</option>
-                            </select>
-                        </label>
-                    </div>
-                    <button id="lockdownActivateBtn" class="btn-danger">Activate lockdown</button>
-                    <div id="lockdownConfirmPanel">
-                        <p style="margin:0 0 6px;font-size:14px;font-weight:600;color:#B71C1C;">
-                            Are you sure? This cannot be cancelled once started.
-                        </p>
-                        <p style="margin:0 0 10px;font-size:13px;">Type <strong>LOCK</strong> to confirm:</p>
-                        <input type="text" id="lockdownConfirmInput" placeholder="LOCK"
-                               autocomplete="off" style="width:110px;">
-                        <button id="lockdownConfirmBtn" class="btn-danger" style="margin-left:8px;" disabled>Lock now</button>
-                        <button id="lockdownCancelBtn" class="btn-ghost" style="margin-left:6px;">Cancel</button>
-                    </div>
-                </div>
-                <div id="lockdownStatus" class="field-status"></div>
-            </div>
-
-            <!-- Disable delay -->
-            <div class="card" id="disableDelaySection">
-                <div class="card-title">Disable Delay</div>
-                <p class="help-text" style="margin-bottom:12px;">
-                    Wait this many seconds after pressing <strong>Disable</strong> before blocking stops.
-                    During the countdown, blocking remains active and the badge shows time remaining.
-                    Set to 0 for instant disable.
-                </p>
-                <div class="inline-row">
-                    <input type="number" id="disableDelayInput" min="0" max="300" step="1" value="0" style="width:80px;">
-                    <span class="text-muted" style="font-size:13px;">seconds (0 – 300)</span>
-                </div>
-                <div class="btn-row">
-                    <button id="saveDisableDelayBtn">Save</button>
-                </div>
-                <div id="disableDelayStatus" class="field-status"></div>
-            </div>
-        </div>
-
         <!-- ══════════════════ TAB: BLOCKED PAGE ══════════════════ -->
         <div class="tab-panel" id="tab-blocked">
             <div class="panel-heading">Blocked Page</div>
@@ -1833,17 +1990,6 @@
                 </div>
                 <div id="statsStatus" class="field-status"></div>
             </div>
-
-            <div class="card" id="focusReportSection">
-                <div class="card-title">Focus Report (last 7 days)</div>
-                <p class="help-text" style="margin-bottom:12px;">Pauses, earned breaks and blocked visits per day. Stored locally on this device.</p>
-                <table class="focus-table" id="focusReportTable">
-                    <thead><tr><th>Day</th><th>Pauses</th><th>Min paused</th><th>Earned breaks</th><th>Blocked</th></tr></thead>
-                    <tbody></tbody>
-                </table>
-                <div class="card-title" style="margin-top:20px;">Pause History</div>
-                <div id="pauseHistoryList"></div>
-            </div>
         </div>
 
         <!-- ══════════════════ TAB: ADVANCED ══════════════════ -->
@@ -1899,30 +2045,6 @@
                     <button id="secRemoveBtn" class="btn-danger">Remove lock</button>
                 </div>
                 <div id="secStatus" class="field-status"></div>
-            </div>
-
-            <!-- Add-rule friction code -->
-            <div class="card" id="accessCodeSection">
-                <div class="card-title">Add-Rule Friction Code</div>
-                <p class="help-text" style="margin-bottom:12px;">
-                    When enabled, a randomly generated code is shown each time you try to add a rule.
-                    You must type the full code (paste disabled) to save. Discourages impulsive additions.
-                </p>
-                <label class="check-row" style="margin-bottom:10px;">
-                    <input type="checkbox" id="accessCodeEnabled">
-                    <span>Enable friction code</span>
-                </label>
-                <div id="accessCodeLengthRow">
-                    <label class="field-label">
-                        Code length: <strong id="accessCodeLengthDisplay">64</strong> characters
-                    </label>
-                    <input type="range" id="accessCodeLength" min="32" max="256" step="8" value="64">
-                    <p class="help-text">Range: 32 – 256 characters. Default: 64.</p>
-                </div>
-                <div class="btn-row">
-                    <button id="saveAccessCodeBtn">Save</button>
-                </div>
-                <div id="accessCodeStatus" class="field-status"></div>
             </div>
 
             <!-- Uninstall feedback URL -->
@@ -2080,7 +2202,7 @@
             <details class="doc-section">
                 <summary>Focus Guard — pauses that switch themselves back on <span class="doc-badge">FOCUS</span></summary>
                 <div class="doc-body">
-                    <div class="doc-where">&#x23F3; Focus &amp; Timer tab → Focus Guard</div>
+                    <div class="doc-where">&#x1F6E1;&#xFE0F; Focus Guard tab → 1. Auto re-enable</div>
                     <p><strong>Pause blocking</strong> turns blocking off for the <strong>pause length</strong> (default 5 min, 1–30), then switches it back on automatically, even if the page is closed or Chrome restarts. Anything that tries to turn blocking off without a pause is reverted.</p>
                     <p>Click <strong>Resume blocking</strong> to end a pause early.</p>
                 </div>
@@ -2089,15 +2211,15 @@
             <details class="doc-section">
                 <summary>Daily pause budget</summary>
                 <div class="doc-body">
-                    <div class="doc-where">&#x23F3; Focus &amp; Timer tab → Focus Guard</div>
-                    <p>All your pauses together can't go over the <strong>daily budget</strong> (default 30 min, 0–120). A pause is shortened to what's left, and once the budget is used up the Pause button refuses until local midnight. The remaining budget is shown in the Focus Guard card and under the sidebar button.</p>
+                    <div class="doc-where">&#x1F6E1;&#xFE0F; Focus Guard tab → 2. Daily pause budget</div>
+                    <p>All your pauses together can't go over the <strong>daily budget</strong> (default 30 min, 0–120). A pause is shortened to what's left, and once the budget is used up the Pause button refuses until local midnight. The remaining budget is shown in that section and under the sidebar button.</p>
                 </div>
             </details>
 
             <details class="doc-section">
                 <summary>Work-hours lock</summary>
                 <div class="doc-body">
-                    <div class="doc-where">&#x23F3; Focus &amp; Timer tab → Focus Guard</div>
+                    <div class="doc-where">&#x1F6E1;&#xFE0F; Focus Guard tab → 3. Work-hours lock</div>
                     <p>Tick <strong>Lock pausing during work hours</strong> and choose the days and times (the window can cross midnight). During work hours you can't pause, a running pause ends right away, and Focus Guard settings can't be changed.</p>
                     <div class="doc-tip">&#x1F4A1; Save the settings before work starts. Once work hours begin they are locked.</div>
                 </div>
@@ -2106,47 +2228,47 @@
             <details class="doc-section">
                 <summary>Focus streak</summary>
                 <div class="doc-body">
-                    <div class="doc-where">&#x23F3; Focus &amp; Timer tab → Focus Guard</div>
-                    <p>Counts the days in a row you haven't paused. Any regular pause resets it to 0; your best streak is kept. The streak is shown in the Focus Guard card, under the sidebar button and on the blocked page.</p>
+                    <div class="doc-where">&#x1F6E1;&#xFE0F; Focus Guard tab → 4. Focus streak</div>
+                    <p>Counts the days in a row you haven't paused. Any regular pause resets it to 0; your best streak is kept. The streak is shown in the overview, under the sidebar button and on the blocked page (you can turn the blocked-page line off).</p>
                 </div>
             </details>
 
             <details class="doc-section">
                 <summary>Earned breaks</summary>
                 <div class="doc-body">
-                    <div class="doc-where">&#x23F3; Focus &amp; Timer tab → Focus Guard</div>
-                    <p>Every finished Pomodoro work session earns <strong>5 min</strong> of break time (up to 60). <strong>Take earned break</strong> spends it as a pause that doesn't use the daily budget, doesn't break your streak and works during work hours. Minutes you don't use are refunded if you resume early.</p>
+                    <div class="doc-where">&#x1F6E1;&#xFE0F; Focus Guard tab → 5. Earned breaks</div>
+                    <p>Every finished Pomodoro work session earns break time: <strong>5 min</strong> by default (1–30), banked up to <strong>60 min</strong> (5–240). Roadmap Coach goals add to the same bank. <strong>Take earned break</strong> spends it as a pause that doesn't use the daily budget, doesn't break your streak and works during work hours. Minutes you don't use are refunded if you resume early.</p>
                 </div>
             </details>
 
             <details class="doc-section">
                 <summary>Points &amp; levels</summary>
                 <div class="doc-body">
-                    <div class="doc-where">&#x23F3; Focus &amp; Timer tab → Focus Guard</div>
-                    <p>Earn <strong>+1</strong> point for every blocked visit and <strong>+10</strong> for every finished Pomodoro work session. Each regular pause costs <strong>15</strong>. Points move you up seven levels, from Beginner to Legend.</p>
+                    <div class="doc-where">&#x1F6E1;&#xFE0F; Focus Guard tab → 6. Points &amp; levels</div>
+                    <p>Earn <strong>+1</strong> point for every blocked visit and <strong>+10</strong> for every finished Pomodoro work session. Each regular pause costs <strong>15</strong>. All three numbers are adjustable. Points move you up seven levels, from Beginner to Legend.</p>
                 </div>
             </details>
 
             <details class="doc-section">
                 <summary>Reflection prompt</summary>
                 <div class="doc-body">
-                    <div class="doc-where">&#x23F3; Focus &amp; Timer tab → Focus Guard</div>
-                    <p>Before a pause starts you see today's blocked visits, the streak you'd lose, your points and the budget left. You must write a reason (15+ characters) and wait 10 seconds. If the add-rule friction code is on, you must also type the code. <strong>Stay focused</strong> or <kbd>Esc</kbd> cancels.</p>
+                    <div class="doc-where">&#x1F6E1;&#xFE0F; Focus Guard tab → 7. Reflection prompt</div>
+                    <p>Before a pause starts you see today's blocked visits, the streak you'd lose, your points and the budget left. You must write a reason (15+ characters by default, 10–300) and wait (10 seconds by default, 5–120). If the friction code is on, you must also type the code. <strong>Stay focused</strong> or <kbd>Esc</kbd> cancels.</p>
                 </div>
             </details>
 
             <details class="doc-section">
                 <summary>Focus report &amp; pause history</summary>
                 <div class="doc-body">
-                    <div class="doc-where">&#x1F4CA; Stats tab → Focus Report</div>
-                    <p>A table of the last 7 days: pauses, minutes paused, earned breaks and blocked visits, with a 7-day total. Below it, <strong>Pause History</strong> lists your recent pauses with when, how long and the reason you gave.</p>
+                    <div class="doc-where">&#x1F6E1;&#xFE0F; Focus Guard tab → 8. Focus report &amp; pause history</div>
+                    <p>A table of the last 7, 14 or 30 days (your choice): pauses, minutes paused, earned breaks and blocked visits, with a total. Below it, <strong>Pause History</strong> lists your recent pauses with when, how long and the reason you gave.</p>
                 </div>
             </details>
 
             <details class="doc-section">
                 <summary>Pomodoro timer — work sessions with automatic break unlocks</summary>
                 <div class="doc-body">
-                    <div class="doc-where">&#x23F3; Focus &amp; Timer tab → Pomodoro Timer</div>
+                    <div class="doc-where">&#x1F6E1;&#xFE0F; Focus Guard tab → Pomodoro Timer</div>
                     <p>A built-in Pomodoro that cycles between <strong>Work</strong> sessions (rules fully active) and <strong>Break</strong> sessions (all rules suspended so you can browse freely). Set work and break durations in minutes, then click <strong>Start timer</strong>.</p>
                     <p>The cycle runs in the background — it continues even if you close the options page. The current phase and remaining time are shown in the Focus tab.</p>
                 </div>
@@ -2155,7 +2277,7 @@
             <details class="doc-section">
                 <summary>Lockdown mode — prevent disabling for a set duration</summary>
                 <div class="doc-body">
-                    <div class="doc-where">&#x23F3; Focus &amp; Timer tab → Lockdown Mode</div>
+                    <div class="doc-where">&#x1F6E1;&#xFE0F; Focus Guard tab → Lockdown / Focus Mode</div>
                     <p>Click <strong>Activate lockdown</strong> and type <code>LOCK</code> to confirm. For the chosen duration (up to 24 hours) you <em>cannot</em> turn off the extension, delete rules, or clear the list. A countdown shows remaining lockdown time.</p>
                     <p>To end it early you must first pass the PIN screen (if a PIN is set).</p>
                     <div class="doc-tip">&#x1F4A1; Use this when you need to commit to a focus session and don't trust yourself to stay off distracting sites.</div>
@@ -2165,7 +2287,7 @@
             <details class="doc-section">
                 <summary>Disable delay — add a countdown before the extension turns off</summary>
                 <div class="doc-body">
-                    <div class="doc-where">&#x2699;&#xFE0F; Settings tab → Disable Delay</div>
+                    <div class="doc-where">&#x1F6E1;&#xFE0F; Focus Guard tab → Disable Delay</div>
                     <p>Set a number of seconds (up to 300). When you start a pause, blocking stays active for that long before the pause takes effect. An orange badge on the toolbar counts down. Click <strong>Cancel</strong> in the options banner to abort.</p>
                 </div>
             </details>
@@ -2229,7 +2351,7 @@
             <details class="doc-section">
                 <summary>Add-rule friction code — force slow, deliberate rule changes</summary>
                 <div class="doc-body">
-                    <div class="doc-where">&#x1F512; Advanced tab → Add-Rule Friction Code</div>
+                    <div class="doc-where">&#x1F6E1;&#xFE0F; Focus Guard tab → Friction Code</div>
                     <p>When enabled, adding any new rule or pausing blocking requires you to <strong>manually type</strong> a randomly generated code (32–256 characters, no paste allowed). This makes impulsive "just unblock it real quick" much harder.</p>
                     <p>Use the length slider to increase the difficulty. Longer codes take more time to type.</p>
                 </div>
