@@ -53,6 +53,7 @@
     chrome.runtime.sendMessage({ action: 'getFocusState' }, state => {
         const el = document.getElementById('focusStreak');
         if (chrome.runtime.lastError || !el || !state || !state.streak.current) return;
+        if (state.settings && state.settings.streakOnBlockedPage === false) return;
         const n = state.streak.current;
         el.textContent = `\u{1F525} ${n}-day focus streak. Don't break it.`;
     });
