@@ -1427,10 +1427,34 @@ async function getBlockInfo() {
     };
 }
 
+// Roadmap Coach's study-time lockdown. Only ever makes things stricter: a
+// lockdown that already runs longer is left alone. The user's own lockdown
+// duration setting (used by the Lockdown card) is kept.
+async function startLockdownFromCoach(mins) {
+    const secs = Math.max(60, Math.min(LOCKDOWN_MAX_SECS, Math.round(Number(mins) || 0) * 60));
+    const before = await chrome.storage.sync.get(['lockdownUntil', 'lockdownDurationSecs', 'lockdownScope']);
+    const endsAt = Date.now() + secs * 1000;
+    if (typeof before.lockdownUntil === 'number' && before.lockdownUntil >= endsAt) {
+        return { ok: true, until: before.lockdownUntil, started: false };
+    }
+    await startLockdown(secs, before.lockdownScope || 'all');
+    await persist({ lockdownDurationSecs: typeof before.lockdownDurationSecs === 'number' ? before.lockdownDurationSecs : DEFAULTS.lockdownDurationSecs });
+    chrome.notifications.create(`coach-lockdown-${Date.now()}`, {
+        type: 'basic', iconUrl: 'icons/icon-48.png',
+        title: 'Easy Redirect — Study time',
+        message: `Roadmap Coach started a ${Math.round(secs / 60)}-min lockdown. Time for today's mission.`
+    });
+    return { ok: true, until: endsAt, started: true };
+}
+
 chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => {
     if (!sender || !ROADMAP_COACH_IDS.includes(sender.id)) return false;
     if (request && request.action === 'getBlockInfo') {
         getBlockInfo().then(sendResponse);
+        return true;
+    }
+    if (request && request.action === 'startLockdown') {
+        startLockdownFromCoach(request.mins).then(sendResponse);
         return true;
     }
     if (request && request.action === 'grantEarnedBreak') {

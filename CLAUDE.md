@@ -176,7 +176,7 @@ There is no permanent off switch. The sidebar toggle and `Ctrl+Shift+Y` go throu
 
 ### Roadmap Coach bridge
 
-`chrome.runtime.onMessageExternal` accepts messages only from `ROADMAP_COACH_IDS` (the unpacked Roadmap Coach extension at `~/Desktop/roadmap-coach`): `getBlockInfo` (sites from enabled domain/path/wildcard rules, on/paused, streak, points, earned minutes) and `grantEarnedBreak { mins }` (adds to `focusStats.earnedMins`, capped at `earnedMinsMax`). Easy Redirect stays the only blocker when both are installed.
+`chrome.runtime.onMessageExternal` accepts messages only from `ROADMAP_COACH_IDS` (the unpacked Roadmap Coach extension at `~/Desktop/roadmap-coach`): `getBlockInfo` (sites from enabled domain/path/wildcard rules, on/paused, streak, points, earned minutes) `grantEarnedBreak { mins }` (adds to `focusStats.earnedMins`, capped at `earnedMinsMax`) and `startLockdown { mins }` (`startLockdownFromCoach()`: Roadmap Coach's study-time lockdown; never shortens a longer running lockdown and keeps the user's `lockdownDurationSecs`). Easy Redirect stays the only blocker when both are installed.
 
 ### Durability invariant — DO NOT REGRESS
 
