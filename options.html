@@ -4,117 +4,59 @@
     <meta charset="utf-8">
     <title>Easy Redirect — Settings</title>
     <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+    <script src="themes.js"></script>
+    <script src="theme.js"></script>
     <style>
         /* ─── Tokens ─────────────────────────────────────────────────── */
+        /* Dark defaults (the Midnight theme). theme.js overrides every token
+           per theme via :root[data-theme="<id>"] rules; all themes are dark. */
         :root {
-          --accent:          #5C6BC0;
-          --accent-hover:    #3949AB;
-          --accent-light:    #E8EAF6;
+          --accent:          #E53935;
+          --accent-hover:    #C62828;
+          --accent-light:    rgba(229,57,53,.18);
 
-          --bg:              #F3F4F8;
-          --bg-card:         #FFFFFF;
-          --bg-section:      #FFFFFF; /* alias for options.js inline styles */
-          --sidebar-bg:      #1E2140;
-          --sidebar-hover:   rgba(255,255,255,.07);
-          --sidebar-active:  rgba(92,107,192,.25);
-          --sidebar-text:    #9AA3C4;
-          --sidebar-text-hi: #FFFFFF;
+          --bg:              #0F1120;
+          --bg-card:         #191C30;
+          --bg-section:      #191C30; /* alias for options.js inline styles */
+          --sidebar-bg:      #0A0C17;
+          --sidebar-hover:   rgba(255,255,255,.06);
+          --sidebar-active:  rgba(229,57,53,.26);
+          --sidebar-text:    #9095AD;
+          --sidebar-text-hi: #E8EAF6;
 
-          --text:            #1E2140;
-          --text-muted:      #757D8A;
-          --border:          #E5E7EB;
-          --border-focus:    #5C6BC0;
+          --text:            #E8EAF6;
+          --text-muted:      #9095AD;
+          --border:          #2A2E48;
+          --border-focus:    #E53935;
 
-          --input-bg:        #FFFFFF;
-          --input-border:    #D1D5DB;
+          --input-bg:        #1C2036;
+          --input-border:    #2A2E48;
 
           --green:           #43A047;
-          --green-bg:        #E8F5E9;
-          --green-border:    #A5D6A7;
-          --green-text:      #2E7D32;
-          --red:             #E53935;
-          --red-bg:          #FDECEA;
-          --orange:          #FB8C00;
-          --orange-bg:       #FFF3E0;
-          --blue:            #1E88E5;
-          --blue-bg:         #E3F2FD;
+          --green-bg:        rgba(67,160,71,.14);
+          --green-border:    rgba(67,160,71,.45);
+          --green-text:      #43A047;
+          --red:             #F4511E;
+          --red-bg:          rgba(244,81,30,.14);
+          --orange:          #F4511E;
+          --orange-bg:       rgba(244,81,30,.14);
+          --blue:            #E53935;
+          --blue-bg:         rgba(229,57,53,.14);
 
-          --exception-bg:    #E8F5E9;
-          --exception-border:#A5D6A7;
-          --exception-text:  #2E7D32;
+          --exception-bg:    rgba(67,160,71,.14);
+          --exception-border:rgba(67,160,71,.45);
+          --exception-text:  #43A047;
 
-          --btn-primary:     #5C6BC0;
-          --btn-primary-hover:#3949AB;
-          --btn-blue:        #1E88E5;
-        }
+          --btn-primary:     #E53935;
+          --btn-primary-hover:#C62828;
+          --btn-blue:        #E53935;
 
-        @media (prefers-color-scheme: dark) {
-          :root {
-            --bg:            #0F1117;
-            --bg-card:       #1A1F2E;
-            --bg-section:    #1A1F2E;
-            --sidebar-bg:    #0A0D1A;
-            --text:          #E8EAF6;
-            --text-muted:    #8B92A8;
-            --border:        #2D3248;
-            --input-bg:      #1E2139;
-            --input-border:  #3D4462;
-            --accent-light:  #1E2139;
-            --green-bg:      #0D2118;
-            --red-bg:        #2D0D0D;
-            --orange-bg:     #1F1200;
-            --blue-bg:       #0D1F33;
-            --exception-bg:  #1b3a1f;
-            --exception-border:#2e7d32;
-            --exception-text:#a5d6a7;
-            --btn-primary:   #3949AB;
-            --btn-primary-hover:#283593;
-            --btn-blue:      #1565C0;
-          }
-        }
-        [data-theme="dark"] {
-          --bg:            #0F1117;
-          --bg-card:       #1A1F2E;
-          --bg-section:    #1A1F2E;
-          --sidebar-bg:    #0A0D1A;
-          --text:          #E8EAF6;
-          --text-muted:    #8B92A8;
-          --border:        #2D3248;
-          --input-bg:      #1E2139;
-          --input-border:  #3D4462;
-          --accent-light:  #1E2139;
-          --green-bg:      #0D2118;
-          --red-bg:        #2D0D0D;
-          --orange-bg:     #1F1200;
-          --blue-bg:       #0D1F33;
-          --exception-bg:  #1b3a1f;
-          --exception-border:#2e7d32;
-          --exception-text:#a5d6a7;
-          --btn-primary:   #3949AB;
-          --btn-primary-hover:#283593;
-          --btn-blue:      #1565C0;
-        }
-        [data-theme="light"] {
-          --bg:            #F3F4F8;
-          --bg-card:       #FFFFFF;
-          --bg-section:    #FFFFFF;
-          --sidebar-bg:    #1E2140;
-          --text:          #1E2140;
-          --text-muted:    #757D8A;
-          --border:        #E5E7EB;
-          --input-bg:      #FFFFFF;
-          --input-border:  #D1D5DB;
-          --accent-light:  #E8EAF6;
-          --green-bg:      #E8F5E9;
-          --red-bg:        #FDECEA;
-          --orange-bg:     #FFF3E0;
-          --blue-bg:       #E3F2FD;
-          --exception-bg:  #E8F5E9;
-          --exception-border:#A5D6A7;
-          --exception-text:#2E7D32;
-          --btn-primary:   #5C6BC0;
-          --btn-primary-hover:#3949AB;
-          --btn-blue:      #1E88E5;
+          --on-accent:       #fff;
+          --font:            -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+          --radius:          12px;
+          --page-bg:         var(--bg);
+          --card-shadow:     0 1px 4px rgba(0,0,0,.05);
+          color-scheme: dark;
         }
 
         /* ─── Layout ──────────────────────────────────────────────────── */
@@ -123,10 +65,10 @@
         html, body {
             margin: 0; padding: 0;
             height: 100vh; overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+            font-family: var(--font);
             font-size: 14px;
             color: var(--text);
-            background: var(--bg);
+            background: var(--page-bg);
         }
 
         #app { display: flex; height: 100vh; }
@@ -253,32 +195,40 @@
             border-top: 1px solid rgba(255,255,255,.07);
         }
 
-        .theme-toggle-row {
-            display: flex;
-            gap: 4px;
-            margin-bottom: 8px;
-        }
-        .theme-btn {
-            flex: 1;
-            padding: 5px 0;
-            border: none;
-            background: rgba(255,255,255,.1);
-            color: rgba(255,255,255,.55);
-            font-size: 11px;
-            font-weight: 600;
-            cursor: pointer;
-            border-radius: 6px;
-            margin-top: 0;
+        .theme-switcher {
             display: flex;
             align-items: center;
+            gap: 4px;
+            margin-bottom: 4px;
+        }
+        .theme-nav {
+            flex: 0 0 30px;
+            height: 28px;
+            padding: 0;
+            margin-top: 0;
             justify-content: center;
-            transition: background .12s, color .12s;
+            background: rgba(255,255,255,.1);
+            color: var(--sidebar-text-hi);
+            font-size: 11px;
+            border-radius: 6px;
         }
-        .theme-btn.active {
-            background: var(--accent);
-            color: #fff;
+        .theme-nav:hover { background: var(--accent); color: var(--on-accent); }
+        .theme-name {
+            flex: 1;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--sidebar-text-hi);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
-        .theme-btn:hover:not(.active) { background: rgba(255,255,255,.18); color: rgba(255,255,255,.9); }
+        .theme-count {
+            text-align: center;
+            font-size: 10px;
+            color: var(--sidebar-text);
+            margin-bottom: 8px;
+        }
 
         .sidebar-shortcuts {
             font-size: 10px;
@@ -352,12 +302,22 @@
         /* ─── Cards ───────────────────────────────────────────────────── */
         .card {
             background: var(--bg-card);
-            border-radius: 12px;
+            border-radius: var(--radius);
             padding: 22px 24px;
             margin-bottom: 18px;
-            box-shadow: 0 1px 4px rgba(0,0,0,.05);
+            box-shadow: var(--card-shadow);
             border: 1px solid var(--border);
         }
+        /* Theme card styles (data-card on <html>, set by theme.js) */
+        [data-card="glass"] .card {
+            backdrop-filter: blur(14px) saturate(140%);
+            -webkit-backdrop-filter: blur(14px) saturate(140%);
+        }
+        [data-card="outline"] .card { border-width: 2px; }
+        [data-card="brutal"] .card { border: 3px solid var(--text); box-shadow: 6px 6px 0 var(--text); }
+        [data-card="shadow"] .card { border-color: transparent; }
+        [data-heading="upper"] .panel-heading { text-transform: uppercase; letter-spacing: .5px; }
+        [data-heading="serif"] .panel-heading { font-family: Georgia, "Times New Roman", serif; }
         .card-title {
             font-size: 13px;
             font-weight: 700;
@@ -427,7 +387,7 @@
             cursor: pointer;
             font-family: inherit;
             background: var(--btn-primary);
-            color: #fff;
+            color: var(--on-accent);
             margin-top: 4px;
             transition: background .13s, opacity .13s;
         }
@@ -906,8 +866,8 @@
             display: none !important;
         }
         /* Danger background for lockdown active panel */
-        [data-theme="dark"] #lockdownActivePanel {
-            --danger-bg: #3b1212;
+        #lockdownActivePanel {
+            --danger-bg: var(--red-bg);
         }
         /* ─── Stats ───────────────────────────────────────────────────── */
         .stat-cards { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
