@@ -1270,11 +1270,12 @@
         </nav>
 
         <div class="sidebar-footer">
-            <div id="themeToggle" class="theme-toggle-row">
-                <button class="theme-btn active" data-theme="auto">Auto</button>
-                <button class="theme-btn" data-theme="light">Light</button>
-                <button class="theme-btn" data-theme="dark">Dark</button>
+            <div id="themeSwitcher" class="theme-switcher">
+                <button id="themePrevBtn" class="theme-nav" title="Previous theme" aria-label="Previous theme">&#9664;</button>
+                <span id="themeName" class="theme-name">Midnight</span>
+                <button id="themeNextBtn" class="theme-nav" title="Next theme" aria-label="Next theme">&#9654;</button>
             </div>
+            <div id="themeCount" class="theme-count"></div>
             <div class="sidebar-shortcuts">
                 <kbd>Ctrl+Shift+B</kbd> open &middot; <kbd>Ctrl+Shift+Y</kbd> toggle<br>
                 <a href="#" id="shortcutsLink">Customise shortcuts</a>
