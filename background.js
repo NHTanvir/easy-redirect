@@ -1391,10 +1391,12 @@ chrome.runtime.onStartup.addListener(async () => {
 // ---------------------------------------------------------------------------
 // The Roadmap Coach extension (and only it) may read what Easy Redirect
 // blocks and grant earned break minutes when its daily roadmap goal is met.
-// Easy Redirect keeps doing all the blocking. Unpacked extension IDs come
-// from the folder path, so this ID is stable for ~/Desktop/roadmap-coach.
+// Easy Redirect keeps doing all the blocking. Both extensions have fixed IDs
+// from the `key` in their manifests (same ID unpacked or force-installed);
+// the second ID is Roadmap Coach's old path-based unpacked ID, accepted
+// while switching over.
 
-const ROADMAP_COACH_IDS = ['nebknlihiblchhknlfcijcmoggjjofjg'];
+const ROADMAP_COACH_IDS = ['ndhomdedcmiobobjnaeeiffflebkbiif', 'nebknlihiblchhknlfcijcmoggjjofjg'];
 
 // Host (plus path) of every enabled rule that names a site; keyword and
 // regex rules can't be expressed as a site.
