@@ -207,6 +207,36 @@ Daily rotation: the first load of a new local day picks a random theme (never ye
 
 Load Easy Redirect and Roadmap Coach unpacked: `chrome://extensions` → Developer mode → **Load unpacked** → this folder (and `~/Desktop/roadmap-coach`). After a change, click **Reload** on the extension. Their IDs are fixed by the public `key` in each `manifest.json`: Easy Redirect `mmojifignfdbfkcacbcfbflnkfdcgood`, Roadmap Coach `ndhomdedcmiobobjnaeeiffflebkbiif`. The bridge between them relies on these IDs, so keep the `key`.
 
+## Force-install: data safety (only if it's ever set up again)
+
+The default is **Load unpacked** + **Reload**, which never removes an extension or its data. Don't set up force-install (`ExtensionInstallForcelist`, packed `.crx`, a local update server) unless the user explicitly asks. If they do, these rules apply. They exist because the last force-install setup made Chrome drop both extensions, **with all their data**, during updates.
+
+**Why data gets lost:** Chrome owns a force-installed copy. It uninstalls the extension, and uninstalling **deletes its stored data**, whenever the extension leaves the policy list, Chrome can't fetch it from the update server, or the force-installed copy and an unpacked copy with the same ID replace each other.
+
+**1. Back up before every risky step.** That means any policy change, any deploy or update, and any switch between unpacked and force-installed. Close Chrome completely first, then run:
+
+```bash
+B=~/focus-extensions-backup-$(date +%Y%m%d-%H%M%S); P=~/.config/google-chrome/Default
+for s in "Local Extension Settings" "Sync Extension Settings"; do
+  for id in ndhomdedcmiobobjnaeeiffflebkbiif mmojifignfdbfkcacbcfbflnkfdcgood; do
+    [ -d "$P/$s/$id" ] && mkdir -p "$B/$s" && cp -a "$P/$s/$id" "$B/$s/"
+  done
+done
+du -sh "$B"/*/*   # must list both IDs and not be empty — otherwise stop
+```
+
+Keep every backup folder; never delete one without the user's say-so. Tell the user the folder's path.
+
+**2. An update must never remove anything:**
+- Keep the same manifest `key`, so the ID doesn't change. The version must always go up.
+- The update server must be running and serving the new `.crx` **before** Chrome checks for updates. Check this with `curl` first.
+- Never remove or edit the policy entry as part of an update.
+- Never have the unpacked and force-installed copies installed at the same time.
+
+**3. Check after every update:** both extensions are still in `chrome://extensions`, and their data is there (Roadmap Coach `days`/`settings`, Easy Redirect rules). If either is missing: close Chrome, copy the backup folders back into `$P/<store>/<id>`, then start Chrome.
+
+**4. Removing force-install** uninstalls both extensions and deletes their data, so back up first (step 1). Afterwards, load them unpacked again and restore the backup with Chrome closed.
+
 ## Git / PR workflow
 
 Feature branches: `feature-name` (kebab-case). Commits use the real current date — never backdate commits or rewrite merge-commit dates. Make several small commits per feature rather than one large one.
