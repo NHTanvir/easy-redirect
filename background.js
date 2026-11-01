@@ -1398,7 +1398,7 @@ chrome.runtime.onStartup.addListener(async () => {
 // The Roadmap Coach extension (and only it) may read what Easy Redirect
 // blocks and grant earned break minutes when its daily roadmap goal is met.
 // Easy Redirect keeps doing all the blocking. Both extensions have fixed IDs
-// from the `key` in their manifests (same ID unpacked or force-installed);
+// from the `key` in their manifests;
 // the second ID is Roadmap Coach's old path-based unpacked ID, accepted
 // while switching over.
 
