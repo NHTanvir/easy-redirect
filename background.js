@@ -191,12 +191,10 @@ const DEFAULTS = {
     // redirect URL from the user's chosen URL to the built-in blocked.html page.
     // The page's only configurable content is the motivational quote below.
     blockedPageEnabled: false,
-    // Motivational quotes on the blocked page (feature #15). When enabled,
-    // blocked.js picks a random quote from motivationQuotes (or falls back to
-    // built-in quotes when the array is empty) and displays it in the blockquote
-    // element on blocked.html. Both keys live in chrome.storage.sync so the
-    // setting and custom quotes follow the user across devices.
-    motivationEnabled: false,
+    // Motivational quotes on the blocked page (feature #15). blocked.js shows a
+    // quote from motivationQuotes (or the built-in collection when the array is
+    // empty) whenever the built-in page is on. Stored in chrome.storage.sync so
+    // the custom quotes follow the user across devices.
     motivationQuotes: [],
     // Block sub-resources (feature #16). When true, iframe (sub_frame) requests to
     // blocked domains are also redirected, not just top-level navigations.
@@ -1311,9 +1309,9 @@ async function runSchemaMigration() {
         groups = groups.map(g => ('delaySeconds' in g) ? g : { ...g, delaySeconds: 0, allowWindowSecs: 0 });
     }
 
-    // motivationEnabled and motivationQuotes (feature #15) are top-level sync keys
-    // with scalar / array defaults. No per-rule or per-group backfill is needed —
-    // initializeMissingDefaults() fills them in automatically on first run after upgrade.
+    // motivationQuotes (feature #15) is a top-level sync key with an array default.
+    // No per-rule or per-group backfill is needed — initializeMissingDefaults()
+    // fills it in automatically on first run after upgrade.
 
     const changed = next !== current || needsRuleBackfill || !hasDefault || groupsNeedSchedule || groupsNeedDelay;
     if (!changed) {

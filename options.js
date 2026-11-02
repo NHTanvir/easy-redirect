@@ -443,8 +443,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 'redirectUrl', 'rules', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups', 'theme', 'themeDate',
                 'accessCode', 'uninstallUrl', 'disableDelaySecs',
                 'pomodoroWorkMinutes', 'pomodoroBreakMinutes',
-                'blockedPageEnabled',
-                'motivationEnabled', 'motivationQuotes',
+                'blockedPageEnabled', 'motivationQuotes',
                 'blockSubresources', 'profileName',
                 'notifyOnRedirect', 'notifyThrottleMs',
                 'incognitoMode'
@@ -1141,15 +1140,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Toggle motivationOptions visibility when the motivation checkbox changes.
-    const motEnabledCb = document.getElementById('motivationEnabled');
-    if (motEnabledCb) {
-        motEnabledCb.addEventListener('change', () => {
-            const motOptions = document.getElementById('motivationOptions');
-            if (motOptions) motOptions.style.display = motEnabledCb.checked ? 'block' : 'none';
-        });
-    }
-
     // Populate UI from stored values — called from loadData().
     function _loadBlockedPageSettings(result) {
         if (blockedPageEnabledCb) {
@@ -1158,15 +1148,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 blockedPageOptions.style.display = blockedPageEnabledCb.checked ? 'block' : 'none';
             }
         }
-        // Load motivation settings (feature #15).
-        const motEnabled = result.motivationEnabled || false;
+        // Load the quote list (feature #15). The quote always shows when the
+        // built-in page is on, so there is no separate enable checkbox.
         const motQuotes  = Array.isArray(result.motivationQuotes) ? result.motivationQuotes : [];
-        const motEnabledEl = document.getElementById('motivationEnabled');
-        if (motEnabledEl) {
-            motEnabledEl.checked = motEnabled;
-            const motOptions = document.getElementById('motivationOptions');
-            if (motOptions) motOptions.style.display = motEnabled ? 'block' : 'none';
-        }
         const motQuotesEl = document.getElementById('motivationQuotes');
         if (motQuotesEl) {
             // Pre-fill the box with the built-in collection when the user has no
@@ -1184,7 +1168,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (saveBlockedPageBtn) {
         saveBlockedPageBtn.addEventListener('click', async () => {
             const enabled = blockedPageEnabledCb ? blockedPageEnabledCb.checked : false;
-            const motEnabled  = document.getElementById('motivationEnabled')?.checked || false;
             const motQuotesEl = document.getElementById('motivationQuotes');
             const motQuotes   = motQuotesEl
                 ? motQuotesEl.value.split('\n').map(s => s.trim()).filter(Boolean)
@@ -1192,7 +1175,6 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 await chrome.storage.sync.set({
                     blockedPageEnabled: enabled,
-                    motivationEnabled: motEnabled,
                     motivationQuotes: motQuotes
                 });
                 await updateRedirectRules();
@@ -1242,7 +1224,6 @@ document.addEventListener('DOMContentLoaded', function() {
         previewBlockedPageBtn.addEventListener('click', async () => {
             // Save any unsaved changes first so the preview reflects the latest input.
             const enabled = blockedPageEnabledCb ? blockedPageEnabledCb.checked : false;
-            const motEnabled  = document.getElementById('motivationEnabled')?.checked || false;
             const motQuotesEl = document.getElementById('motivationQuotes');
             const motQuotes   = motQuotesEl
                 ? motQuotesEl.value.split('\n').map(s => s.trim()).filter(Boolean)
@@ -1250,7 +1231,6 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 await chrome.storage.sync.set({
                     blockedPageEnabled: enabled,
-                    motivationEnabled: motEnabled,
                     motivationQuotes: motQuotes
                 });
             } catch (_) { /* ignore — preview still works with stale storage */ }

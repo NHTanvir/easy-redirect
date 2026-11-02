@@ -46,12 +46,12 @@
         el.textContent = `\u{1F525} ${n}-day focus streak. Don't break it.`;
     });
 
-    // Motivational quote (feature #15) — the only configurable content on the page.
+    // Motivational quote (feature #15) — the only content on the page, always shown.
     chrome.storage.sync.get(
-        ['motivationEnabled', 'motivationQuotes'],
+        ['motivationQuotes'],
         syncResult => {
             const quoteEl = document.getElementById('motivationQuote');
-            if (quoteEl && syncResult.motivationEnabled) {
+            if (quoteEl) {
                 const quotes = Array.isArray(syncResult.motivationQuotes) && syncResult.motivationQuotes.length > 0
                     ? syncResult.motivationQuotes
                     : BUILTIN_QUOTES;
