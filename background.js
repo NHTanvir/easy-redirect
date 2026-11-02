@@ -88,6 +88,70 @@ async function clearTemporaryOverride(ruleId) {
     await updateRedirectRules();
 }
 
+// Delay allow-window (feature #12). After the user sits out a group's countdown
+// they get `allowWindowSecs` of access to the site. The deadline is stored in
+// chrome.storage.local under `allowedUntil:<ruleId>` (written by countdown.js
+// via the startAllowWindow message) and an alarm named `allowWindow:<ruleId>`
+// re-emits DNR rules at expiry so blocking resumes on its own.
+//
+// Like temporaryOverrides, an active window makes createRedirectRules() skip
+// that rule entirely — without that the DNR rule keeps matching and the user
+// bounces straight back to the countdown.
+const ALLOW_WINDOW_KEY_PREFIX = 'allowedUntil:';
+const ALLOW_WINDOW_ALARM_PREFIX = 'allowWindow:';
+
+// Read the active `allowedUntil:<ruleId>` entries for the given rule IDs,
+// pruning any that have already passed (an alarm may have been missed while
+// Chrome was closed). Returns a { [ruleId]: expiresAt } map.
+//
+// Only the keys for ruleIds are fetched — never storage.local.get(null) — so a
+// rule rebuild doesn't drag the whole local store (stats, pause log, any legacy
+// image data URL) through memory on every emit.
+async function getActiveAllowWindows(ruleIds) {
+    const ids = Array.isArray(ruleIds) ? ruleIds.filter(Boolean) : [];
+    if (ids.length === 0) return {};
+    const keys = ids.map(id => ALLOW_WINDOW_KEY_PREFIX + id);
+    const stored = await chrome.storage.local.get(keys);
+    const active = {};
+    const expiredKeys = [];
+    const now = Date.now();
+    for (const id of ids) {
+        const key = ALLOW_WINDOW_KEY_PREFIX + id;
+        const value = stored[key];
+        if (value === undefined) continue;
+        if (typeof value === 'number' && value > now) {
+            active[id] = value;
+        } else {
+            expiredKeys.push(key);
+        }
+    }
+    // Pruning writes to chrome.storage.local, which the storage.onChanged
+    // listener ignores (it returns early unless namespace === 'sync'), so this
+    // cannot re-trigger the rule rebuild we are currently inside.
+    if (expiredKeys.length) await chrome.storage.local.remove(expiredKeys);
+    return active;
+}
+
+// Start (or extend) the allow window for a rule and re-emit DNR rules so the
+// rule stops matching before the caller navigates to the site.
+async function startAllowWindow(ruleId, seconds) {
+    if (!ruleId || !(seconds > 0)) return null;
+    const expiresAt = Date.now() + seconds * 1000;
+    await chrome.storage.local.set({ [ALLOW_WINDOW_KEY_PREFIX + ruleId]: expiresAt });
+    await chrome.alarms.create(ALLOW_WINDOW_ALARM_PREFIX + ruleId, { when: expiresAt });
+    await updateRedirectRules();
+    return expiresAt;
+}
+
+// End an allow window early / on expiry: drop the key, cancel the alarm and
+// re-emit DNR rules so the rule blocks again.
+async function clearAllowWindow(ruleId) {
+    if (!ruleId) return;
+    await chrome.storage.local.remove(ALLOW_WINDOW_KEY_PREFIX + ruleId);
+    await chrome.alarms.clear(ALLOW_WINDOW_ALARM_PREFIX + ruleId);
+    await updateRedirectRules();
+}
+
 const DEFAULTS = {
     redirectUrl: 'https://www.google.com',
     blockedWebsites: [],
@@ -308,6 +372,15 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     if (alarm.name.startsWith(TEMP_OVERRIDE_ALARM_PREFIX)) {
         const ruleId = alarm.name.slice(TEMP_OVERRIDE_ALARM_PREFIX.length);
         await clearTemporaryOverride(ruleId);
+        return;
+    }
+
+    // Delay allow-window expiry (feature #12): an `allowWindow:<ruleId>` alarm
+    // fires when the post-countdown access window runs out, so the rule starts
+    // redirecting again.
+    if (alarm.name.startsWith(ALLOW_WINDOW_ALARM_PREFIX)) {
+        const ruleId = alarm.name.slice(ALLOW_WINDOW_ALARM_PREFIX.length);
+        await clearAllowWindow(ruleId);
         return;
     }
 
@@ -1595,6 +1668,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         clearTemporaryOverride(request.ruleId).then(() => sendResponse({ ok: true }));
         return true;
     }
+    // Delay allow-window (feature #12). countdown.js calls this once the user has
+    // waited out the countdown; it must finish (DNR rules re-emitted) before the
+    // page navigates, otherwise the rule still matches and the user bounces back.
+    if (request.action === 'startAllowWindow') {
+        startAllowWindow(request.ruleId, request.seconds)
+            .then(expiresAt => sendResponse({ ok: true, expiresAt }))
+            .catch(err => sendResponse({ ok: false, error: String(err) }));
+        return true;
+    }
     if (request.action === 'getTemporaryOverrides') {
         getTemporaryOverrides().then(o => sendResponse({ overrides: o }));
         return true;
@@ -2038,6 +2120,11 @@ async function _createRedirectRules(rules, redirectUrl, opts = {}) {
         // override's alarm fires and clearTemporaryOverride re-emits DNR rules.
         const tempOverrides = await getTemporaryOverrides();
 
+        // Delay allow-windows (feature #12): a rule the user has just waited out
+        // is skipped for the length of its group's allowWindowSecs, so they can
+        // actually reach the site instead of bouncing back to the countdown.
+        const allowWindows = await getActiveAllowWindows(rules.map(r => r && r.id));
+
         // Build DNR rules. Disabled source rules are skipped here, not deleted —
         // toggling enabled back to true must restore behaviour without touching
         // storage. Unknown types log a warning so future contributors see they
@@ -2065,6 +2152,18 @@ async function _createRedirectRules(rules, redirectUrl, opts = {}) {
             // override expiry alarm will call clearTemporaryOverride which
             // re-emits DNR rules, so blocking transparently resumes at expiry.
             if (tempOverrides[rule.id]) {
+                return;
+            }
+
+            // Skip rules inside an active delay allow-window (feature #12). The
+            // allowWindow:<ruleId> alarm re-emits rules at expiry, so blocking
+            // resumes automatically.
+            //
+            // Blocklist mode only: countdowns are never shown in allowlist mode
+            // (see the groupDelay branch below), where this rule is an *allow*
+            // entry — skipping it there would hand the site to the catch-all
+            // redirect and block it, the exact opposite of an allow window.
+            if (mode === 'blocklist' && allowWindows[rule.id]) {
                 return;
             }
 
