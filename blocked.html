@@ -36,13 +36,13 @@
             padding: 32px 16px;
         }
         .card {
-            max-width: 500px;
+            max-width: 640px;
             width: 100%;
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-top: 4px solid var(--accent);
             border-radius: var(--radius);
-            padding: 44px 40px;
+            padding: 48px 48px 40px;
             text-align: center;
             box-shadow: 0 12px 44px rgba(0,0,0,.22);
         }
@@ -58,58 +58,32 @@
             box-shadow: 0 6px 18px rgba(0,0,0,.20);
         }
         #blockedImage.visible { display: block; }
-        h1 {
-            font-size: 28px;
-            font-weight: 700;
-            letter-spacing: -0.02em;
-            color: var(--accent);
-            margin-bottom: 12px;
-        }
-        #blockedMessage {
-            font-size: 15px;
-            color: var(--text-muted);
-            line-height: 1.6;
-            margin-bottom: 24px;
-            white-space: pre-wrap;
-            word-break: break-word;
-        }
-        #blockedFrom {
-            font-size: 12px;
-            color: var(--text-muted);
-            background: color-mix(in srgb, var(--text-muted) 12%, transparent);
-            border-radius: 20px;
-            padding: 5px 12px;
-            display: none;
-            max-width: 100%;
-            margin: 0 auto 22px;
-            word-break: break-all;
-        }
-        #blockedFrom.visible { display: inline-block; }
         #motivationQuote {
             display: none;
             position: relative;
-            font-size: 19px;
-            font-weight: 600;
+            font-size: 34px;
+            font-weight: 700;
             font-style: italic;
             color: var(--text);
-            background: color-mix(in srgb, var(--accent) 12%, transparent);
-            border-left: 4px solid var(--accent);
-            border-radius: 10px;
-            padding: 22px 24px 22px 52px;
-            text-align: left;
-            margin: 4px 0 26px;
-            line-height: 1.55;
+            background: color-mix(in srgb, var(--accent) 13%, transparent);
+            border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+            border-left: 6px solid var(--accent);
+            border-radius: 14px;
+            padding: 44px 40px 44px 44px;
+            text-align: center;
+            margin: 0 0 32px;
+            line-height: 1.35;
         }
         #motivationQuote.visible { display: block; }
         #motivationQuote::before {
             content: "\201C";
             position: absolute;
-            left: 16px;
+            left: 20px;
             top: 10px;
-            font-size: 46px;
+            font-size: 72px;
             line-height: 1;
             color: var(--accent);
-            opacity: .55;
+            opacity: .4;
             font-family: Georgia, "Times New Roman", serif;
         }
         .actions {
@@ -146,10 +120,7 @@
 <body>
 <div class="card">
     <img id="blockedImage" src="" alt="">
-    <h1 id="blockedTitle">Site Blocked</h1>
-    <p id="blockedMessage"></p>
     <blockquote id="motivationQuote"></blockquote>
-    <p id="blockedFrom"></p>
     <p id="focusStreak"></p>
     <div class="actions">
         <a class="btn btn-primary" href="#" id="goBackBtn" data-i18n="blockedPageGoBack">Go back</a>
