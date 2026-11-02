@@ -1133,7 +1133,10 @@ document.addEventListener('DOMContentLoaded', function() {
     if (blockedPageEnabledCb) {
         blockedPageEnabledCb.addEventListener('change', () => {
             if (blockedPageOptions) {
-                blockedPageOptions.style.display = blockedPageEnabledCb.checked ? '' : 'none';
+                // Use 'block' not '': an empty string clears the inline style and
+                // the element falls back to the stylesheet rule
+                // `#blockedPageOptions { display: none }`, so it would stay hidden.
+                blockedPageOptions.style.display = blockedPageEnabledCb.checked ? 'block' : 'none';
             }
         });
     }
