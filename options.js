@@ -1171,7 +1171,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         const motQuotesEl = document.getElementById('motivationQuotes');
         if (motQuotesEl) {
-            motQuotesEl.value = motQuotes.join('\n');
+            // Pre-fill the box with the built-in collection when the user has no
+            // custom quotes yet, so the 50 defaults are visible and editable
+            // (add/remove lines) rather than hidden behind an empty textarea.
+            const quotesToShow = motQuotes.length > 0
+                ? motQuotes
+                : (typeof BUILTIN_MOTIVATION_QUOTES !== 'undefined' ? BUILTIN_MOTIVATION_QUOTES : []);
+            motQuotesEl.value = quotesToShow.join('\n');
         }
         // Load stored image preview from local storage.
         chrome.storage.local.get(['blockedImageDataUrl'], localResult => {
