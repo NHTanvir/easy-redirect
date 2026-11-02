@@ -1167,7 +1167,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (motEnabledEl) {
             motEnabledEl.checked = motEnabled;
             const motOptions = document.getElementById('motivationOptions');
-            if (motOptions) motOptions.style.display = motEnabled ? '' : 'none';
+            if (motOptions) motOptions.style.display = motEnabled ? 'block' : 'none';
         }
         const motQuotesEl = document.getElementById('motivationQuotes');
         if (motQuotesEl) {
