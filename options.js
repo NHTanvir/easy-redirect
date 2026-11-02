@@ -1146,7 +1146,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (motEnabledCb) {
         motEnabledCb.addEventListener('change', () => {
             const motOptions = document.getElementById('motivationOptions');
-            if (motOptions) motOptions.style.display = motEnabledCb.checked ? '' : 'none';
+            if (motOptions) motOptions.style.display = motEnabledCb.checked ? 'block' : 'none';
         });
     }
 
