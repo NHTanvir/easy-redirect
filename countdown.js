@@ -1,7 +1,9 @@
 // countdown.js — drives the countdown interstitial page (feature #12).
 //
 // URL parameters accepted (all set by background.js at redirect time):
-//   from=<encoded-original-url>  — the URL the user was trying to visit
+//   from=<encoded-original-url>  — the URL the user was trying to visit. DNR
+//                                  cannot inject it, so it is usually absent and
+//                                  document.referrer is used instead.
 //   to=<encoded-redirect-url>    — the final redirect destination (blocked page)
 //   delay=<seconds>              — how many seconds to count down
 //   window=<seconds>             — allow-window length (0 = no window)
@@ -20,7 +22,12 @@
     });
 
     const params = new URLSearchParams(location.search);
-    const fromUrl    = params.get('from')   || '';
+    // DNR cannot inject the matched URL into a redirect target, so background.js
+    // leaves ?from= empty when it redirects here. Fall back to document.referrer
+    // (the page the browser came from) so we still know where the user was
+    // heading — without it every navigation below collapses to `toUrl`, i.e. the
+    // blocked page, and the countdown can never let the user through.
+    const fromUrl    = params.get('from')   || document.referrer || '';
     const toUrl      = params.get('to')     || 'https://www.google.com';
     const delaySecs  = Math.max(1, parseInt(params.get('delay')  || '10', 10));
     const windowSecs = Math.max(0, parseInt(params.get('window') || '0',  10));
