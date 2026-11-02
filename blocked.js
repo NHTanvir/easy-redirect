@@ -52,6 +52,7 @@
         } catch (_) {
             fromEl.textContent = `Blocked: ${fromUrl}`;
         }
+        fromEl.classList.add('visible');
     }
 
     // Focus streak: a reminder of what a pause would cost.
