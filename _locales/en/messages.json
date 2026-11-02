@@ -19,14 +19,6 @@
     "message": "Toggle Easy Redirect on/off",
     "description": "Command description"
   },
-  "blockedPageTitle": {
-    "message": "Site Blocked",
-    "description": "Default heading on blocked.html"
-  },
-  "blockedPageMessage": {
-    "message": "This site has been blocked by Easy Redirect to help you stay focused.",
-    "description": "Default body on blocked.html"
-  },
   "blockedPageGoBack": {
     "message": "Go back",
     "description": "Button on blocked.html"

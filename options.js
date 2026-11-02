@@ -443,7 +443,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 'redirectUrl', 'rules', 'extensionEnabled', 'mode', 'alwaysAllowed', 'groups', 'theme', 'themeDate',
                 'accessCode', 'uninstallUrl', 'disableDelaySecs',
                 'pomodoroWorkMinutes', 'pomodoroBreakMinutes',
-                'blockedPageEnabled', 'blockedPageTitle', 'blockedMessage',
+                'blockedPageEnabled',
                 'motivationEnabled', 'motivationQuotes',
                 'blockSubresources', 'profileName',
                 'notifyOnRedirect', 'notifyThrottleMs',
@@ -562,7 +562,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (notifyEl) {
             notifyEl.checked = result.notifyOnRedirect || false;
             const o = document.getElementById('notifyOptions');
-            if (o) o.style.display = notifyEl.checked ? '' : 'none';
+            if (o) o.style.display = notifyEl.checked ? 'block' : 'none';
         }
         const tEl = document.getElementById('notifyThrottleSecs');
         if (tEl) tEl.value = Math.round((result.notifyThrottleMs ?? 5000) / 1000);
@@ -1079,7 +1079,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // Feature on, session active.
                 if (startBtn) startBtn.style.display = 'none';
-                if (stopBtn) stopBtn.style.display = '';
+                // 'inline-block' not '': #pomodoroStopBtn has `display: none` in
+                // CSS, so an empty string would leave the Stop button hidden.
+                if (stopBtn) stopBtn.style.display = 'inline-block';
 
                 const isWork = state === 'work';
                 const totalMins = isWork
@@ -1125,15 +1127,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const blockedPageEnabledCb = document.getElementById('blockedPageEnabled');
     const blockedPageOptions   = document.getElementById('blockedPageOptions');
-    const blockedPageTitleEl   = document.getElementById('blockedPageTitle');
-    const blockedMessageEl     = document.getElementById('blockedMessage');
     const blockedPageStatusEl  = document.getElementById('blockedPageStatus');
 
     // Show/hide the options panel based on the checkbox state.
     if (blockedPageEnabledCb) {
         blockedPageEnabledCb.addEventListener('change', () => {
             if (blockedPageOptions) {
-                blockedPageOptions.style.display = blockedPageEnabledCb.checked ? '' : 'none';
+                // Use 'block' not '': an empty string clears the inline style and
+                // the element falls back to the stylesheet rule
+                // `#blockedPageOptions { display: none }`, so it would stay hidden.
+                blockedPageOptions.style.display = blockedPageEnabledCb.checked ? 'block' : 'none';
             }
         });
     }
@@ -1143,7 +1146,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (motEnabledCb) {
         motEnabledCb.addEventListener('change', () => {
             const motOptions = document.getElementById('motivationOptions');
-            if (motOptions) motOptions.style.display = motEnabledCb.checked ? '' : 'none';
+            if (motOptions) motOptions.style.display = motEnabledCb.checked ? 'block' : 'none';
         });
     }
 
@@ -1152,11 +1155,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (blockedPageEnabledCb) {
             blockedPageEnabledCb.checked = result.blockedPageEnabled === true;
             if (blockedPageOptions) {
-                blockedPageOptions.style.display = blockedPageEnabledCb.checked ? '' : 'none';
+                blockedPageOptions.style.display = blockedPageEnabledCb.checked ? 'block' : 'none';
             }
         }
-        if (blockedPageTitleEl) blockedPageTitleEl.value = result.blockedPageTitle || '';
-        if (blockedMessageEl)   blockedMessageEl.value   = result.blockedMessage   || '';
         // Load motivation settings (feature #15).
         const motEnabled = result.motivationEnabled || false;
         const motQuotes  = Array.isArray(result.motivationQuotes) ? result.motivationQuotes : [];
@@ -1164,21 +1165,18 @@ document.addEventListener('DOMContentLoaded', function() {
         if (motEnabledEl) {
             motEnabledEl.checked = motEnabled;
             const motOptions = document.getElementById('motivationOptions');
-            if (motOptions) motOptions.style.display = motEnabled ? '' : 'none';
+            if (motOptions) motOptions.style.display = motEnabled ? 'block' : 'none';
         }
         const motQuotesEl = document.getElementById('motivationQuotes');
         if (motQuotesEl) {
-            motQuotesEl.value = motQuotes.join('\n');
+            // Pre-fill the box with the built-in collection when the user has no
+            // custom quotes yet, so the 50 defaults are visible and editable
+            // (add/remove lines) rather than hidden behind an empty textarea.
+            const quotesToShow = motQuotes.length > 0
+                ? motQuotes
+                : (typeof BUILTIN_MOTIVATION_QUOTES !== 'undefined' ? BUILTIN_MOTIVATION_QUOTES : []);
+            motQuotesEl.value = quotesToShow.join('\n');
         }
-        // Load stored image preview from local storage.
-        chrome.storage.local.get(['blockedImageDataUrl'], localResult => {
-            const previewDiv = document.getElementById('blockedImagePreview');
-            const previewImg = document.getElementById('blockedImagePreviewImg');
-            if (localResult.blockedImageDataUrl && previewDiv && previewImg) {
-                previewImg.src = localResult.blockedImageDataUrl;
-                previewDiv.style.display = '';
-            }
-        });
     }
 
     // Save blocked page settings.
@@ -1186,8 +1184,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (saveBlockedPageBtn) {
         saveBlockedPageBtn.addEventListener('click', async () => {
             const enabled = blockedPageEnabledCb ? blockedPageEnabledCb.checked : false;
-            const title   = (blockedPageTitleEl  && blockedPageTitleEl.value.trim())  || '';
-            const message = (blockedMessageEl    && blockedMessageEl.value.trim())    || '';
             const motEnabled  = document.getElementById('motivationEnabled')?.checked || false;
             const motQuotesEl = document.getElementById('motivationQuotes');
             const motQuotes   = motQuotesEl
@@ -1196,8 +1192,6 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 await chrome.storage.sync.set({
                     blockedPageEnabled: enabled,
-                    blockedPageTitle: title,
-                    blockedMessage: message,
                     motivationEnabled: motEnabled,
                     motivationQuotes: motQuotes
                 });
@@ -1247,8 +1241,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (previewBlockedPageBtn) {
         previewBlockedPageBtn.addEventListener('click', async () => {
             // Save any unsaved changes first so the preview reflects the latest input.
-            const title   = (blockedPageTitleEl  && blockedPageTitleEl.value.trim())  || '';
-            const message = (blockedMessageEl    && blockedMessageEl.value.trim())    || '';
             const enabled = blockedPageEnabledCb ? blockedPageEnabledCb.checked : false;
             const motEnabled  = document.getElementById('motivationEnabled')?.checked || false;
             const motQuotesEl = document.getElementById('motivationQuotes');
@@ -1258,70 +1250,12 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 await chrome.storage.sync.set({
                     blockedPageEnabled: enabled,
-                    blockedPageTitle: title,
-                    blockedMessage: message,
                     motivationEnabled: motEnabled,
                     motivationQuotes: motQuotes
                 });
             } catch (_) { /* ignore — preview still works with stale storage */ }
             const qp = new URLSearchParams({ from: 'https://example.com', preview: '1' });
             chrome.tabs.create({ url: `${chrome.runtime.getURL('blocked.html')}?${qp}` });
-        });
-    }
-
-    // Image upload — read file as data URL and store in chrome.storage.local.
-    // Data URLs can be several hundred KB; we cap at ~1 MB to avoid filling
-    // local storage. The image is intentionally NOT stored in sync (sync per-item
-    // limit is 8 KB, nowhere near enough for even a small image).
-    const blockedImageUpload = document.getElementById('blockedImageUpload');
-    if (blockedImageUpload) {
-        blockedImageUpload.addEventListener('change', () => {
-            const file = blockedImageUpload.files && blockedImageUpload.files[0];
-            if (!file) return;
-            const MAX_BYTES = 1024 * 1024; // 1 MB
-            if (file.size > MAX_BYTES) {
-                if (blockedPageStatusEl) {
-                    blockedPageStatusEl.textContent = 'Image too large (max 1 MB).';
-                    blockedPageStatusEl.style.color = '#c62828';
-                }
-                blockedImageUpload.value = '';
-                return;
-            }
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const dataUrl = e.target.result;
-                chrome.storage.local.set({ blockedImageDataUrl: dataUrl }, () => {
-                    const previewDiv = document.getElementById('blockedImagePreview');
-                    const previewImg = document.getElementById('blockedImagePreviewImg');
-                    if (previewDiv) previewDiv.style.display = '';
-                    if (previewImg) previewImg.src = dataUrl;
-                    if (blockedPageStatusEl) {
-                        blockedPageStatusEl.textContent = 'Image saved locally.';
-                        blockedPageStatusEl.style.color = '#2e7d32';
-                        setTimeout(() => { if (blockedPageStatusEl) blockedPageStatusEl.textContent = ''; }, 2000);
-                    }
-                });
-            };
-            reader.readAsDataURL(file);
-        });
-    }
-
-    // Remove image button.
-    const clearBlockedImageBtn = document.getElementById('clearBlockedImageBtn');
-    if (clearBlockedImageBtn) {
-        clearBlockedImageBtn.addEventListener('click', () => {
-            chrome.storage.local.remove('blockedImageDataUrl', () => {
-                const previewDiv = document.getElementById('blockedImagePreview');
-                const previewImg = document.getElementById('blockedImagePreviewImg');
-                if (previewDiv) previewDiv.style.display = 'none';
-                if (previewImg) previewImg.src = '';
-                if (blockedImageUpload) blockedImageUpload.value = '';
-                if (blockedPageStatusEl) {
-                    blockedPageStatusEl.textContent = 'Image removed.';
-                    blockedPageStatusEl.style.color = '#2e7d32';
-                    setTimeout(() => { if (blockedPageStatusEl) blockedPageStatusEl.textContent = ''; }, 2000);
-                }
-            });
         });
     }
 
@@ -3197,7 +3131,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Redirect notification settings handlers (issue #33).
     document.getElementById('notifyOnRedirect')?.addEventListener('change', e => {
         const o = document.getElementById('notifyOptions');
-        if (o) o.style.display = e.target.checked ? '' : 'none';
+        if (o) o.style.display = e.target.checked ? 'block' : 'none';
     });
     document.getElementById('saveNotifyBtn')?.addEventListener('click', async () => {
         const en = document.getElementById('notifyOnRedirect')?.checked || false;

@@ -7,17 +7,15 @@
 (function () {
     'use strict';
 
+    // BUILTIN_MOTIVATION_QUOTES comes from quotes.js (loaded before this script).
+    const BUILTIN_QUOTES = (typeof BUILTIN_MOTIVATION_QUOTES !== 'undefined')
+        ? BUILTIN_MOTIVATION_QUOTES
+        : ['Stay focused. Every blocked visit is a small win.'];
+
     document.querySelectorAll('[data-i18n]').forEach(el => {
         const m = chrome.i18n.getMessage(el.getAttribute('data-i18n'));
         if (m) el.textContent = m;
     });
-
-    const params = new URLSearchParams(location.search);
-    // ?from= is set by the countdown interstitial when it chains to blocked.html.
-    // When blocked.html is the direct DNR redirect target, DNR cannot inject the
-    // matched URL into the redirect, so we fall back to document.referrer (the
-    // last page the browser visited before this one).
-    const fromUrl = params.get('from') || document.referrer || '';
 
     // Fix up the settings link — replace the PLACEHOLDER extension ID with the real one.
     const settingsBtn = document.getElementById('settingsBtn');
@@ -39,16 +37,6 @@
         });
     }
 
-    // Show the blocked URL in the subtitle.
-    const fromEl = document.getElementById('blockedFrom');
-    if (fromEl && fromUrl) {
-        try {
-            fromEl.textContent = `Blocked: ${new URL(fromUrl).hostname}`;
-        } catch (_) {
-            fromEl.textContent = `Blocked: ${fromUrl}`;
-        }
-    }
-
     // Focus streak: a reminder of what a pause would cost.
     chrome.runtime.sendMessage({ action: 'getFocusState' }, state => {
         const el = document.getElementById('focusStreak');
@@ -58,37 +46,16 @@
         el.textContent = `\u{1F525} ${n}-day focus streak. Don't break it.`;
     });
 
-    // Load all display settings from chrome.storage.sync + local.
+    // Motivational quote (feature #15) — the only configurable content on the page.
     chrome.storage.sync.get(
-        ['blockedPageTitle', 'blockedMessage', 'motivationEnabled', 'motivationQuotes'],
+        ['motivationEnabled', 'motivationQuotes'],
         syncResult => {
-            // Title
-            const titleEl = document.getElementById('blockedTitle');
-            if (titleEl) {
-                const i18nTitle = chrome.i18n.getMessage('blockedPageTitle');
-                titleEl.textContent = (typeof syncResult.blockedPageTitle === 'string' && syncResult.blockedPageTitle.trim())
-                    ? syncResult.blockedPageTitle.trim()
-                    : (i18nTitle || 'Site Blocked');
-            }
-
-            // Message
-            const msgEl = document.getElementById('blockedMessage');
-            if (msgEl) {
-                // A per-redirect ?msg= param takes precedence over the stored default.
-                const overrideMsg = params.get('msg');
-                const storedMsg = typeof syncResult.blockedMessage === 'string' ? syncResult.blockedMessage.trim() : '';
-                const i18nMsg = chrome.i18n.getMessage('blockedPageMessage');
-                msgEl.textContent = overrideMsg || storedMsg || i18nMsg ||
-                    'This site has been blocked by Easy Redirect to help you stay focused.';
-            }
-
-            // Motivation quote (feature #15 compatible — optional).
             const quoteEl = document.getElementById('motivationQuote');
             if (quoteEl && syncResult.motivationEnabled) {
                 const quotes = Array.isArray(syncResult.motivationQuotes) && syncResult.motivationQuotes.length > 0
                     ? syncResult.motivationQuotes
-                    : ['Stay focused. Every blocked visit is a small win.'];
-                // Seeded rotation: pick quote by day-of-year + seconds-of-minute so it changes
+                    : BUILTIN_QUOTES;
+                // Seeded rotation: pick quote by day-of-year + minute-of-hour so it changes
                 // every minute but is consistent across refreshes within the same minute.
                 const now = new Date();
                 const doy = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
@@ -96,15 +63,6 @@
                 quoteEl.textContent = `"${quotes[idx]}"`;
                 quoteEl.classList.add('visible');
             }
-
-            // Custom image — stored as a data URL in chrome.storage.local.
-            chrome.storage.local.get(['blockedImageDataUrl'], localResult => {
-                const imgEl = document.getElementById('blockedImage');
-                if (imgEl && localResult.blockedImageDataUrl) {
-                    imgEl.src = localResult.blockedImageDataUrl;
-                    imgEl.classList.add('visible');
-                }
-            });
         }
     );
 })();

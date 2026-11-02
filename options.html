@@ -1034,14 +1034,6 @@
             letter-spacing: 2px; text-transform: uppercase;
         }
 
-        /* Image preview */
-        #blockedImagePreview { margin-top: 8px; display: none; }
-        #blockedImagePreviewImg {
-            max-width: 120px; max-height: 120px;
-            border-radius: 7px; border: 1px solid var(--border);
-            object-fit: contain;
-        }
-
         /* Regex test */
         #regexTestRow { display: none; margin-top: 10px; }
 
@@ -1873,36 +1865,14 @@
                 </label>
 
                 <div id="blockedPageOptions">
-                    <div class="field-group">
-                        <label class="field-label">Page title</label>
-                        <input type="text" id="blockedPageTitle" placeholder="Site Blocked" maxlength="80">
-                    </div>
-                    <div class="field-group">
-                        <label class="field-label">Message</label>
-                        <textarea id="blockedMessage" rows="3" maxlength="500"
-                                  placeholder="This site has been blocked by Easy Redirect to help you stay focused."
-                                  style="resize:vertical;"></textarea>
-                    </div>
-                    <div class="field-group">
-                        <label class="field-label">Custom image (optional)</label>
-                        <input type="file" id="blockedImageUpload" accept="image/*">
-                        <p class="help-text">Stored locally on this device (not synced). Max ~1 MB.</p>
-                        <div id="blockedImagePreview">
-                            <img id="blockedImagePreviewImg" src="" alt="Preview">
-                            <button id="clearBlockedImageBtn" class="btn-ghost btn-sm" style="display:block;margin-top:4px;color:var(--red);border-color:var(--red);">Remove image</button>
-                        </div>
-                    </div>
-
-                    <hr class="divider">
-
                     <div id="motivationSection">
                         <label class="check-row" style="margin-bottom:8px;">
                             <input type="checkbox" id="motivationEnabled">
                             <span style="font-size:14px;">Show motivational quote</span>
                         </label>
                         <div id="motivationOptions">
-                            <label class="field-label">Quotes (one per line; empty = built-in collection)</label>
-                            <textarea id="motivationQuotes" rows="4" maxlength="2000"
+                            <label class="field-label">Quotes (one per line; starts with 50 built-in quotes &mdash; edit or remove any. Clear the box to fall back to the built-in set.)</label>
+                            <textarea id="motivationQuotes" rows="6" maxlength="4000"
                                       placeholder="Stay focused. Every blocked visit is a small win.&#10;Your future self will thank you."
                                       style="resize:vertical;"></textarea>
                         </div>
@@ -2434,6 +2404,7 @@
     </main><!-- /#main-content -->
 </div><!-- /#app -->
 
+<script src="quotes.js"></script>
 <script src="tabs.js"></script>
 <script src="options.js"></script>
 </body>
