@@ -189,12 +189,8 @@ const DEFAULTS = {
     lockdownSource: 'user',
     // Custom blocked page (feature #13). blockedPageEnabled switches the default
     // redirect URL from the user's chosen URL to the built-in blocked.html page.
-    // blockedPageTitle / blockedMessage allow the user to customise the copy shown
-    // on that page. The image is stored separately in chrome.storage.local as a
-    // data URL (too large for sync quota) under the key 'blockedImageDataUrl'.
+    // The page's only configurable content is the motivational quote below.
     blockedPageEnabled: false,
-    blockedPageTitle: '',
-    blockedMessage: '',
     // Motivational quotes on the blocked page (feature #15). When enabled,
     // blocked.js picks a random quote from motivationQuotes (or falls back to
     // built-in quotes when the array is empty) and displays it in the blockquote
