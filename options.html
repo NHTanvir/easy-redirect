@@ -1056,8 +1056,25 @@
 
         /* Blocked page options */
         #blockedPageOptions { display: none; }
-        #motivationOptions  { display: none; }
         #notifyOptions      { display: none; }
+
+        /* Toggle switch */
+        .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; cursor: pointer; }
+        .toggle-switch { position: relative; display: inline-flex; flex: 0 0 auto; }
+        .toggle-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+        .toggle-track {
+            width: 46px; height: 26px; border-radius: 13px;
+            background: var(--border); transition: background .18s ease;
+            display: inline-flex; align-items: center; padding: 3px;
+        }
+        .toggle-thumb {
+            width: 20px; height: 20px; border-radius: 50%;
+            background: #fff; transition: transform .18s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,.4);
+        }
+        .toggle-switch input:checked + .toggle-track { background: var(--accent); }
+        .toggle-switch input:checked + .toggle-track .toggle-thumb { transform: translateX(20px); }
+        .toggle-switch input:focus-visible + .toggle-track { outline: 2px solid var(--accent); outline-offset: 2px; }
 
         /* Pomodoro stop btn */
         #pomodoroStopBtn { display: none; }
@@ -1855,28 +1872,23 @@
 
             <div class="card" id="blockedPageSection">
                 <div class="card-title">Custom Blocked Page</div>
-                <p class="help-text" style="margin-bottom:14px;">
-                    When enabled, blocked sites redirect to a built-in page instead of your configured
-                    redirect URL. Per-rule and per-group redirect overrides still take precedence.
+                <p class="help-text" style="margin-bottom:16px;">
+                    When on, blocked sites show a built-in page with a motivational quote instead of your
+                    configured redirect URL. Per-rule and per-group redirect overrides still take precedence.
                 </p>
-                <label class="check-row" style="margin-bottom:14px;">
-                    <input type="checkbox" id="blockedPageEnabled">
-                    <span style="font-size:14px;">Use built-in blocked page</span>
+                <label class="toggle-row" style="margin-bottom:16px;">
+                    <span style="font-size:14px;font-weight:600;">Use built-in blocked page</span>
+                    <span class="toggle-switch">
+                        <input type="checkbox" id="blockedPageEnabled">
+                        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                    </span>
                 </label>
 
                 <div id="blockedPageOptions">
-                    <div id="motivationSection">
-                        <label class="check-row" style="margin-bottom:8px;">
-                            <input type="checkbox" id="motivationEnabled">
-                            <span style="font-size:14px;">Show motivational quote</span>
-                        </label>
-                        <div id="motivationOptions">
-                            <label class="field-label">Quotes (one per line; starts with 50 built-in quotes &mdash; edit or remove any. Clear the box to fall back to the built-in set.)</label>
-                            <textarea id="motivationQuotes" rows="6" maxlength="4000"
-                                      placeholder="Stay focused. Every blocked visit is a small win.&#10;Your future self will thank you."
-                                      style="resize:vertical;"></textarea>
-                        </div>
-                    </div>
+                    <label class="field-label">Quotes (one per line; starts with 50 built-in quotes &mdash; edit or remove any. Clear the box to fall back to the built-in set.)</label>
+                    <textarea id="motivationQuotes" rows="6" maxlength="4000"
+                              placeholder="Stay focused. Every blocked visit is a small win.&#10;Your future self will thank you."
+                              style="resize:vertical;"></textarea>
 
                     <hr class="divider">
 
