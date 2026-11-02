@@ -562,7 +562,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (notifyEl) {
             notifyEl.checked = result.notifyOnRedirect || false;
             const o = document.getElementById('notifyOptions');
-            if (o) o.style.display = notifyEl.checked ? '' : 'none';
+            if (o) o.style.display = notifyEl.checked ? 'block' : 'none';
         }
         const tEl = document.getElementById('notifyThrottleSecs');
         if (tEl) tEl.value = Math.round((result.notifyThrottleMs ?? 5000) / 1000);
