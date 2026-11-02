@@ -3200,7 +3200,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Redirect notification settings handlers (issue #33).
     document.getElementById('notifyOnRedirect')?.addEventListener('change', e => {
         const o = document.getElementById('notifyOptions');
-        if (o) o.style.display = e.target.checked ? '' : 'none';
+        if (o) o.style.display = e.target.checked ? 'block' : 'none';
     });
     document.getElementById('saveNotifyBtn')?.addEventListener('click', async () => {
         const en = document.getElementById('notifyOnRedirect')?.checked || false;
