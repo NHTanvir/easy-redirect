@@ -1079,7 +1079,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // Feature on, session active.
                 if (startBtn) startBtn.style.display = 'none';
-                if (stopBtn) stopBtn.style.display = '';
+                // 'inline-block' not '': #pomodoroStopBtn has `display: none` in
+                // CSS, so an empty string would leave the Stop button hidden.
+                if (stopBtn) stopBtn.style.display = 'inline-block';
 
                 const isWork = state === 'work';
                 const totalMins = isWork
@@ -1185,7 +1187,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const previewImg = document.getElementById('blockedImagePreviewImg');
             if (localResult.blockedImageDataUrl && previewDiv && previewImg) {
                 previewImg.src = localResult.blockedImageDataUrl;
-                previewDiv.style.display = '';
+                // 'block' not '': an empty string falls back to the stylesheet
+                // rule `#blockedImagePreview { display: none }`, which would keep
+                // the preview — and its "Remove image" button — hidden.
+                previewDiv.style.display = 'block';
             }
         });
     }
@@ -1302,7 +1307,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 chrome.storage.local.set({ blockedImageDataUrl: dataUrl }, () => {
                     const previewDiv = document.getElementById('blockedImagePreview');
                     const previewImg = document.getElementById('blockedImagePreviewImg');
-                    if (previewDiv) previewDiv.style.display = '';
+                    if (previewDiv) previewDiv.style.display = 'block';
                     if (previewImg) previewImg.src = dataUrl;
                     if (blockedPageStatusEl) {
                         blockedPageStatusEl.textContent = 'Image saved locally.';
