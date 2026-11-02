@@ -67,16 +67,45 @@
         windowDisplay.textContent = fmtSecs(windowSecs);
     }
 
-    // Navigate to the original URL the user wanted, optionally recording
-    // the start of the allow window so future visits skip the countdown.
+    // Navigate to the original URL the user wanted, opening the allow window
+    // first when the group grants one.
+    //
+    // The window must be registered by the background worker (not written here
+    // directly): it stores allowedUntil:<ruleId>, schedules the expiry alarm and
+    // — crucially — re-emits the DNR rules so the matching rule stops
+    // redirecting. Writing the key from this page alone left the rule active, so
+    // the navigation below was redirected straight back here.
     function navigateToFrom() {
-        if (allowKey && windowSecs > 0) {
-            const allowUntil = Date.now() + windowSecs * 1000;
-            chrome.storage.local.set({ [allowKey]: allowUntil }, () => {
-                location.replace(fromUrl || toUrl);
-            });
-        } else {
-            location.replace(fromUrl || toUrl);
+        const target = fromUrl || toUrl;
+        if (!(allowKey && windowSecs > 0 && ruleId)) {
+            location.replace(target);
+            return;
+        }
+
+        // Navigate exactly once, and never leave the user stuck on this page if
+        // the service worker is slow to wake or the message fails.
+        let navigated = false;
+        const go = () => {
+            if (navigated) return;
+            navigated = true;
+            location.replace(target);
+        };
+        const bail = setTimeout(go, 2000);
+
+        try {
+            chrome.runtime.sendMessage(
+                { action: 'startAllowWindow', ruleId, seconds: windowSecs },
+                () => {
+                    clearTimeout(bail);
+                    // Touch lastError so Chrome doesn't log "unchecked runtime
+                    // lastError" when the worker went away mid-flight.
+                    void chrome.runtime.lastError;
+                    go();
+                }
+            );
+        } catch (_) {
+            clearTimeout(bail);
+            go();
         }
     }
 
