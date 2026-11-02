@@ -1155,7 +1155,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (blockedPageEnabledCb) {
             blockedPageEnabledCb.checked = result.blockedPageEnabled === true;
             if (blockedPageOptions) {
-                blockedPageOptions.style.display = blockedPageEnabledCb.checked ? '' : 'none';
+                blockedPageOptions.style.display = blockedPageEnabledCb.checked ? 'block' : 'none';
             }
         }
         if (blockedPageTitleEl) blockedPageTitleEl.value = result.blockedPageTitle || '';
