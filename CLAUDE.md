@@ -8,9 +8,10 @@ Easy Redirect is an unpacked Chrome extension (Manifest V3) that redirects user-
 
 ## Loading / running the extension
 
-1. `chrome://extensions` → enable Developer mode → **Load unpacked** → select this directory.
-2. After editing any file, click the reload icon on the extension card.
-3. Service-worker output: click the **service worker** link on the extension card.
+Easy Redirect and Roadmap Coach are **force-installed** by Chrome policy (since 2026-11-26), so they can't be disabled or removed. See "Install (both extensions)" below.
+
+1. After editing any file: `sudo bash ~/.config/focus-extensions/repack.sh`, then `chrome://extensions` → **Update**. **Reload** and **Load unpacked** don't apply any more.
+2. Service-worker output: click the **service worker** link on the extension card.
 
 Options-page changes take effect the next time the options tab is opened or refreshed.
 
@@ -205,11 +206,22 @@ Daily rotation: the first load of a new local day picks a random theme (never ye
 
 ## Install (both extensions)
 
-Load Easy Redirect and Roadmap Coach unpacked: `chrome://extensions` → Developer mode → **Load unpacked** → this folder (and `~/Desktop/roadmap-coach`). After a change, click **Reload** on the extension. Their IDs are fixed by the public `key` in each `manifest.json`: Easy Redirect `mmojifignfdbfkcacbcfbflnkfdcgood`, Roadmap Coach `ndhomdedcmiobobjnaeeiffflebkbiif`. The bridge between them relies on these IDs, so keep the `key`.
+**Current setup: force-installed** (since 2026-11-26). Policy `/etc/opt/chrome/policies/managed/focus-extensions.json` (`ExtensionSettings`, `force_installed`, `chattr +i`) points both IDs at a local update server: systemd `focus-extensions-update.service`, `python3 -m http.server 8099` serving `/opt/focus-extensions/web/{update.xml,*.crx}`. Scripts and signing keys are in `~/.config/focus-extensions/`:
 
-## Force-install: data safety (only if it's ever set up again)
+| Script | Use |
+|--------|-----|
+| `repack.sh` (sudo) | Backs up, packs both from `~/Desktop/*`, bumps the version above the published one, publishes. Then `chrome://extensions` → **Update**. |
+| `restore-backup.sh [dir]` | Chrome closed. Restores Local/Sync Extension Settings + IndexedDB (default: `last-backup`). |
+| `uninstall.sh` (sudo) | Chrome closed. Backs up, removes policy + server. Chrome then deletes both extensions **and their data**. |
+| `force-install.sh` (sudo) | Chrome closed. First-time setup. |
 
-The default is **Load unpacked** + **Reload**, which never removes an extension or its data. Don't set up force-install (`ExtensionInstallForcelist`, packed `.crx`, a local update server) unless the user explicitly asks. If they do, these rules apply. They exist because the last force-install setup made Chrome drop both extensions, **with all their data**, during updates.
+Never **Load unpacked** either extension while force-install is active (same ID → one replaces the other → data deleted). Chrome can't force "Allow in Incognito" or "Allow access to file URLs" (Roadmap Coach needs the latter); those are toggled by hand.
+
+Their IDs are fixed by the public `key` in each `manifest.json`: Easy Redirect `mmojifignfdbfkcacbcfbflnkfdcgood`, Roadmap Coach `ndhomdedcmiobobjnaeeiffflebkbiif`. The bridge between them, and the `.crx` signing keys, rely on these IDs, so keep the `key`.
+
+## Force-install: data safety
+
+These rules apply while force-install is active. They exist because the previous force-install setup made Chrome drop both extensions, **with all their data**, during updates.
 
 **Why data gets lost:** Chrome owns a force-installed copy. It uninstalls the extension, and uninstalling **deletes its stored data**, whenever the extension leaves the policy list, Chrome can't fetch it from the update server, or the force-installed copy and an unpacked copy with the same ID replace each other.
 
@@ -245,7 +257,7 @@ Author identity: the configured git user (`NHTanvir <naymulhasantanvir10@gmail.c
 
 ## Testing
 
-Extension APIs (`chrome.runtime`, `chrome.storage.*`, `chrome.i18n`) are unavailable in `file://` context. Always load via `chrome://extensions` → Load unpacked. `blocked.html` and `countdown.html` render blank content when opened from disk.
+Extension APIs (`chrome.runtime`, `chrome.storage.*`, `chrome.i18n`) are unavailable in `file://` context. Always run them as the installed extension. `blocked.html` and `countdown.html` render blank content when opened from disk.
 
 ### Automated browser testing
 
